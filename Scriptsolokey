@@ -1,0 +1,13 @@
+if game.PlaceId == 16552821455 then --ingame
+    -- Tunggu 1 detik setelah masuk ke game
+    wait(1)
+
+    -- Loadstring pertama
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/scfull"))() 
+    print("Loadstring pertama dijalankan.")
+    
+    print("Game ID cocok, semua loadstring dijalankan.")
+else
+    -- Script ini hanya dijalankan jika game ID tidak cocok
+    print("Game ID tidak cocok, script tidak dijalankan.")
+end
