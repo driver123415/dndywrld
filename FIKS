@@ -1,3 +1,4 @@
+wait(1)
 --print("script run")
 print("Full Script Is Running")
 local function executeScripts(scripts)
