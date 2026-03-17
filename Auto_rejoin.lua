@@ -1,3 +1,4 @@
+-- rejoin when a player enter HERE
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local Workspace = game:GetService("Workspace")
