@@ -11,7 +11,7 @@ local function executeScripts(scripts)
 end
 
 local scripts = {
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey",
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey"
 }
 
