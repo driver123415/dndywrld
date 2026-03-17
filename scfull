@@ -1,5 +1,5 @@
 task.wait(1)
 script_key="HdMnilKWYoxtNudqYzzNOcpungMxxzYY";
 getgenv().autoload = true
-getgenv().configname = "coba1"
+getgenv().configname = "coba2"
 loadstring(game:HttpGet("https://raw.githubusercontent.com/riddance-club/script/refs/heads/main/loader.lua"))()
