@@ -1,0 +1,36 @@
+--Auto Claiming All Monster Trinket Script (Twisted Claim)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local EarnMonsterTrinket = ReplicatedStorage:WaitForChild("EarnMonsterTrinket")
+
+-- claim list
+local monsterList = {
+    "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
+    "GoobMonster", "VeeMonster", "DandyMonster", "ScrapsMonster", 
+    "ShrimpoMonster", "AstroMonster", "BrightneyMonster", "RazzleDazzleMonster", 
+    "ToodlesMonster", "TishaMonster", "TeaganMonster", "ShellyMonster", 
+    "FlutterMonster", "CosmoMonster", "SproutMonster", "FinnMonster", 
+    "GlistenMonster", "GigiMonster", "ConnieMonster", "LooeyMonster", 
+    "BobetteMonster", "CoalMonster", "RudieMonster", "GingerMonster", 
+    "YattaMonster", "BassieMonster", "EggsonMonster", "CocoaMonster", 
+    "FlyteMonster", "BlottMonster", "DyleMonster", "BrushaMonster", 
+    "RabeccaMonster", "SoulvesterMonster", "GourdyMonster", "EclipseMonster", 
+    "SquirmMonster"
+}
+
+for index, monsterName in ipairs(monsterList) do
+    local args = { monsterName }
+    
+    local success, err = pcall(function()
+        EarnMonsterTrinket:InvokeServer(unpack(args))
+    end)
+    
+    if success then
+        print("[" .. index .. "/" .. #monsterList .. "] success claim: " .. monsterName)
+    else
+        warn("Fail claim: " .. monsterName .. " | Error: " .. tostring(err))
+    end
+    
+    task.wait(0.5)
+end
+
+print("Claim is Complete!")
