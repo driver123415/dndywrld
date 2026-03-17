@@ -1,0 +1,38 @@
+--Auto Claiming All Journal Script (Journal Claim)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RemoteFunction = ReplicatedStorage:WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction")
+
+-- Claim List
+local achievementList = {
+    "ID_1_SpeedWalker", "ID_2_LongDistanceRunner", "ID_3_MarathonRunner", 
+    "ID_4_MachineEnthusiast", "ID_5_MachineMaster", "ID_6_THEMachine", 
+    "ID_7_ItemFinder", "ID_8_ItemTracker", "ID_9_ItemHunter", 
+    "ID_10_HissyFit", "ID_11_Sightseer", "ID_12_ClockedIn", 
+    "ID_13_Overtime", "ID_21_GossipBud", "ID_22_GossipTime", 
+    "ID_23_Only90MoreToGo", "ID_24_Only75More", "ID_25_Halfway50More", 
+    "ID_26_TwistedsFearMe", "ID_31_FineDining", "ID_32_StealthMission", 
+    "ID_33_SpeedRunner", "ID_34_CenterOfAttention", "ID_35_MasterOfMany", 
+    "ID_36_WhatADeal", "ID_37_GearedUp", "ID_38_MainCharacter"
+}
+
+for index, achievementID in ipairs(achievementList) do
+    local args = {
+        "AttemptRedeemAchievement",
+        achievementID
+    }
+    
+    local success, err = pcall(function()
+        RemoteFunction:InvokeServer(unpack(args))
+    end)
+    
+    if success then
+        print("[" .. index .. "/" .. #achievementList .. "] success claim: " .. achievementID)
+    else
+        warn("Fail claim: " .. achievementID .. " | Error: " .. tostring(err))
+    end
+   
+    task.wait(0.5)
+end
+
+print("Claim is Complete!")
