@@ -1,0 +1,19 @@
+wait(1)
+--print("script run")
+print("Full Script Is Running")
+local function executeScripts(scripts)
+    for _, script in ipairs(scripts) do
+        local co = coroutine.create(function()
+            loadstring(game:HttpGet(script))()
+        end)
+        coroutine.resume(co)
+    end
+end
+
+local scripts = {
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey2"
+}
+
+executeScripts(scripts)
