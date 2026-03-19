@@ -1,7 +1,7 @@
 -- ==================== Configuration ====================
 local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game
 local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
-local MinPlayer = 3                 -- Minimal jumlah player agar tidak diteleportasi
+local MinPlayer = 2                 -- Minimal jumlah player agar tidak diteleportasi
 -- =======================================================
 
 if game.PlaceId == INGAME_PLACE_ID then
