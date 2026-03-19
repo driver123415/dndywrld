@@ -1,0 +1,55 @@
+-- ==================== Configuration ====================
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game
+local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
+local MinPlayer = 2                 -- Minimal jumlah player agar tidak diteleportasi
+-- =======================================================
+
+if game.PlaceId == INGAME_PLACE_ID then
+    print("In-game detected. Running player check script...")
+    
+    local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    local Workspace = game:GetService("Workspace")
+
+    local player = Players.LocalPlayer
+
+    -- Wait until CurrentRoom appears (up to 30 seconds)
+    local currentRoom = Workspace:WaitForChild("CurrentRoom", 30)
+
+    if not currentRoom then
+        warn("CurrentRoom not found. Script stopped.")
+        return
+    end
+
+    task.wait(2)
+
+    -- Membuat fungsi khusus untuk mengecek dan teleport
+    local function checkPlayerCount()
+        local playerCount = #Players:GetPlayers()
+        
+        if playerCount < MinPlayer then
+            print("Warning: Only " .. playerCount .. " player(s) detected. Minimum is " .. MinPlayer .. ".")
+            print("Teleporting back to Lobby...")
+            TeleportService:Teleport(LOBBY_PLACE_ID, player)
+        else
+            print("Safe! Player count is " .. playerCount .. ". Not teleporting.")
+        end
+    end
+
+    -- 1. Lakukan pengecekan pertama kali saat game baru mulai
+    checkPlayerCount()
+
+    -- 2. Pengecekan otomatis SETIAP KALI ada player yang keluar dari game
+    Players.PlayerRemoving:Connect(function(playerLeaving)
+        print(playerLeaving.Name .. " has left the game. Re-checking player count...")
+        
+        -- Tunggu 0.5 detik agar data server Roblox sempat menghapus player tersebut dari daftar
+        task.wait(0.5) 
+        
+        -- Panggil lagi fungsi pengecekan
+        checkPlayerCount()
+    end)
+
+else
+    print("Not in-game (Place ID mismatch). Script is doing nothing.")
+end
