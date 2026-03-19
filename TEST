@@ -1,1 +1,2 @@
---script loadstring(game:HttpGet("LINK"))()
+--script 
+loadstring(game:HttpGet("LINK"))()
