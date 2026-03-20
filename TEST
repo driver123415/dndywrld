@@ -5,4 +5,4 @@
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2"))()--Cosmo
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck"))()--playercek
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/auto_join_soloV2"))()--playercek
+loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/auto_join_soloV2"))()--join tepe sama
