@@ -14,7 +14,7 @@ if game.PlaceId == targetPlaceId then
             
             -- Menggunakan pcall agar jika link github error/lag, script tidak mati
             local success, err = pcall(function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/auto_join_soloV2.lua"))() 
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/auto_join_soloV2"))() 
             end)
 
             if success then
