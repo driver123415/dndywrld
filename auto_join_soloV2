@@ -1,0 +1,78 @@
+-- ==================== Configuration ====================
+local PORTAL_CFRAME = CFrame.new(-55.29, 23.39, -93.38) -- Koordinat Portal 1
+-- =======================================================
+
+-- ==================== AntiCheat Removal (TOP) ====================
+pcall(function()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local events = ReplicatedStorage:WaitForChild("Events", 5)
+    if events then
+        local antiCheat = events:FindFirstChild("AntiCheatTrigger")
+        if antiCheat then
+            antiCheat:Destroy()
+        end
+    end
+end)
+
+-- ==================== Services ====================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- ==================== State ====================
+local running = true
+
+-- ==================== STOP IF CurrentRoom EXISTS ====================
+if workspace:FindFirstChild("CurrentRoom") then
+    return
+end
+
+-- ==================== Get HumanoidRootPart ====================
+local function getHRP()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
+end
+
+-- ==================== Check leaveButton ====================
+local function leaveButtonExists()
+    local gui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not gui then return false end
+
+    local mainGui = gui:FindFirstChild("MainGui")
+    if not mainGui then return false end
+
+    return mainGui:FindFirstChild("leaveButton") ~= nil
+end
+
+-- ==================== Main Logic ====================
+task.spawn(function()
+    local hrp = getHRP()
+    local gate = workspace
+        :WaitForChild("Elevators")
+        :WaitForChild("Gate")
+        :WaitForChild("Gate")
+
+    while running do
+        -- Stop if CurrentRoom appears
+        if workspace:FindFirstChild("CurrentRoom") then
+            running = false
+            break
+        end
+
+        -- Teleport to elevator (Gate)
+        hrp.CFrame = gate.CFrame
+
+        -- Wait 10 seconds
+        task.wait(10)
+
+        -- If leaveButton appears → teleport to Portal 1 & stop
+        if leaveButtonExists() then
+            print("Successfully joined the queue. Teleporting to Portal 1...")
+            
+            -- Teleport karakter ke koordinat Portal 1
+            hrp.CFrame = PORTAL_CFRAME
+            
+            running = false
+            break
+        end
+    end
+end)
