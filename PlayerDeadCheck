@@ -1,0 +1,53 @@
+-- ==================== Configuration ====================
+local INGAME_PLACE_ID = 16552821455 -- Place ID when inside the game (Run)
+local LOBBY_PLACE_ID = 16116270224  -- Lobby Place ID to escape to
+-- =======================================================
+
+if game.PlaceId == INGAME_PLACE_ID then
+    print("In-game detected. Starting Auto-Teleport on Spectate/Death...")
+
+    local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+
+    -- Function to execute teleportation
+    local function teleportToLobby()
+        print("Spectate mode detected! Teleporting back to Lobby...")
+        TeleportService:Teleport(LOBBY_PLACE_ID, player)
+    end
+
+    -- Function to monitor the Spectator GUI
+    local function setupSpectateDetection(gui)
+        if gui.Name == "SpectatorGui" then
+            -- Wait for SpectateFrame to appear inside SpectatorGui
+            local spectateFrame = gui:WaitForChild("SpectateFrame", 5)
+            
+            if spectateFrame then
+                -- 1. Monitor changes when the menu suddenly appears
+                spectateFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if spectateFrame.Visible == true then
+                        teleportToLobby()
+                    end
+                end)
+                
+                -- 2. Just in case the pop-up is already visible when the script loads
+                if spectateFrame.Visible == true then
+                    teleportToLobby()
+                end
+            end
+        end
+    end
+
+    -- Loop to check existing GUIs currently on the screen
+    for _, child in ipairs(playerGui:GetChildren()) do
+        setupSpectateDetection(child)
+    end
+
+    -- Event listener in case the game removes and spawns a new GUI when the player dies
+    playerGui.ChildAdded:Connect(setupSpectateDetection)
+
+else
+    print("Not in-game (Place ID mismatch). Auto-Teleport to Lobby is disabled.")
+end
