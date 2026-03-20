@@ -1,3 +1,4 @@
+task.wait (2)
 -- ==================== Configuration ====================
 local PORTAL_CFRAME = CFrame.new(-55.29, 23.39, -93.38) -- Koordinat Portal 1
 -- =======================================================
