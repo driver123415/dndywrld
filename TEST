@@ -3,4 +3,6 @@
 --game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(-55.29, 23.39, -93.38) --Portal 1
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/FIKS3"))()--Cosmo
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2"))()--Cosmo
-loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck"))()--playercek
+--loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck"))()--playercek
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/auto_join_soloV2"))()--playercek
