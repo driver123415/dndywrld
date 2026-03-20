@@ -1,0 +1,35 @@
+local targetPlaceId = 16116270224
+local timeoutSeconds = 30 -- Waktu tunggu (detik) sebelum mencoba eksekusi ulang
+
+if game.PlaceId == targetPlaceId then
+    print("Berada di Lobby. Memulai proses auto-join...")
+    
+    -- Menjalankan loop di background agar tidak membuat game freeze
+    task.spawn(function()
+        while game.PlaceId == targetPlaceId do
+            -- Tunggu 3 detik setelah masuk/sebelum eksekusi
+            task.wait(3)
+
+            print("Mengeksekusi loadstring...")
+            
+            -- Menggunakan pcall agar jika link github error/lag, script tidak mati
+            local success, err = pcall(function()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/auto_join_soloV2.lua"))() 
+            end)
+
+            if success then
+                print("Loadstring dijalankan. Menunggu " .. timeoutSeconds .. " detik...")
+            else
+                warn("Gagal mengeksekusi loadstring: " .. tostring(err))
+            end
+            
+            -- Script akan menunggu 30 detik. 
+            -- Jika dalam 30 detik kamu berhasil teleport, game ini akan tertutup otomatis.
+            -- Jika gagal teleport, loop akan kembali ke atas dan menjalankan loadstring lagi.
+            task.wait(timeoutSeconds)
+        end
+    end)
+else
+    -- Script ini hanya dijalankan jika game ID tidak cocok
+    print("Game ID tidak cocok, script tidak dijalankan.")
+end
