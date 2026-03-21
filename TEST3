@@ -1,5 +1,5 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V3 (ANTI-REBUTAN & AUTO ELEVATOR)
+-- CONFIGURATION: AUTO MACHINE FARMER V4 (UNDERGROUND & INSTANT PERFECT)
 -- ==============================================================================
 local Config = {
     
@@ -11,12 +11,14 @@ local Config = {
     -- [2] PENGATURAN TELEPORT & POSISI
     Teleport = {
         Enable = true,          
-        Mode = "Instant",       -- "Tween" atau "Instant"
+        Mode = "Instant",       -- PILIHAN: "Tween" atau "Instant"
         TweenSpeed = 1.25,      
         SafeRadius = 30,        -- Jarak aman dari monster
-        PlayerRadius = 8,       -- Jarak aman dari player lain (mesin dianggap penuh jika ada player di jarak ini)
-        DelayNext = 1.5,        
-        UndergroundOffset = -7  -- Posisi sembunyi di bawah tanah (-7 studs)
+        PlayerRadius = 8,       -- Jarak aman dari player lain (Anti-Rebutan)
+        DelayNext = 1.0,        -- Jeda sebelum pindah mesin
+        
+        -- PENGATURAN SEMBUNYI DI BAWAH TANAH
+        UndergroundOffset = -4.5 -- Posisi pas: Sembunyi di bawah lantai tapi prompt tetap terjangkau
     },
 
     -- [3] PENGATURAN GENERATOR ESP
@@ -42,22 +44,27 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 
 local isFarming = false
 
--- ==================== MEMBUAT PLATFORM PIJAKAN ====================
-local farmPlatform = Instance.new("Part")
-farmPlatform.Name = "FarmPlatform"
-farmPlatform.Size = Vector3.new(10, 1, 10)
-farmPlatform.Anchored = true
-farmPlatform.CanCollide = true
-farmPlatform.Transparency = 1 
-farmPlatform.Material = Enum.Material.SmoothPlastic
-farmPlatform.Parent = nil 
-
 -- ==================== FUNGSI BANTUAN ====================
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
 
--- Deteksi Monster
+local function getModelCenter(model)
+    if not model or not model:IsA("Model") then return nil end
+    local parts = {}
+    for _, part in pairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            table.insert(parts, part)
+        end
+    end
+    if #parts == 0 then return nil end
+    local totalPosition = Vector3.zero
+    for _, part in pairs(parts) do
+        totalPosition = totalPosition + part.Position
+    end
+    return totalPosition / #parts
+end
+
 local function isMonsterNear(generator, radius)
     local map = getMap()
     if map then
@@ -74,19 +81,15 @@ local function isMonsterNear(generator, radius)
     return false
 end
 
--- Deteksi Player Lain (Anti-Rebutan)
 local function isMachineOccupied(generator, radius)
     local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
     if inGamePlayers then
         for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
-            -- Abaikan diri kita sendiri
             if otherPlayer.Name ~= player.Name then
                 local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
                 if otherRoot and generator.PrimaryPart then
                     local distance = (otherRoot.Position - generator.PrimaryPart.Position).Magnitude
-                    if distance <= radius then 
-                        return true -- Ada orang lain yang sedang mengerjakan mesin ini
-                    end
+                    if distance <= radius then return true end
                 end
             end
         end
@@ -185,49 +188,59 @@ local function updateGeneratorESP()
     end
 end
 
--- ==================== FUNGSI INTERAKSI PAKSA (BYPASS PROMPT) ====================
+-- ==================== FUNGSI INTERAKSI PAKSA ====================
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
-            local oldLineOfSight = descendant.RequiresLineOfSight
-            local oldMaxDist = descendant.MaxActivationDistance
-            
+            -- Paksa bypass pengecekan dari server
             descendant.RequiresLineOfSight = false
             descendant.MaxActivationDistance = 50
             
-            descendant:InputHoldBegin()
-            task.wait(0.1)
-            descendant:InputHoldEnd()
+            pcall(function()
+                descendant:InputHoldBegin()
+            end)
             
-            descendant.RequiresLineOfSight = oldLineOfSight
-            descendant.MaxActivationDistance = oldMaxDist
             return true
         end
     end
     return false
 end
 
--- ==================== FUNGSI PERGERAKAN ====================
+-- ==================== FUNGSI MOVEMENT & PLATFORM ====================
+local activePlatform = nil
+
 local function moveToPosition(targetCFrame, usePlatform)
     local originalGravity = Workspace.Gravity
     Workspace.Gravity = 0
     rootPart.AssemblyLinearVelocity = Vector3.zero
     
-    -- Hanya gunakan platform jika kita menuju ke bawah tanah (Generator)
+    -- Bersihkan platform lama jika ada
+    if activePlatform then
+        activePlatform:Destroy()
+        activePlatform = nil
+    end
+    
     if usePlatform then
-        farmPlatform.CFrame = targetCFrame * CFrame.new(0, -3.1, 0)
-        farmPlatform.Parent = Workspace
-    else
-        farmPlatform.Parent = nil
+        -- Membuat platform pijakan berukuran 15x15 seperti script referensi
+        activePlatform = Instance.new("Part")
+        activePlatform.Size = Vector3.new(15, 1, 15)
+        activePlatform.Anchored = true
+        activePlatform.CanCollide = true
+        activePlatform.Transparency = 0.5
+        activePlatform.Color = Color3.fromRGB(0, 255, 0)
+        -- Posisi platform tepat 3.5 stud di bawah dada (telapak kaki)
+        activePlatform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+        activePlatform.Parent = Workspace
     end
     
     if Config.Teleport.Mode == "Instant" then
         rootPart.CFrame = targetCFrame
-        task.wait(0.2) 
+        task.wait(0.1) 
     else
         local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
         local distance = (rootPart.Position - targetCFrame.Position).Magnitude
         local duration = distance / (speed * Config.Teleport.TweenSpeed)
+        if duration <= 0 then duration = 0.1 end
         
         local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
         local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
@@ -238,22 +251,31 @@ local function moveToPosition(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
--- Fungsi ke Elevator
+-- ==================== FUNGSI TELEPORT KE LIFT ====================
 local function teleportToElevator()
     local map = getMap()
     if map then
-        local elevator = map:FindFirstChild("Elevator")
-        if elevator and elevator.PrimaryPart then
-            print("[INFO] Semua Generator Selesai! Menuju Elevator...")
-            -- Bergerak ke tengah-tengah lift (tidak perlu platform bawah tanah)
-            moveToPosition(elevator.PrimaryPart.CFrame * CFrame.new(0, 2, 0), false)
+        print("[INFO] Semua Generator Selesai! Mencari Elevator...")
+        local freeArea = map:FindFirstChild("FreeArea")
+        if freeArea then
+            local elevator = freeArea:FindFirstChild("Elevator") or freeArea:FindFirstChild("FakeElevator")
+            if elevator and elevator:IsA("Model") then
+                print("[SUCCESS] Elevator ditemukan! Meluncur ke lantai berikutnya...")
+                local centerPos = getModelCenter(elevator)
+                if centerPos then
+                    -- Teleport ke tengah-tengah lift (atas tanah) tanpa platform
+                    moveToPosition(CFrame.new(centerPos + Vector3.new(0, 4, 0)), false)
+                end
+            end
         else
-            -- Cari model yang namanya mengandung "Elevator" jika namanya agak beda
+            -- Pencarian darurat di root map
             for _, child in ipairs(map:GetChildren()) do
-                if child:IsA("Model") and string.find(child.Name:lower(), "elevator") and child.PrimaryPart then
-                    print("[INFO] Semua Generator Selesai! Menuju Elevator...")
-                    moveToPosition(child.PrimaryPart.CFrame * CFrame.new(0, 2, 0), false)
-                    break
+                if child:IsA("Model") and string.find(child.Name:lower(), "elevator") then
+                    local centerPos = getModelCenter(child)
+                    if centerPos then
+                        moveToPosition(CFrame.new(centerPos + Vector3.new(0, 4, 0)), false)
+                        break
+                    end
                 end
             end
         end
@@ -285,7 +307,6 @@ local function startAutoFarming()
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
                                         
-                                        -- Syarat mesin layak dikerjakan: Tidak dirasuki, aman dari monster, kosong dari player lain
                                         if not connie and not targetGen then
                                             if not isMonsterNear(gen, Config.Teleport.SafeRadius) then
                                                 if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
@@ -300,11 +321,10 @@ local function startAutoFarming()
                         
                         -- 2. Ambil Keputusan
                         if uncompletedCount == 0 then
-                            -- Kasus A: Map sudah bersih (0 mesin tersisa)
+                            -- Kasus A: Map bersih (0 mesin tersisa)
                             teleportToElevator()
+                            task.wait(5) -- Tunggu loading floor selanjutnya
                             
-                            -- Jeda agak lama karena kita menunggu transisi lantai berikutnya
-                            task.wait(5) 
                         elseif targetGen then
                             -- Kasus B: Mesin aman ditemukan, sikat!
                             print("[FARMER] Menuju Generator: " .. targetGen.Name)
@@ -312,6 +332,7 @@ local function startAutoFarming()
                             local targetCFrame = genCF * CFrame.new(0, Config.Teleport.UndergroundOffset, 0)
                             
                             moveToPosition(targetCFrame, true)
+                            task.wait(0.1)
                             
                             -- Loop kerja mesin
                             while isFarming and targetGen.Parent do
@@ -321,29 +342,30 @@ local function startAutoFarming()
                                     break 
                                 end
                                 
-                                -- Jika tiba-tiba ada player lain datang mendekat, kita ngalah dan pergi
                                 if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                     print("[WARNING] Ada player lain mendekat! Pindah cari mesin lain...")
                                     break
                                 end
                                 
-                                -- Jaga-jaga pastikan karakter tetap nempel di target
-                                if (rootPart.Position - targetCFrame.Position).Magnitude > 3 then
-                                    rootPart.CFrame = targetCFrame
-                                end
+                                -- Paksa nempel di koordinat bawah tanah agar tidak digeser game
+                                rootPart.CFrame = targetCFrame
                                 
+                                -- Tembak fungsi Extract Ichor
                                 local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
                                 if not isDecoding then
                                     forceTriggerGenerator(targetGen)
                                 end
                                 
-                                task.wait(0.5)
+                                task.wait(0.2)
+                            end
+                            
+                            -- Hapus platform setelah mesin kelar/ditinggal
+                            if activePlatform then
+                                activePlatform:Destroy()
+                                activePlatform = nil
                             end
                             
                             task.wait(Config.Teleport.DelayNext)
-                        else
-                            -- Kasus C: Ada mesin sisa, tapi dijaga monster atau dipakai orang (Waiting Mode)
-                            -- Tidak berbuat apa-apa, tunggu sampai situasi aman
                         end
                     end
                 end
@@ -363,7 +385,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V3 BERHASIL DIJALANKAN")
+print(" AUTO MACHINE FARMER V4 BERHASIL DIJALANKAN")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
