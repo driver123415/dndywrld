@@ -417,7 +417,7 @@ end
 -- ==================== INISIALISASI ====================
 print("==================================================")
 print(" AUTO MACHINE FARMER V9 (KAPAL SELAM + KILL SWITCH)")
-print(" Tekan 'K' kapan saja untuk mematikan script!")
+print(" asah!")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
