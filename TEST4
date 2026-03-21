@@ -1,23 +1,17 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN masuk tengah generator)
+-- CONFIGURATION: AUTO MACHINE FARMER V10 (DRAGGABLE GUI & AUTO DETECT SAFETY)
 -- ==============================================================================
 local Config = {
-    
-    Skillcheck = { Enable = true },
-
+    Skillcheck = { Enable = false }, 
     Teleport = {
         Enable = true,          
-        Mode = "Instant",       -- PILIHAN: "Tween" atau "Instant"
+        Mode = "Instant",       
         TweenSpeed = 1.25,      
         SafeRadius = 30,        
         PlayerRadius = 8,       
         DelayNext = 1.0,        
-        
-        -- KEDALAMAN: Dinaikkan menjadi -5.5 (Ubah angka ini jika masih kurang pas)
-        -- Semakin mendekati angka 0, posisi kamu akan semakin ke atas
-        UndergroundOffset = 20
+        UndergroundOffset = 11.5
     },
-
     ESP = {
         Enable = true,          
         NormalColor = Color3.fromRGB(150, 150, 150),   
@@ -33,15 +27,16 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
+local playerGui = player:WaitForChild("PlayerGui")
 
 local isFarming = false
-local activePlatform = nil
 
--- ==================== FUNGSI BANTUAN ====================
+-- ==================== FUNGSI BANTUAN DASAR ====================
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
@@ -60,6 +55,10 @@ local function getModelCenter(model)
         totalPosition = totalPosition + part.Position
     end
     return totalPosition / #parts
+end
+
+local function howfar(plrObj, cframe)
+    return (plrObj.Character.HumanoidRootPart.Position - cframe.Position).Magnitude
 end
 
 local function isMonsterNear(generator, radius)
@@ -94,11 +93,132 @@ local function isMachineOccupied(generator, radius)
     return false
 end
 
--- ==================== FUNGSI AUTO SKILLCHECK (V2 BYPASS) ====================
+-- ==================== FUNGSI AUTO DETECT (SAFETY DARI REFERENSI) ====================
+local function forceStop()
+    local decoding = character:FindFirstChild("Decoding") and character.Decoding.Value
+    if decoding ~= nil then
+        pcall(function()
+            decoding.Stats.StopInteracting:FireServer("Stop")
+        end)
+    end
+    -- Pastikan path UI ini sesuai dengan game kamu
+    pcall(function()
+        return not playerGui.ScreenGui.Menu.StopGenerator.Visible
+    end)
+    return true
+end
+
+local function getFakeElevatorPosition()
+    local map = getMap()
+    if map then
+        local freeArea = map:FindFirstChild("FreeArea")
+        if freeArea then
+            local fakeElevator = freeArea:FindFirstChild("FakeElevator")
+            if fakeElevator and fakeElevator:IsA("Model") then
+                return getModelCenter(fakeElevator)
+            end
+        end
+    end
+    return nil
+end
+
+local function clientinvalidposdetect(playerposition)
+    if not playerposition or typeof(playerposition) ~= "Vector3" then
+        return false
+    end
+    if playerposition.Magnitude > 2000 then
+        print("[SAFETY] Posisi Magnitudo > 2000 (Terlalu Jauh)")
+        return false
+    end
+    -- Normal Y adalah sekitar 100, jika kurang dari 80 akan memicu teleport
+    if playerposition.Y < 80 then
+        print("[SAFETY] Jatuh dari map. Posisi Y:", playerposition.Y)
+        return false
+    end
+    if playerposition.X ~= playerposition.X or (playerposition.Y ~= playerposition.Y or playerposition.Z ~= playerposition.Z) then
+        return false -- Deteksi NaN
+    end
+    local v8 = playerposition.X
+    if math.abs(v8) ~= (1 / 0) then
+        local v9 = playerposition.Y
+        if math.abs(v9) ~= (1 / 0) then
+            local v10 = playerposition.Z
+            if math.abs(v10) ~= (1 / 0) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function teleportplr(cf)
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    character:PivotTo(cf)
+    Workspace.Gravity = originalGravity
+end
+
+local function getSproutTantacleCFrames()
+    local cframes = {}
+    local currentMap = getMap()
+    if not currentMap then return cframes end
+
+    local freeArea = currentMap:FindFirstChild("FreeArea")
+    if not freeArea then return cframes end
+
+    for _, sproutTantacle in ipairs(freeArea:GetChildren()) do
+        if sproutTantacle.Name == "SproutTendril" and sproutTantacle:IsA("Model") then
+            table.insert(cframes, sproutTantacle:GetPivot())
+        end
+    end
+    return cframes
+end
+
+-- Menjalankan Loop Deteksi Keamanan
+task.spawn(function()
+    print("[INFO] Memulai Sistem Keamanan Latar Belakang...")
+    while true do
+        if getMap() and character and rootPart then
+            local monstersFolder = getMap():FindFirstChild("Monsters")
+            local playerposition = rootPart.Position
+            local fakeElevatorPosition = getFakeElevatorPosition()
+            
+            -- 1. Deteksi jika ketahuan monster dan targetnya adalah localplayer
+            if monstersFolder then
+                for _, monster in pairs(monstersFolder:GetChildren()) do
+                    if monster:FindFirstChild("ChasingValue") and monster.ChasingValue.Value == character then
+                        forceStop()
+                    end
+                end
+            end
+            
+            -- 2. Deteksi jika player jatuh / keluar map
+            if not clientinvalidposdetect(playerposition) then
+                if fakeElevatorPosition then
+                    teleportplr(CFrame.new(fakeElevatorPosition))
+                end
+            end
+            
+            -- 3. Deteksi jarak dengan Sprout Tendril
+            for _, sproutTantacleCFrame in ipairs(getSproutTantacleCFrames()) do
+                local sproutDistance = howfar(player, sproutTantacleCFrame)
+                if sproutDistance <= 5 then
+                    if fakeElevatorPosition then
+                        teleportplr(CFrame.new(fakeElevatorPosition))
+                    end
+                    break
+                end
+            end
+        end
+        task.wait(1/15)
+    end
+end)
+
+-- ==================== FUNGSI AUTO SKILLCHECK ====================
 local function setupAutoSkillcheck()
     if not Config.Skillcheck.Enable then return end
     task.spawn(function()
-        print("[INFO] Memulai Auto Skillcheck Bypass (V2)...")
         while Config.Skillcheck.Enable do
             pcall(function()
                 local events = ReplicatedStorage:FindFirstChild("Events")
@@ -189,44 +309,23 @@ end
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
-            local oldLineOfSight = descendant.RequiresLineOfSight
-            local oldMaxDist = descendant.MaxActivationDistance
-            
             descendant.RequiresLineOfSight = false
             descendant.MaxActivationDistance = 100 
-            
             pcall(function()
                 descendant:InputHoldBegin()
             end)
-            
             return true
         end
     end
     return false
 end
 
--- ==================== FUNGSI MOVEMENT & PLATFORM ====================
+-- ==================== FUNGSI MOVEMENT ====================
 local function moveToPosition(targetCFrame, usePlatform)
     local originalGravity = Workspace.Gravity
     Workspace.Gravity = 0
     rootPart.AssemblyLinearVelocity = Vector3.zero
     rootPart.Anchored = false
-    
-    if activePlatform then
-        activePlatform:Destroy()
-        activePlatform = nil
-    end
-    
-    if usePlatform then
-        activePlatform = Instance.new("Part")
-        activePlatform.Size = Vector3.new(15, 1, 15)
-        activePlatform.Anchored = true
-        activePlatform.CanCollide = true
-        activePlatform.Transparency = 0.5
-        activePlatform.Color = Color3.fromRGB(0, 255, 0)
-        activePlatform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
-        activePlatform.Parent = Workspace
-    end
     
     if Config.Teleport.Mode == "Instant" then
         rootPart.CFrame = targetCFrame
@@ -262,7 +361,7 @@ local function teleportToRealElevator()
         if freeArea then
             for _, child in ipairs(freeArea:GetChildren()) do
                 if child:IsA("Model") and child.Name == "Elevator" and child.PrimaryPart then
-                    print("[SUCCESS] Real Elevator ditemukan! Meluncur...")
+                    print("[SUCCESS] Meluncur ke Elevator...")
                     local targetCFrame = child.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
                     moveToPosition(targetCFrame, false)
                     return true
@@ -277,15 +376,12 @@ local function teleportToRealElevator()
                 return true
             end
         end
-        print("[WARNING] Elevator tidak ditemukan.")
     end
     return false
 end
 
 -- ==================== FUNGSI UTAMA FARMING ====================
 local function startAutoFarming()
-    isFarming = true
-    
     task.spawn(function()
         while isFarming do
             if Config.Teleport.Enable then
@@ -322,8 +418,6 @@ local function startAutoFarming()
                             task.wait(5)
                             
                         elseif targetGen then
-                            print("[FARMER] Menuju Generator: " .. targetGen.Name)
-                            
                             local centerPos = getModelCenter(targetGen)
                             if centerPos and targetGen.PrimaryPart then
                                 local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
@@ -334,12 +428,10 @@ local function startAutoFarming()
                                 while isFarming and targetGen.Parent do
                                     local stats = targetGen:FindFirstChild("Stats")
                                     if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
-                                        print("[FARMER] Generator Selesai!")
                                         break 
                                     end
                                     
                                     if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                        print("[WARNING] Ada player lain mendekat! Pindah cari mesin lain...")
                                         break
                                     end
                                     
@@ -354,11 +446,6 @@ local function startAutoFarming()
                                 end
                                 
                                 rootPart.Anchored = false
-                                if activePlatform then
-                                    activePlatform:Destroy()
-                                    activePlatform = nil
-                                end
-                                
                                 task.wait(Config.Teleport.DelayNext)
                             end
                         end
@@ -377,9 +464,44 @@ local function startAutoFarming()
     end)
 end
 
--- ==================== INISIALISASI ====================
+-- ==================== UI TOGGLE DRAGGABLE SETUP ====================
+local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FarmToggleUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = guiContainer
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 150, 0, 40)
+toggleBtn.Position = UDim2.new(0.5, -75, 0, 20)
+toggleBtn.Text = "START FARMING"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 20
+toggleBtn.Active = true -- Memungkinkan interaksi geser
+toggleBtn.Draggable = true -- Membuat UI bisa digeser dengan bebas
+toggleBtn.Parent = screenGui
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if isFarming then
+        isFarming = false
+        Config.Skillcheck.Enable = false
+        rootPart.Anchored = false
+        toggleBtn.Text = "START FARMING"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    else
+        isFarming = true
+        Config.Skillcheck.Enable = true
+        toggleBtn.Text = "STOP FARMING"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        setupAutoSkillcheck()
+        startAutoFarming()
+    end
+end)
+
 print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN Ahayyyyyyy")
+print(" AUTO MACHINE FARMER V10 (SAFETY SYSTEM & DRAGGABLE)")
+print(" Loop deteksi bahaya aktif, tombol bisa digeser")
 print("==================================================")
-setupAutoSkillcheck()
-startAutoFarming()
