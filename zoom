@@ -1,5 +1,5 @@
 -- ==================== Configuration ====================
-local ZOOM_DISTANCE = 50 -- Set your desired zoom out distance here (Default Roblox max is usually 128)
+local ZOOM_DISTANCE = 200 -- Set your desired zoom out distance here (Default Roblox max is usually 128)
 local LOCK_ZOOM = false  -- Set to 'true' if you want to lock the camera at this distance. Set to 'false' if you still want to be able to scroll in/out.
 -- =======================================================
 
