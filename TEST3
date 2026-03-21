@@ -1,5 +1,5 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V4 (UNDERGROUND & INSTANT PERFECT)
+-- CONFIGURATION: AUTO MACHINE FARMER V5 (ABSOLUTE CENTER & DEEP UNDERGROUND)
 -- ==============================================================================
 local Config = {
     
@@ -15,10 +15,11 @@ local Config = {
         TweenSpeed = 1.25,      
         SafeRadius = 30,        -- Jarak aman dari monster
         PlayerRadius = 8,       -- Jarak aman dari player lain (Anti-Rebutan)
-        DelayNext = 1.0,        -- Jeda sebelum pindah mesin
+        DelayNext = 1.0,        
         
         -- PENGATURAN SEMBUNYI DI BAWAH TANAH
-        UndergroundOffset = -4.5 -- Posisi pas: Sembunyi di bawah lantai tapi prompt tetap terjangkau
+        -- Diperdalam menjadi -8 agar kepala tidak menyangkut di lantai tebal
+        UndergroundOffset = -8 
     },
 
     -- [3] PENGATURAN GENERATOR ESP
@@ -43,12 +44,14 @@ local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
 local isFarming = false
+local activePlatform = nil
 
 -- ==================== FUNGSI BANTUAN ====================
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
 
+-- Mencari Titik Tengah Absolut dari seluruh part di dalam Generator
 local function getModelCenter(model)
     if not model or not model:IsA("Model") then return nil end
     local parts = {}
@@ -192,9 +195,11 @@ end
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
-            -- Paksa bypass pengecekan dari server
+            local oldLineOfSight = descendant.RequiresLineOfSight
+            local oldMaxDist = descendant.MaxActivationDistance
+            
             descendant.RequiresLineOfSight = false
-            descendant.MaxActivationDistance = 50
+            descendant.MaxActivationDistance = 100 -- Jarak dimaksimalkan karena kita turun ke -8
             
             pcall(function()
                 descendant:InputHoldBegin()
@@ -207,28 +212,23 @@ local function forceTriggerGenerator(generator)
 end
 
 -- ==================== FUNGSI MOVEMENT & PLATFORM ====================
-local activePlatform = nil
-
 local function moveToPosition(targetCFrame, usePlatform)
     local originalGravity = Workspace.Gravity
     Workspace.Gravity = 0
     rootPart.AssemblyLinearVelocity = Vector3.zero
     
-    -- Bersihkan platform lama jika ada
     if activePlatform then
         activePlatform:Destroy()
         activePlatform = nil
     end
     
     if usePlatform then
-        -- Membuat platform pijakan berukuran 15x15 seperti script referensi
         activePlatform = Instance.new("Part")
         activePlatform.Size = Vector3.new(15, 1, 15)
         activePlatform.Anchored = true
         activePlatform.CanCollide = true
         activePlatform.Transparency = 0.5
         activePlatform.Color = Color3.fromRGB(0, 255, 0)
-        -- Posisi platform tepat 3.5 stud di bawah dada (telapak kaki)
         activePlatform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
         activePlatform.Parent = Workspace
     end
@@ -263,12 +263,10 @@ local function teleportToElevator()
                 print("[SUCCESS] Elevator ditemukan! Meluncur ke lantai berikutnya...")
                 local centerPos = getModelCenter(elevator)
                 if centerPos then
-                    -- Teleport ke tengah-tengah lift (atas tanah) tanpa platform
                     moveToPosition(CFrame.new(centerPos + Vector3.new(0, 4, 0)), false)
                 end
             end
         else
-            -- Pencarian darurat di root map
             for _, child in ipairs(map:GetChildren()) do
                 if child:IsA("Model") and string.find(child.Name:lower(), "elevator") then
                     local centerPos = getModelCenter(child)
@@ -306,7 +304,6 @@ local function startAutoFarming()
                                     
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
-                                        
                                         if not connie and not targetGen then
                                             if not isMonsterNear(gen, Config.Teleport.SafeRadius) then
                                                 if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
@@ -321,51 +318,53 @@ local function startAutoFarming()
                         
                         -- 2. Ambil Keputusan
                         if uncompletedCount == 0 then
-                            -- Kasus A: Map bersih (0 mesin tersisa)
                             teleportToElevator()
-                            task.wait(5) -- Tunggu loading floor selanjutnya
+                            task.wait(5)
                             
                         elseif targetGen then
-                            -- Kasus B: Mesin aman ditemukan, sikat!
                             print("[FARMER] Menuju Generator: " .. targetGen.Name)
-                            local genCF = targetGen.PrimaryPart.CFrame
-                            local targetCFrame = genCF * CFrame.new(0, Config.Teleport.UndergroundOffset, 0)
                             
-                            moveToPosition(targetCFrame, true)
-                            task.wait(0.1)
-                            
-                            -- Loop kerja mesin
-                            while isFarming and targetGen.Parent do
-                                local stats = targetGen:FindFirstChild("Stats")
-                                if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
-                                    print("[FARMER] Generator Selesai!")
-                                    break 
+                            -- MENGGUNAKAN ABSOLUTE CENTER (Tengah mesin, bukan ujung PrimaryPart)
+                            local centerPos = getModelCenter(targetGen)
+                            if centerPos then
+                                -- Tarik garis lurus murni ke bawah (Sumbu Y dikurangi) tanpa efek rotasi
+                                local targetCFrame = CFrame.new(centerPos.X, centerPos.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
+                                
+                                moveToPosition(targetCFrame, true)
+                                task.wait(0.1)
+                                
+                                -- Loop kerja mesin
+                                while isFarming and targetGen.Parent do
+                                    local stats = targetGen:FindFirstChild("Stats")
+                                    if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
+                                        print("[FARMER] Generator Selesai!")
+                                        break 
+                                    end
+                                    
+                                    if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                        print("[WARNING] Ada player lain mendekat! Pindah cari mesin lain...")
+                                        break
+                                    end
+                                    
+                                    -- PAKSA posisi karakter diam di tempat (mencegah terpental physics)
+                                    rootPart.CFrame = targetCFrame
+                                    rootPart.AssemblyLinearVelocity = Vector3.zero
+                                    
+                                    local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
+                                    if not isDecoding then
+                                        forceTriggerGenerator(targetGen)
+                                    end
+                                    
+                                    task.wait(0.1)
                                 end
                                 
-                                if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                    print("[WARNING] Ada player lain mendekat! Pindah cari mesin lain...")
-                                    break
+                                if activePlatform then
+                                    activePlatform:Destroy()
+                                    activePlatform = nil
                                 end
                                 
-                                -- Paksa nempel di koordinat bawah tanah agar tidak digeser game
-                                rootPart.CFrame = targetCFrame
-                                
-                                -- Tembak fungsi Extract Ichor
-                                local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
-                                if not isDecoding then
-                                    forceTriggerGenerator(targetGen)
-                                end
-                                
-                                task.wait(0.2)
+                                task.wait(Config.Teleport.DelayNext)
                             end
-                            
-                            -- Hapus platform setelah mesin kelar/ditinggal
-                            if activePlatform then
-                                activePlatform:Destroy()
-                                activePlatform = nil
-                            end
-                            
-                            task.wait(Config.Teleport.DelayNext)
                         end
                     end
                 end
@@ -385,7 +384,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V4 BERHASIL DIJALANKAN")
+print(" AUTO MACHINE FARMER V5 BERHASIL DIJALANKAN")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
