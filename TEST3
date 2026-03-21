@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN uhuyvehveh)
--- + DYNAMIC ELEVATION / KAPAL SELAM
+-- + DYNAMIC ELEVATION + KILL SWITCH (TOMBOL 'K')
 -- ==============================================================================
 local Config = {
     
@@ -8,15 +8,15 @@ local Config = {
 
     Teleport = {
         Enable = true,          
-        Mode = "Instant",       -- PILIHAN: "Tween" atau "Instant"
+        Mode = "Instant",       
         TweenSpeed = 1.25,      
         SafeRadius = 30,        
         PlayerRadius = 8,       
         DelayNext = 1.0,        
         
-        -- DYNAMIC ELEVATION (Ide Gilamu!)
-        OffsetHidden = -5,      -- Kedalaman saat datang/sembunyi agar 100% aman
-        OffsetFarming = 1.0     -- Kedalaman otomatis saat mode Skillcheck menyala
+        -- DYNAMIC ELEVATION 
+        OffsetHidden = -5,      -- Kedalaman saat datang/sembunyi
+        OffsetFarming = 1.0     -- Kedalaman saat mode Skillcheck menyala
     },
 
     ESP = {
@@ -26,21 +26,61 @@ local Config = {
         PossessedColor = Color3.fromRGB(0, 255, 255)   
     }
 }
--- ==============================================================================
--- END OF CONFIGURATION
+
+-- ==================== KILL SWITCH AWAL (ANTI-TUMPUK) ====================
+if _G.StopAutoFarmer then
+    _G.StopAutoFarmer()
+    task.wait(0.5) -- Beri waktu loop yang lama untuk mati sebelum memulai yang baru
+end
 -- ==============================================================================
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-local isFarming = false
+local isFarming = true
 local activePlatform = nil
+
+-- ==================== FUNGSI CLEANUP (KILL SWITCH) ====================
+_G.StopAutoFarmer = function()
+    isFarming = false
+    Config.Skillcheck.Enable = false
+    
+    if activePlatform then
+        activePlatform:Destroy()
+        activePlatform = nil
+    end
+    
+    if rootPart then
+        rootPart.Anchored = false
+    end
+    
+    -- Bersihkan semua ESP yang menempel di mesin
+    local map = Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+    if map and map:FindFirstChild("Generators") then
+        for _, gen in pairs(map.Generators:GetChildren()) do
+            if gen:FindFirstChild("GenESP") then gen.GenESP:Destroy() end
+            if gen:FindFirstChild("GenText") then gen.GenText:Destroy() end
+        end
+    end
+    
+    print("[KILL SWITCH] Script berhasil dimatikan dan dibersihkan!")
+end
+
+-- Deteksi Tombol 'K' untuk mematikan paksa
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.K then
+        if isFarming then
+            _G.StopAutoFarmer()
+        end
+    end
+end)
 
 -- ==================== FUNGSI BANTUAN ====================
 local function getMap()
@@ -51,15 +91,11 @@ local function getModelCenter(model)
     if not model or not model:IsA("Model") then return nil end
     local parts = {}
     for _, part in pairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            table.insert(parts, part)
-        end
+        if part:IsA("BasePart") then table.insert(parts, part) end
     end
     if #parts == 0 then return nil end
     local totalPosition = Vector3.zero
-    for _, part in pairs(parts) do
-        totalPosition = totalPosition + part.Position
-    end
+    for _, part in pairs(parts) do totalPosition = totalPosition + part.Position end
     return totalPosition / #parts
 end
 
@@ -100,7 +136,7 @@ local function setupAutoSkillcheck()
     if not Config.Skillcheck.Enable then return end
     task.spawn(function()
         print("[INFO] Memulai Auto Skillcheck Bypass (V2)...")
-        while Config.Skillcheck.Enable do
+        while isFarming and Config.Skillcheck.Enable do
             pcall(function()
                 local events = ReplicatedStorage:FindFirstChild("Events")
                 if events then
@@ -190,16 +226,12 @@ end
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
-            local oldLineOfSight = descendant.RequiresLineOfSight
-            local oldMaxDist = descendant.MaxActivationDistance
-            
             descendant.RequiresLineOfSight = false
             descendant.MaxActivationDistance = 100 
             
             pcall(function()
                 descendant:InputHoldBegin()
             end)
-            
             return true
         end
     end
@@ -244,11 +276,6 @@ local function moveToPosition(targetCFrame, usePlatform)
         tween.Completed:Wait()
     end
     
-    if usePlatform then
-        rootPart.CFrame = targetCFrame
-        rootPart.Anchored = true 
-    end
-    
     Workspace.Gravity = originalGravity
 end
 
@@ -285,8 +312,6 @@ end
 
 -- ==================== FUNGSI UTAMA FARMING ====================
 local function startAutoFarming()
-    isFarming = true
-    
     task.spawn(function()
         while isFarming do
             if Config.Teleport.Enable then
@@ -327,11 +352,9 @@ local function startAutoFarming()
                             
                             local centerPos = getModelCenter(targetGen)
                             if centerPos and targetGen.PrimaryPart then
-                                -- Bikin dua koordinat: Satu sembunyi, Satu kerja
                                 local hiddenCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.OffsetHidden, centerPos.Z)
                                 local farmingCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.OffsetFarming, centerPos.Z)
                                 
-                                -- Datang ke lokasi dengan mode Sembunyi (-5)
                                 moveToPosition(hiddenCFrame, true)
                                 task.wait(0.1)
                                 
@@ -350,18 +373,17 @@ local function startAutoFarming()
                                     local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
                                     
                                     if isDecoding then
-                                        -- NAIK KE ATAS (FARMING MODE)
                                         rootPart.CFrame = farmingCFrame
                                         if activePlatform then
                                             activePlatform.CFrame = farmingCFrame * CFrame.new(0, -3.5, 0)
                                         end
+                                        rootPart.Anchored = true
                                     else
-                                        -- TURUN KE BAWAH (SEMBUNYI & TEMBAK PROMPT)
                                         rootPart.CFrame = hiddenCFrame
                                         if activePlatform then
                                             activePlatform.CFrame = hiddenCFrame * CFrame.new(0, -3.5, 0)
                                         end
-                                        
+                                        rootPart.Anchored = true
                                         forceTriggerGenerator(targetGen)
                                     end
                                     
@@ -394,7 +416,8 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN brahbrah1")
+print(" AUTO MACHINE FARMER V9 (KAPAL SELAM + KILL SWITCH)")
+print(" Tekan 'K' kapan saja untuk mematikan script!")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
