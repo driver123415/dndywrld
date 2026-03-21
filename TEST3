@@ -1,1 +1,295 @@
+-- ==============================================================================
+-- CONFIGURATION: AUTO MACHINE FARMER (GENERATOR)
+-- ==============================================================================
+local Config = {
+    
+    -- [1] PENGATURAN AUTO SKILLCHECK
+    Skillcheck = {
+        Enable = true,          -- Otomatis menyelesaikan skillcheck dengan Perfect (Mode V2/Bypass Remote)
+    },
 
+    -- [2] PENGATURAN AUTO TELEPORT & AURA
+    Teleport = {
+        Enable = true,          -- Otomatis berpindah ke generator selanjutnya setelah selesai
+        TweenSpeed = 1.25,      -- Kecepatan meluncur (1.25 adalah batas aman anticheat)
+        SafeRadius = 30,        -- Jarak aman (Script tidak akan teleport ke mesin jika ada monster di radius ini)
+        DelayNext = 1.5         -- Jeda waktu sebelum terbang ke mesin berikutnya (dalam detik)
+    },
+    
+    Aura = {
+        Enable = true,          -- Otomatis menekan tombol interaksi mesin tanpa harus ditekan manual
+        Range = 25              -- Jarak jangkauan aura tanganmu
+    },
+
+    -- [3] PENGATURAN GENERATOR ESP
+    ESP = {
+        Enable = true,          -- Menampilkan mesin tembus dinding
+        NormalColor = Color3.fromRGB(150, 150, 150),   -- Warna abu-abu untuk mesin biasa
+        CompletedColor = Color3.fromRGB(255, 0, 255),  -- Warna ungu/pink untuk mesin yang sudah selesai
+        PossessedColor = Color3.fromRGB(0, 255, 255)   -- Warna cyan/biru muda untuk mesin yang dirasuki (Hati-hati!)
+    }
+}
+-- ==============================================================================
+-- END OF CONFIGURATION (JANGAN UBAH KODE DI BAWAH KECUALI PAHAM)
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local isFarming = false
+local currentTween = nil
+
+-- ==================== FUNGSI BANTUAN ====================
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
+
+local function isMonsterNear(generator, radius)
+    local map = getMap()
+    if map then
+        local monstersFolder = map:FindFirstChild("Monsters")
+        if monstersFolder then
+            for _, monster in pairs(monstersFolder:GetChildren()) do
+                if monster:IsA("Model") and monster.PrimaryPart then
+                    local distance = (monster.PrimaryPart.Position - generator.PrimaryPart.Position).Magnitude
+                    if distance <= radius then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- ==================== FUNGSI AUTO SKILLCHECK (V2 BYPASS) ====================
+local function setupAutoSkillcheck()
+    if not Config.Skillcheck.Enable then return end
+    
+    task.spawn(function()
+        print("[INFO] Memulai Auto Skillcheck Bypass (V2)...")
+        while Config.Skillcheck.Enable do
+            pcall(function()
+                local events = ReplicatedStorage:FindFirstChild("Events")
+                if events then
+                    local su = events:FindFirstChild("SkillcheckUpdate")
+                    if su then
+                        -- Memanipulasi balasan server agar selalu dianggap sukses
+                        su.OnClientInvoke = function() 
+                            return true 
+                        end
+                    end
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
+-- ==================== FUNGSI GENERATOR ESP ====================
+local function updateGeneratorESP()
+    if not Config.ESP.Enable then return end
+    local map = getMap()
+    if not map then return end
+    
+    local generatorsFolder = map:FindFirstChild("Generators")
+    if generatorsFolder then
+        for _, gen in pairs(generatorsFolder:GetChildren()) do
+            if gen:IsA("Model") then
+                -- Buat Highlight jika belum ada
+                local highlight = gen:FindFirstChild("GenESP")
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "GenESP"
+                    highlight.Parent = gen
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.5
+                end
+                
+                -- Buat BillboardGui Text jika belum ada
+                local billboard = gen:FindFirstChild("GenText")
+                local label
+                if not billboard then
+                    billboard = Instance.new("BillboardGui")
+                    billboard.Name = "GenText"
+                    billboard.Adornee = gen
+                    billboard.Size = UDim2.new(0, 100, 0, 50)
+                    billboard.AlwaysOnTop = true
+                    billboard.Parent = gen
+                    
+                    label = Instance.new("TextLabel")
+                    label.Name = "Text"
+                    label.Size = UDim2.new(1, 0, 1, 0)
+                    label.BackgroundTransparency = 1
+                    label.Font = Enum.Font.Nunito
+                    label.TextStrokeTransparency = 0.5
+                    label.TextSize = 16
+                    label.Parent = billboard
+                else
+                    label = billboard.Text
+                end
+
+                -- Cek Status Mesin
+                local stats = gen:FindFirstChild("Stats")
+                if stats then
+                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
+                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
+                    local current = stats:FindFirstChild("CurrentAmount") and math.floor(stats.CurrentAmount.Value + 0.5) or 0
+                    local required = stats:FindFirstChild("RequiredAmount") and stats.RequiredAmount.Value or 0
+                    
+                    local genName = gen.Name
+                    local textColor = Config.ESP.NormalColor
+                    
+                    if connie then
+                        textColor = Config.ESP.PossessedColor
+                        genName = genName .. "\n[POSSESSED]"
+                        highlight.FillColor = Config.ESP.PossessedColor
+                    elseif completed then
+                        textColor = Config.ESP.CompletedColor
+                        highlight.FillColor = Config.ESP.CompletedColor
+                    else
+                        textColor = Config.ESP.NormalColor
+                        highlight.FillColor = Config.ESP.NormalColor
+                    end
+                    
+                    label.TextColor3 = textColor
+                    label.Text = genName .. "\n(" .. current .. " / " .. required .. ")"
+                end
+            end
+        end
+    end
+end
+
+-- ==================== FUNGSI TELEPORT & AURA (FARMER) ====================
+local function tweenToPosition(targetCFrame)
+    local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
+    local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+    local duration = distance / (speed * Config.Teleport.TweenSpeed)
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+    currentTween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
+    
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    
+    currentTween:Play()
+    currentTween.Completed:Wait()
+    
+    Workspace.Gravity = originalGravity
+    currentTween = nil
+end
+
+local function interactWithPrompt(prompt)
+    if prompt.HoldDuration == 0 then
+        prompt:InputHoldBegin()
+        prompt:InputHoldEnd()
+    else
+        prompt:InputHoldBegin()
+    end
+end
+
+local function startAutoFarming()
+    isFarming = true
+    
+    -- Loop 1: Aura Interaksi
+    task.spawn(function()
+        while isFarming do
+            if Config.Aura.Enable then
+                local map = getMap()
+                if map and rootPart then
+                    local genFolder = map:FindFirstChild("Generators")
+                    if genFolder then
+                        for _, gen in pairs(genFolder:GetChildren()) do
+                            for _, descendant in pairs(gen:GetDescendants()) do
+                                if descendant:IsA("ProximityPrompt") and descendant.Enabled then
+                                    local promptPart = descendant.Parent
+                                    if promptPart and promptPart:IsA("BasePart") then
+                                        local dist = (promptPart.Position - rootPart.Position).Magnitude
+                                        if dist <= Config.Aura.Range then
+                                            interactWithPrompt(descendant)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+
+    -- Loop 2: Teleportasi Cerdas
+    task.spawn(function()
+        while isFarming do
+            if Config.Teleport.Enable then
+                -- Cek apakah kita sedang mengerjakan mesin (Decoding)
+                local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
+                
+                if not isDecoding then
+                    local map = getMap()
+                    if map then
+                        local genFolder = map:FindFirstChild("Generators")
+                        if genFolder then
+                            local targetGen = nil
+                            
+                            -- Cari mesin yang belum selesai, tidak dirasuki, dan tidak ada monster
+                            for _, gen in pairs(genFolder:GetChildren()) do
+                                if gen:IsA("Model") and gen.PrimaryPart then
+                                    local stats = gen:FindFirstChild("Stats")
+                                    if stats then
+                                        local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
+                                        local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
+                                        
+                                        if not completed and not connie then
+                                            if not isMonsterNear(gen, Config.Teleport.SafeRadius) then
+                                                targetGen = gen
+                                                break -- Langsung hajar mesin pertama yang memenuhi syarat
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            if targetGen and not currentTween then
+                                print("[FARMER] Target ditemukan: " .. targetGen.Name .. ". Meluncur...")
+                                task.wait(Config.Teleport.DelayNext) -- Jeda sebentar agar natural
+                                
+                                -- Posisi target: Di depan mesin sedikit
+                                local genCF = targetGen.PrimaryPart.CFrame
+                                local offsetPos = genCF.Position + genCF.LookVector * 4
+                                local finalTarget = CFrame.new(offsetPos, genCF.Position)
+                                
+                                tweenToPosition(finalTarget)
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(1) -- Cek status decoding tiap 1 detik
+        end
+    end)
+    
+    -- Loop 3: Update ESP secara berkala
+    task.spawn(function()
+        while isFarming do
+            updateGeneratorESP()
+            task.wait(0.5)
+        end
+    end)
+end
+
+-- ==================== INISIALISASI ====================
+print("==================================================")
+print(" AUTO MACHINE FARMER BERHASIL DIJALANKAN")
+print("==================================================")
+setupAutoSkillcheck()
+startAutoFarming()
