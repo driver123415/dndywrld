@@ -379,7 +379,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN")
+print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN Ahayyyyyyy")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
