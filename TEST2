@@ -1,5 +1,5 @@
 -- ==================== Configuration ====================
-local TWEEN_SPEED_MULTIPLIER = 1.25 -- Kecepatan bergerak (semakin tinggi semakin cepat, tapi berisiko lagback)
+local TWEEN_SPEED_MULTIPLIER = 0.25 -- Kecepatan bergerak (semakin tinggi semakin cepat, tapi berisiko lagback)
 local ITEM_AURA_RANGE = 30          -- Jarak deteksi untuk mengambil item (sesuai script asli Noxious)
 local UNDERGROUND_OFFSET = -3.3     -- Posisi Y offset (berada di bawah lantai agar aman dari pantauan)
 -- =======================================================
