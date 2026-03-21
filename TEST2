@@ -1,53 +1,127 @@
+-- ==================== Configuration ====================
+local TWEEN_SPEED_MULTIPLIER = 1.25 -- Kecepatan bergerak (semakin tinggi semakin cepat, tapi berisiko lagback)
+local ITEM_AURA_RANGE = 30          -- Jarak deteksi untuk mengambil item (sesuai script asli Noxious)
+local UNDERGROUND_OFFSET = -3.3     -- Posisi Y offset (berada di bawah lantai agar aman dari pantauan)
+-- =======================================================
+
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
 
-print("[DEBUG] Memulai pemantauan SpectatorGui...")
+local isAuraActive = false
 
-local function monitorSpectatorGui(gui)
-    if gui:IsA("ScreenGui") and gui.Name == "SpectatorGui" then
-        print("[DEBUG] -> SpectatorGui ditemukan!")
-        
-        -- Cek status bawaan (default) saat game baru mulai
-        print("[DEBUG] -> Status Awal SpectatorGui - Enabled:", gui.Enabled)
-        
-        local spectateFrame = gui:WaitForChild("SpectateFrame", 5)
-        if spectateFrame then
-            print("[DEBUG] -> SpectateFrame ditemukan!")
-            print("[DEBUG] -> Status Awal SpectateFrame - Visible:", spectateFrame.Visible, "| Transparency:", spectateFrame.BackgroundTransparency)
-            
-            -- Pantau perubahan pada SpectatorGui
-            gui:GetPropertyChangedSignal("Enabled"):Connect(function()
-                print("[DEBUG] -> [UPDATE] SpectatorGui 'Enabled' berubah menjadi:", gui.Enabled)
-            end)
+-- 1. Fungsi untuk mendapatkan Map (CurrentRoom)
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
 
-            -- Pantau perubahan pada SpectateFrame
-            spectateFrame:GetPropertyChangedSignal("Visible"):Connect(function()
-                print("[DEBUG] -> [UPDATE] SpectateFrame 'Visible' berubah menjadi:", spectateFrame.Visible)
-            end)
-            
-            -- Pantau transparansi (siapa tahu disembunyikan pakai alpha)
-            spectateFrame:GetPropertyChangedSignal("BackgroundTransparency"):Connect(function()
-                print("[DEBUG] -> [UPDATE] SpectateFrame 'Transparency' berubah menjadi:", spectateFrame.BackgroundTransparency)
-            end)
-            
-            -- Pantau posisi (siapa tahu digeser dari luar layar ke tengah layar saat mati)
-            spectateFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
-                print("[DEBUG] -> [UPDATE] SpectateFrame posisi berubah! Posisi baru:", tostring(spectateFrame.AbsolutePosition))
-            end)
-        else
-            print("[DEBUG] -> SpectateFrame TIDAK ditemukan di dalam SpectatorGui!")
-        end
+-- 2. Fungsi untuk eksekusi ProximityPrompt (Ambil Item)
+local function interactWithPrompt(prompt)
+    if prompt.HoldDuration == 0 then
+        prompt:InputHoldBegin()
+        prompt:InputHoldEnd()
+    else
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration)
+        prompt:InputHoldEnd()
     end
 end
 
--- 1. Cek semua GUI yang sudah ada di PlayerGui saat ini
-for _, child in ipairs(playerGui:GetChildren()) do
-    monitorSpectatorGui(child)
+-- 3. Fungsi Item Aura (Berjalan di background untuk menyedot item terdekat)
+local function startItemAura()
+    isAuraActive = true
+    task.spawn(function()
+        while isAuraActive do
+            local map = getMap()
+            if map and rootPart then
+                local itemsFolder = map:FindFirstChild("Items")
+                if itemsFolder then
+                    for _, item in pairs(itemsFolder:GetChildren()) do
+                        local promptPart = item:FindFirstChild("Prompt")
+                        if promptPart then
+                            local proximityPrompt = promptPart:FindFirstChild("ProximityPrompt")
+                            if proximityPrompt and proximityPrompt.Enabled then
+                                local distance = (promptPart.Position - rootPart.Position).Magnitude
+                                if distance <= ITEM_AURA_RANGE then
+                                    interactWithPrompt(proximityPrompt)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.05) -- Kecepatan scanning item
+        end
+    end)
 end
 
--- 2. Pantau jika game membuat GUI baru saat player mati
-playerGui.ChildAdded:Connect(function(child)
-    print("[DEBUG] -> GUI baru dibuat oleh game:", child.Name)
-    monitorSpectatorGui(child)
-end)
+-- 4. Fungsi Tween (Bergerak ke lokasi target)
+local function tweenToPosition(targetCFrame)
+    -- Menghitung durasi berdasarkan kecepatan maksimal player agar pergerakan natural
+    local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
+    local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+    local duration = distance / (speed * TWEEN_SPEED_MULTIPLIER)
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+    local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
+    
+    -- Matikan gravitasi sementara agar tidak jatuh ke void
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    
+    tween:Play()
+    tween.Completed:Wait()
+    
+    Workspace.Gravity = originalGravity
+end
+
+-- 5. Fungsi Utama: Eksekusi Ambil Semua Item
+local function pickupAllItems()
+    local map = getMap()
+    if not map then 
+        print("[ERROR] Map tidak ditemukan.") 
+        return 
+    end
+
+    local itemsFolder = map:FindFirstChild("Items")
+    if not itemsFolder or #itemsFolder:GetChildren() == 0 then
+        print("[INFO] Tidak ada item tersisa di map ini.")
+        return
+    end
+
+    print("[START] Mengambil semua item di map...")
+    
+    -- Simpan posisi awal player
+    local originalPosition = rootPart.CFrame
+    
+    -- Nyalakan aura penyedot item
+    startItemAura()
+    
+    -- Loop untuk mendatangi setiap item
+    for _, item in ipairs(itemsFolder:GetChildren()) do
+        if item:IsA("Model") then
+            -- Set target CFrame persis di bawah item (underground)
+            local itemCFrame = item:GetPivot() * CFrame.new(0, UNDERGROUND_OFFSET, 0)
+            tweenToPosition(itemCFrame)
+            task.wait(0.1) -- Jeda sebentar agar aura sempat mengambil item
+        end
+    end
+
+    -- Kembali ke posisi awal
+    print("[INFO] Kembali ke posisi semula...")
+    tweenToPosition(originalPosition)
+    
+    -- Matikan aura
+    task.wait(0.2)
+    isAuraActive = false
+    print("[SUCCESS] Seluruh item berhasil diambil!")
+end
+
+-- Jalankan fungsi
+pickupAllItems()
