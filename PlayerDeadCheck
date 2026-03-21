@@ -1,54 +1,59 @@
-task.wait (1)
 -- ==================== Configuration ====================
-local INGAME_PLACE_ID = 16552821455 -- Place ID when inside the game (Run)
-local LOBBY_PLACE_ID = 16116270224  -- Lobby Place ID to escape to
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game (Run)
+local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
 -- =======================================================
 
 if game.PlaceId == INGAME_PLACE_ID then
-    print("In-game detected. Starting Auto-Teleport on Spectate/Death...")
+    print("[DEBUG] In-game detected. Memulai pemantauan Kematian/Spectate...")
 
     local Players = game:GetService("Players")
-    local TeleportService = game:GetService("TeleportService")
-    
     local player = Players.LocalPlayer
-    local playerGui = player:WaitForChild("PlayerGui")
+    local hasTriggered = false -- Kunci agar print tidak spam jika kedua metode terpicu bersamaan
 
-    -- Function to execute teleportation
-    local function teleportToLobby()
-        print("Spectate mode detected! Teleporting back to Lobby...")
-        TeleportService:Teleport(LOBBY_PLACE_ID, player)
+    -- Fungsi simulasi teleportasi (hanya print ke konsol)
+    local function triggerTeleport(sumber)
+        if hasTriggered then return end
+        hasTriggered = true 
+        
+        print("======================================================")
+        print("[SUCCESS] Kematian terdeteksi dari: " .. sumber)
+        print("[SUCCESS] --> SEHARUSNYA PLAYER DI-TELEPORT KE LOBBY SEKARANG! <--")
+        print("======================================================")
     end
 
-    -- Function to monitor the Spectator GUI
-    local function setupSpectateDetection(gui)
-        if gui.Name == "SpectatorGui" then
-            -- Wait for SpectateFrame to appear inside SpectatorGui
-            local spectateFrame = gui:WaitForChild("SpectateFrame", 5)
-            
-            if spectateFrame then
-                -- 1. Monitor changes when the menu suddenly appears
-                spectateFrame:GetPropertyChangedSignal("Visible"):Connect(function()
-                    if spectateFrame.Visible == true then
-                        teleportToLobby()
-                    end
-                end)
-                
-                -- 2. Just in case the pop-up is already visible when the script loads
-                if spectateFrame.Visible == true then
-                    teleportToLobby()
-                end
-            end
+    -- METODE 1: Deteksi kematian lewat Humanoid
+    local function setupDeathDetection(character)
+        local humanoid = character:WaitForChild("Humanoid", 10)
+        if humanoid then
+            humanoid.Died:Connect(function()
+                print("[DEBUG] Trigger ditarik: Humanoid darahnya habis (Died event).")
+                triggerTeleport("Humanoid.Died")
+            end)
         end
     end
 
-    -- Loop to check existing GUIs currently on the screen
-    for _, child in ipairs(playerGui:GetChildren()) do
-        setupSpectateDetection(child)
+    -- Pasang deteksi ke karakter yang sedang dipakai saat ini
+    if player.Character then
+        setupDeathDetection(player.Character)
     end
 
-    -- Event listener in case the game removes and spawns a new GUI when the player dies
-    playerGui.ChildAdded:Connect(setupSpectateDetection)
+    -- Pasang ulang jika karakter di-spawn ulang (respawn)
+    player.CharacterAdded:Connect(setupDeathDetection)
+
+    -- METODE 2: Deteksi jika game menghapus karaktermu dari InGamePlayers
+    task.spawn(function()
+        local inGamePlayers = workspace:WaitForChild("InGamePlayers", 10)
+        if inGamePlayers then
+            inGamePlayers.ChildRemoved:Connect(function(child)
+                -- Mengecek apakah yang dihapus dari map adalah model karakter kita
+                if child.Name == player.Name then
+                    print("[DEBUG] Trigger ditarik: Karakter dihapus dari InGamePlayers.")
+                    triggerTeleport("InGamePlayers.ChildRemoved")
+                end
+            end)
+        end
+    end)
 
 else
-    print("Not in-game (Place ID mismatch). Auto-Teleport to Lobby is disabled.")
+    print("[DEBUG] Not in-game (Place ID mismatch). Script pemantau mati.")
 end
