@@ -1,4 +1,4 @@
-task.wait (60)
+task.wait (120)
 -- ==================== Configuration ====================
 local INGAME_PLACE_ID = 16552821455 -- Place ID when inside the game (Run)
 local LOBBY_PLACE_ID = 16116270224  -- Lobby Place ID to escape to
