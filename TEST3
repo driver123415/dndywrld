@@ -1,7 +1,7 @@
-print("SC test1")
+print("SC test2")
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN)
--- + DYNAMIC ELEVATION + DRAGGABLE GUI ON/OFF + MONSTER CHASE EVASION
+-- CONFIGURATION: AUTO MACHINE FARMER V11 (SAFE-ZONE EVASION)
+-- + DYNAMIC ELEVATION + DRAGGABLE GUI + MONSTER CHASE EVASION (FAKE ELEVATOR)
 -- ==============================================================================
 local Config = {
     
@@ -11,10 +11,11 @@ local Config = {
         Enable = true,          
         Mode = "Instant",       
         TweenSpeed = 1.25,      
-        SafeRadius = 30,        -- Jarak aman dari monster
+        SafeRadius = 30,        
         PlayerRadius = 8,       
         DelayNext = 1.0,        
         
+        -- DYNAMIC ELEVATION
         OffsetHidden = 1.0,     -- Kedalaman saat datang/sembunyi
         OffsetFarming = -5      -- Kedalaman saat mode Skillcheck menyala
     },
@@ -76,7 +77,7 @@ uiCorner.Parent = mainFrame
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 0, 30)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Farmer (V9)"
+titleLabel.Text = "Auto Farmer (V11)"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 14
@@ -153,7 +154,22 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
--- ==================== FUNGSI BERHENTI PAKSA (ANTI-MONSTER) ====================
+-- Cari titik tengah Safe Place (Fake Elevator)
+local function getFakeElevatorPosition()
+    local map = getMap()
+    if map then
+        local freeArea = map:FindFirstChild("FreeArea")
+        if freeArea then
+            local fakeElevator = freeArea:FindFirstChild("FakeElevator")
+            if fakeElevator and fakeElevator:IsA("Model") then
+                return getModelCenter(fakeElevator)
+            end
+        end
+    end
+    return nil
+end
+
+-- ==================== FUNGSI ANCAMAN MONSTER ====================
 local function forceStop()
     local decoding = character:FindFirstChild("Decoding")
     if decoding and decoding.Value ~= nil then
@@ -163,20 +179,30 @@ local function forceStop()
     end
 end
 
--- ==================== FUNGSI DETEKSI ANCAMAN MONSTER ====================
-local function isMonsterThreat(generator, radius)
+-- Cek target monster
+local function isPlayerChased()
     local map = getMap()
     if map then
         local monstersFolder = map:FindFirstChild("Monsters")
         if monstersFolder then
             for _, monster in pairs(monstersFolder:GetChildren()) do
-                -- 1. Cek apakah monster sedang mengunci target (mengejar) karakter kita
                 local chasingVal = monster:FindFirstChild("ChasingValue")
                 if chasingVal and chasingVal.Value == character then
                     return true
                 end
-                
-                -- 2. Cek apakah monster terlalu dekat dengan mesin secara radius
+            end
+        end
+    end
+    return false
+end
+
+-- Cek radius monster sekitar mesin
+local function isMonsterNear(generator, radius)
+    local map = getMap()
+    if map then
+        local monstersFolder = map:FindFirstChild("Monsters")
+        if monstersFolder then
+            for _, monster in pairs(monstersFolder:GetChildren()) do
                 if monster:IsA("Model") and monster.PrimaryPart and generator.PrimaryPart then
                     local distance = (monster.PrimaryPart.Position - generator.PrimaryPart.Position).Magnitude
                     if distance <= radius then return true end
@@ -304,16 +330,9 @@ end
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
-            local oldLineOfSight = descendant.RequiresLineOfSight
-            local oldMaxDist = descendant.MaxActivationDistance
-            
             descendant.RequiresLineOfSight = false
             descendant.MaxActivationDistance = 100 
-            
-            pcall(function()
-                descendant:InputHoldBegin()
-            end)
-            
+            pcall(function() descendant:InputHoldBegin() end)
             return true
         end
     end
@@ -358,10 +377,15 @@ local function moveToPosition(targetCFrame, usePlatform)
         tween.Completed:Wait()
     end
     
+    if usePlatform then
+        rootPart.CFrame = targetCFrame
+        rootPart.Anchored = true 
+    end
+    
     Workspace.Gravity = originalGravity
 end
 
--- ==================== FUNGSI TELEPORT KE LIFT ====================
+-- ==================== FUNGSI TELEPORT KE LIFT AKHIR ====================
 local function teleportToRealElevator()
     local map = getMap()
     if map then
@@ -398,6 +422,30 @@ local function startAutoFarming()
                 continue
             end
             
+            -- CEK DULU: Apakah kita sedang dikejar monster?
+            if isPlayerChased() then
+                print("[EVASION] Dikejar Monster! Evakuasi ke Safe Place (Fake Elevator)...")
+                forceStop()
+                
+                local safePos = getFakeElevatorPosition()
+                if safePos then
+                    -- Teleport ke atas Fake Elevator agar aman (TIDAK butuh platform)
+                    moveToPosition(CFrame.new(safePos + Vector3.new(0, 4, 0)), false)
+                else
+                    -- Jika Fake Elevator tidak ada (jarang terjadi), terbang sedikit ke atas sebagai darurat
+                    moveToPosition(rootPart.CFrame * CFrame.new(0, 50, 0), true)
+                end
+                
+                -- Bersembunyi sampai indikator ChasingValue hilang
+                while isPlayerChased() and isFarmerToggledON and not _G.KillOldFarmer do
+                    task.wait(1)
+                end
+                
+                print("[INFO] Monster kehilangan jejak. Melanjutkan farming...")
+                task.wait(1)
+                continue -- Ulangi pencarian mesin
+            end
+            
             local map = getMap()
             if map then
                 local genFolder = map:FindFirstChild("Generators")
@@ -415,8 +463,7 @@ local function startAutoFarming()
                                 if not completed then
                                     uncompletedCount = uncompletedCount + 1
                                     if not connie and not targetGen then
-                                        -- Cek ancaman monster sebelum memilih mesin
-                                        if not isMonsterThreat(gen, Config.Teleport.SafeRadius) then
+                                        if not isMonsterNear(gen, Config.Teleport.SafeRadius) then
                                             if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                 targetGen = gen
                                             end
@@ -446,26 +493,22 @@ local function startAutoFarming()
                                     break 
                                 end
                                 
-                                -- JIKA ADA MONSTER MENGEJAR ATAU PLAYER MENDEKAT SAAT SEDANG FARMING:
-                                if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) or isMonsterThreat(targetGen, Config.Teleport.SafeRadius) then
-                                    print("[WARNING] Kondisi tidak aman (Player/Monster terdeteksi)! Membatalkan mesin...")
-                                    forceStop() -- Tembakkan event Stop ke server
-                                    break -- Keluar dari loop mesin, biarkan script mencari mesin/tempat aman
+                                -- JIKA TIBA-TIBA DIKEJAR MONSTER ATAU ADA PLAYER LAIN DATANG SAAT FARMING
+                                if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) or isMonsterNear(targetGen, Config.Teleport.SafeRadius) or isPlayerChased() then
+                                    print("[WARNING] Mesin didatangi ancaman! Membatalkan interaksi...")
+                                    forceStop()
+                                    break -- Keluar loop agar terbawa ke fungsi evakuasi (Safe Place) di atas
                                 end
                                 
                                 local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
                                 
                                 if isDecoding then
                                     rootPart.CFrame = farmingCFrame
-                                    if activePlatform then
-                                        activePlatform.CFrame = farmingCFrame * CFrame.new(0, -3.5, 0)
-                                    end
+                                    if activePlatform then activePlatform.CFrame = farmingCFrame * CFrame.new(0, -3.5, 0) end
                                     rootPart.Anchored = true
                                 else
                                     rootPart.CFrame = hiddenCFrame
-                                    if activePlatform then
-                                        activePlatform.CFrame = hiddenCFrame * CFrame.new(0, -3.5, 0)
-                                    end
+                                    if activePlatform then activePlatform.CFrame = hiddenCFrame * CFrame.new(0, -3.5, 0) end
                                     rootPart.Anchored = true
                                     forceTriggerGenerator(targetGen)
                                 end
