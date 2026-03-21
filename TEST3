@@ -15,8 +15,8 @@ local Config = {
         DelayNext = 1.0,        
         
         -- DYNAMIC ELEVATION 
-        OffsetHidden = -5,      -- Kedalaman saat datang/sembunyi
-        OffsetFarming = 1.0     -- Kedalaman saat mode Skillcheck menyala
+        OffsetHidden = 1.0,      -- Kedalaman saat datang/sembunyi
+        OffsetFarming = -5     -- Kedalaman saat mode Skillcheck menyala
     },
 
     ESP = {
