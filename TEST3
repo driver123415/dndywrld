@@ -1,5 +1,5 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V8 (PERFECT UNDERGROUND & PLATFORM)
+-- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN)
 -- ==============================================================================
 local Config = {
     
@@ -13,8 +13,9 @@ local Config = {
         PlayerRadius = 8,       
         DelayNext = 1.0,        
         
-        -- KEDALAMAN: -7 dari dasar mesin (pasti tembus ke bawah lantai)
-        UndergroundOffset = -7 
+        -- KEDALAMAN: Dinaikkan menjadi -5.5 (Ubah angka ini jika masih kurang pas)
+        -- Semakin mendekati angka 0, posisi kamu akan semakin ke atas
+        UndergroundOffset = -5.5 
     },
 
     ESP = {
@@ -223,7 +224,6 @@ local function moveToPosition(targetCFrame, usePlatform)
         activePlatform.CanCollide = true
         activePlatform.Transparency = 0.5
         activePlatform.Color = Color3.fromRGB(0, 255, 0)
-        -- Posisi platform tepat 3.5 stud di bawah dada (telapak kaki)
         activePlatform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
         activePlatform.Parent = Workspace
     end
@@ -245,13 +245,13 @@ local function moveToPosition(targetCFrame, usePlatform)
     
     if usePlatform then
         rootPart.CFrame = targetCFrame
-        rootPart.Anchored = true -- Mengunci karakter agar tidak terlempar
+        rootPart.Anchored = true 
     end
     
     Workspace.Gravity = originalGravity
 end
 
--- ==================== FUNGSI TELEPORT KE LIFT (REAL ONLY) ====================
+-- ==================== FUNGSI TELEPORT KE LIFT ====================
 local function teleportToRealElevator()
     local map = getMap()
     if map then
@@ -277,7 +277,7 @@ local function teleportToRealElevator()
                 return true
             end
         end
-        print("[WARNING] Elevator tidak ditemukan atau map sudah bersih.")
+        print("[WARNING] Elevator tidak ditemukan.")
     end
     return false
 end
@@ -324,7 +324,6 @@ local function startAutoFarming()
                         elseif targetGen then
                             print("[FARMER] Menuju Generator: " .. targetGen.Name)
                             
-                            -- POSISI TARGET: X dan Z dari Absolute Center, tapi Y dari PrimaryPart (Dasar lantai) dikurangi offset
                             local centerPos = getModelCenter(targetGen)
                             if centerPos and targetGen.PrimaryPart then
                                 local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
@@ -380,7 +379,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V8 BERHASIL DIJALANKAN")
+print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
