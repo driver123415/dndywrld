@@ -1,16 +1,9 @@
-local CoreGui = game:GetService("CoreGui")
-
---// Hapus GUI lama jika ada (mencegah bug tumpuk saat dieksekusi ulang)
-if CoreGui:FindFirstChild("CustomDevConsole") then
-	CoreGui.CustomDevConsole:Destroy()
-end
-
 local screen = Instance.new("ScreenGui")
 screen.IgnoreGuiInset = false
-screen.ResetOnSpawn = false -- Dibuat false agar console tidak hilang saat karakter mati
+screen.ResetOnSpawn = true
 screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screen.Name = "CustomDevConsole"
-screen.Parent = CoreGui
+screen.Name = "Screen"
+screen.Parent = game.CoreGui
 
 --// Tombol untuk membuka (Unminimize) console
 local openBtn = Instance.new("TextButton")
@@ -30,11 +23,11 @@ obCorner.Parent = openBtn
 
 --// Frame Utama Console
 local console = Instance.new("Frame")
-console.BackgroundColor3 = Color3.new(0.078, 0.121, 0.152)
-console.Position = UDim2.new(0.35, 0, 0.25, 0)
+console.BackgroundColor3 = Color3.new(0.0784314, 0.121569, 0.152941)
+console.Position = UDim2.new(0.358, 0, 0.264, 0)
 console.Size = UDim2.new(0.4, 0, 0.5, 0)
 console.Visible = true
-console.Active = true
+console.Active = true -- Diperlukan untuk drag
 console.Name = "Console"
 console.Parent = screen
 
@@ -44,28 +37,41 @@ uicorner.Parent = console
 local uistroke = Instance.new("UIStroke")
 uistroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 uistroke.Color = Color3.new(1, 1, 1)
-uistroke.Thickness = 2
+uistroke.Thickness = 2.4
 uistroke.Parent = console
 
 local uigradient = Instance.new("UIGradient")
-uigradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(0.086, 0, 0.725)), ColorSequenceKeypoint.new(1, Color3.new(0.294, 0.380, 0.435))})
+uigradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(0.0862745, 0, 0.72549)), ColorSequenceKeypoint.new(1, Color3.new(0.294118, 0.380392, 0.435294))})
 uigradient.Parent = uistroke
 
---// Tombol Minimize (-)
+--// Judul Console (Tengah Atas)
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -40, 0, 30) -- Dikurangi sedikit agar tidak menabrak tombol minimize
+titleLabel.Position = UDim2.new(0, 0, 0, 10)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "CONSOLE"
+titleLabel.TextColor3 = Color3.new(1, 1, 1)
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextSize = 22
+titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+titleLabel.Parent = console
+
+--// Tombol Minimize (-) - Dipindahkan ke posisi yang lebih estetis
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -35, 0, 5)
+minimizeBtn.Position = UDim2.new(1, -35, 0, 10) -- Diturunkan sedikit
 minimizeBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
 minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
 minimizeBtn.Font = Enum.Font.SourceSansBold
-minimizeBtn.TextSize = 20
 minimizeBtn.Text = "-"
+minimizeBtn.TextScaled = true
 minimizeBtn.Parent = console
 
 local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(1, 0)
 minCorner.Parent = minimizeBtn
 
+--// Logic Minimize & Unminimize
 minimizeBtn.MouseButton1Click:Connect(function()
 	console.Visible = false
 	openBtn.Visible = true
@@ -76,7 +82,7 @@ openBtn.MouseButton1Click:Connect(function()
 	openBtn.Visible = false
 end)
 
---// Resize Handle (Pojok kanan bawah)
+--// Resize Handle (Pojok kanan bawah untuk memperbesar/kecil)
 local resizeHandle = Instance.new("TextButton")
 resizeHandle.Size = UDim2.new(0, 20, 0, 20)
 resizeHandle.Position = UDim2.new(1, -20, 1, -20)
@@ -89,16 +95,16 @@ resizeHandle.Parent = console
 
 --// Scrolling Frame untuk Logs
 local console_2 = Instance.new("ScrollingFrame")
-console_2.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Sangat Penting: Agar scroll otomatis bertambah
 console_2.CanvasSize = UDim2.new(0, 0, 0, 0)
-console_2.ScrollBarImageColor3 = Color3.new(0.137, 0.211, 0.266)
-console_2.ScrollBarThickness = 6
+console_2.ScrollBarImageColor3 = Color3.new(0.137255, 0.211765, 0.266667)
+console_2.ScrollBarThickness = 8
 console_2.Active = true
-console_2.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+console_2.BackgroundColor3 = Color3.new(0.101961, 0.101961, 0.101961)
 console_2.BackgroundTransparency = 1
 console_2.BorderSizePixel = 0
-console_2.Position = UDim2.new(0.02, 0, 0.12, 0)
-console_2.Size = UDim2.new(0.96, 0, 0.85, 0)
+console_2.Position = UDim2.new(0.02, 0, 0.15, 0) -- Diturunkan agar tidak menutupi tombol minimize
+console_2.Size = UDim2.new(0.96, 0, 0.82, 0) -- Disesuaikan
+console_2.Visible = true
 console_2.Name = "ConsoleList"
 console_2.Parent = console
 
@@ -107,55 +113,61 @@ logs.Name = "Logs"
 logs.Parent = console_2
 
 local uilist_layout = Instance.new("UIListLayout")
-uilist_layout.Padding = UDim.new(0, 8)
+uilist_layout.Padding = UDim.new(0, 10) -- Padding antar log lebih besar
 uilist_layout.SortOrder = Enum.SortOrder.LayoutOrder
+uilist_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Log akan di tengah frame
 uilist_layout.Parent = logs
 
---// Template Frame Log (Example)
+--// Template Frame Log (Example) - Perbaikan Total
 local example = Instance.new("Frame")
 example.BackgroundColor3 = Color3.new(1, 1, 1)
 example.BackgroundTransparency = 1
-example.Size = UDim2.new(1, -10, 0, 0)
-example.AutomaticSize = Enum.AutomaticSize.Y -- Membiarkan frame memanjang ke bawah jika teks panjang
-example.Visible = false
+example.Size = UDim2.new(1, -15, 0, 30) -- Ukuran fixed untuk list layout
+example.Visible = false -- Disembunyikan agar template asli tidak terlihat
 example.Name = "Example"
 example.Parent = logs
 
+-- Label Baris ("1 - ") - Dipisahkan ke frame sendiri
 local lineLabel = Instance.new("TextLabel")
-lineLabel.Font = Enum.Font.SourceSansBold
-lineLabel.Text = "1 -"
-lineLabel.TextColor3 = Color3.new(0.4, 0.4, 0.4)
-lineLabel.TextSize = 16 -- Ukuran font fixed
+lineLabel.Font = Enum.Font.Code -- Font monospace lebih rapi
+lineLabel.Text = "1 - "
+lineLabel.TextColor3 = Color3.new(0.282353, 0.282353, 0.282353)
+lineLabel.TextSize = 14
+lineLabel.BackgroundColor3 = Color3.new(1, 1, 1)
 lineLabel.BackgroundTransparency = 1
-lineLabel.Position = UDim2.new(0, 0, 0, 2)
-lineLabel.Size = UDim2.new(0, 30, 0, 20)
-lineLabel.TextXAlignment = Enum.TextXAlignment.Left
-lineLabel.TextYAlignment = Enum.TextYAlignment.Top
+lineLabel.Position = UDim2.new(0, 5, 0, 0)
+lineLabel.Size = UDim2.new(0, 30, 1, 0) -- Lebar wadah label baris
+lineLabel.TextXAlignment = Enum.TextXAlignment.Left -- Teks di kiri
+lineLabel.Visible = true
 lineLabel.Name = "LineLabel"
 lineLabel.Parent = example
 
+-- Label Teks Log Utama - Diberi ruang besar dan pembungkusan
 local logLabel = Instance.new("TextLabel")
-logLabel.Font = Enum.Font.Cartoon
+logLabel.Font = Enum.Font.Cartoon -- Sesuai permintaan
 logLabel.Text = "Log: Hello, World"
-logLabel.TextColor3 = Color3.new(0.423, 0.8, 1)
-logLabel.TextSize = 16 -- Ukuran font fixed agar tidak mengecil
+logLabel.TextColor3 = Color3.new(0.423529, 0.8, 1)
+logLabel.TextSize = 14
+logLabel.BackgroundColor3 = Color3.new(1, 1, 1)
 logLabel.BackgroundTransparency = 1
-logLabel.Position = UDim2.new(0, 35, 0, 2)
-logLabel.Size = UDim2.new(1, -95, 0, 0)
-logLabel.AutomaticSize = Enum.AutomaticSize.Y -- Teks akan wrap ke bawah, bukan mengecil
-logLabel.TextWrapped = true
-logLabel.TextXAlignment = Enum.TextXAlignment.Left
-logLabel.TextYAlignment = Enum.TextYAlignment.Top
+logLabel.Position = UDim2.new(0, 35, 0, 0) -- Di kanan label baris
+logLabel.Size = UDim2.new(1, -110, 1, 0) -- Disesuaikan agar muat tombol copy
+logLabel.TextXAlignment = Enum.TextXAlignment.Left -- Teks di kiri
+logLabel.TextYAlignment = Enum.TextYAlignment.Center -- Teks di tengah vertikal
+logLabel.TextWrapped = true -- Teks terbungkus ke baris baru
+logLabel.TextScaled = false -- Jangan diskalakan agar keterbacaan terjaga
+logLabel.Visible = true
 logLabel.Name = "LogLabel"
 logLabel.Parent = example
 
+--// Tombol Copy di dalam log - Tetap sama
 local copyBtn = Instance.new("TextButton")
 copyBtn.Size = UDim2.new(0, 50, 0, 22)
-copyBtn.Position = UDim2.new(1, -50, 0, 0)
+copyBtn.Position = UDim2.new(1, -55, 0.5, -11)
 copyBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34)
 copyBtn.TextColor3 = Color3.new(1, 1, 1)
 copyBtn.Font = Enum.Font.SourceSansBold
-copyBtn.TextSize = 14
+copyBtn.TextSize = 13
 copyBtn.Text = "Copy"
 copyBtn.Name = "CopyBtn"
 copyBtn.Parent = example
@@ -164,7 +176,8 @@ local cpCorner = Instance.new("UICorner")
 cpCorner.CornerRadius = UDim.new(0, 4)
 cpCorner.Parent = copyBtn
 
---// Dragging Logic
+
+--// Dragging Logic (Geser GUI)
 local UIS = game:GetService("UserInputService")
 local dragging, dragInput, dragStart, startPos
 
@@ -192,7 +205,8 @@ UIS.InputChanged:Connect(function(input)
 	end
 end)
 
---// Resizing Logic
+
+--// Resizing Logic (Perbesar/Kecil GUI)
 local resizing, resizeStart, startSize
 
 resizeHandle.InputBegan:Connect(function(input)
@@ -213,46 +227,48 @@ UIS.InputChanged:Connect(function(input)
 	end
 end)
 
---// Hook Print ke Console
+
+--// Hook & Core Script
 task.spawn(function()
+	local Logs = logs
+	local ExampleFrame = example
 	local LineCount = 0
 
 	local CreateMessage = function(...)
 		LineCount += 1
-		
-		-- Batas maksimal log adalah 250 agar game tidak lag
-		if LineCount > 250 then
-			local oldLog = logs:FindFirstChild("Line: " .. tostring(LineCount - 250))
+		if LineCount >= 250 then
+			local oldLog = Logs:FindFirstChild("Line: " .. tostring(LineCount - 250))
 			if oldLog then oldLog:Destroy() end
 		end
 		
 		local msgText = ...
-		local NewFrame = example:Clone()
+		local NewFrame = ExampleFrame:Clone()
 		NewFrame.Name = "Line: " .. tostring(LineCount)
 		NewFrame.LayoutOrder = LineCount
 		NewFrame.Visible = true
 		
+		-- Merujuk ke struktur template yang baru
 		local line = NewFrame:FindFirstChild("LineLabel")
 		local txt = NewFrame:FindFirstChild("LogLabel")
-		local copyButton = NewFrame:FindFirstChild("CopyBtn")
+		local copyBtn = NewFrame:FindFirstChild("CopyBtn")
 
-		if line and txt and copyButton then
-			line.Text = tostring(LineCount) .. " -"
+		if line and txt and copyBtn then
+			line.Text = tostring(LineCount) .. " - "
 			txt.Text = tostring(msgText)
 			
-			copyButton.MouseButton1Click:Connect(function()
+			-- Fungsi Copy untuk log ini
+			copyBtn.MouseButton1Click:Connect(function()
 				if setclipboard then
 					setclipboard(tostring(msgText))
 				end
 			end)
 		end
 
-		NewFrame.Parent = logs
+		NewFrame.Parent = Logs
 		
-		-- Memaksa scrollbar untuk selalu turun ke log paling bawah
-		task.delay(0.05, function()
-			console_2.CanvasPosition = Vector2.new(0, 9999999)
-		end)
+		-- Auto-scroll mengikuti log terbaru
+		console_2.CanvasSize = UDim2.new(0, 0, 0, uilist_layout.AbsoluteContentSize.Y + 10)
+		console_2.CanvasPosition = Vector2.new(0, console_2.CanvasSize.Y.Offset)
 	end
 
 	local function tableToString(tbl)
@@ -272,21 +288,16 @@ task.spawn(function()
 		return table.concat(result, "\n")
 	end
 
-	local oldPrint
-	oldPrint = hookfunction(print, function(...)
-		local args = {...}
-		local strArgs = {}
-		
-		for _, v in ipairs(args) do
-			if type(v) == "table" then
-				table.insert(strArgs, tableToString(v))
-			else
-				table.insert(strArgs, tostring(v))
-			end
+	local prt
+	prt = hookfunction(print, function(...)
+		local args = ...
+		if type(args) == "table" then
+			args = tableToString(args)
+		elseif type(args) == "function" then
+			args = getupvalues(args)
 		end
-		
-		local message = table.concat(strArgs, " ")
+		local message = tostring(args)
 		CreateMessage(message)
-		return oldPrint(...)
+		return warn(message) -- Sesuai dengan behavior aslinya
 	end)
 end)
