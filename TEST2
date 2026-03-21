@@ -1,0 +1,53 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+print("[DEBUG] Memulai pemantauan SpectatorGui...")
+
+local function monitorSpectatorGui(gui)
+    if gui:IsA("ScreenGui") and gui.Name == "SpectatorGui" then
+        print("[DEBUG] -> SpectatorGui ditemukan!")
+        
+        -- Cek status bawaan (default) saat game baru mulai
+        print("[DEBUG] -> Status Awal SpectatorGui - Enabled:", gui.Enabled)
+        
+        local spectateFrame = gui:WaitForChild("SpectateFrame", 5)
+        if spectateFrame then
+            print("[DEBUG] -> SpectateFrame ditemukan!")
+            print("[DEBUG] -> Status Awal SpectateFrame - Visible:", spectateFrame.Visible, "| Transparency:", spectateFrame.BackgroundTransparency)
+            
+            -- Pantau perubahan pada SpectatorGui
+            gui:GetPropertyChangedSignal("Enabled"):Connect(function()
+                print("[DEBUG] -> [UPDATE] SpectatorGui 'Enabled' berubah menjadi:", gui.Enabled)
+            end)
+
+            -- Pantau perubahan pada SpectateFrame
+            spectateFrame:GetPropertyChangedSignal("Visible"):Connect(function()
+                print("[DEBUG] -> [UPDATE] SpectateFrame 'Visible' berubah menjadi:", spectateFrame.Visible)
+            end)
+            
+            -- Pantau transparansi (siapa tahu disembunyikan pakai alpha)
+            spectateFrame:GetPropertyChangedSignal("BackgroundTransparency"):Connect(function()
+                print("[DEBUG] -> [UPDATE] SpectateFrame 'Transparency' berubah menjadi:", spectateFrame.BackgroundTransparency)
+            end)
+            
+            -- Pantau posisi (siapa tahu digeser dari luar layar ke tengah layar saat mati)
+            spectateFrame:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+                print("[DEBUG] -> [UPDATE] SpectateFrame posisi berubah! Posisi baru:", tostring(spectateFrame.AbsolutePosition))
+            end)
+        else
+            print("[DEBUG] -> SpectateFrame TIDAK ditemukan di dalam SpectatorGui!")
+        end
+    end
+end
+
+-- 1. Cek semua GUI yang sudah ada di PlayerGui saat ini
+for _, child in ipairs(playerGui:GetChildren()) do
+    monitorSpectatorGui(child)
+end
+
+-- 2. Pantau jika game membuat GUI baru saat player mati
+playerGui.ChildAdded:Connect(function(child)
+    print("[DEBUG] -> GUI baru dibuat oleh game:", child.Name)
+    monitorSpectatorGui(child)
+end)
