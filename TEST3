@@ -1,544 +1,252 @@
-print("SC test2")
+print("testis1123")
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V11 (SAFE-ZONE EVASION)
--- + DYNAMIC ELEVATION + DRAGGABLE GUI + MONSTER CHASE EVASION (FAKE ELEVATOR)
+-- AUTO MACHINE FARMER: PURE NOXIOUS HUB EDITION
+-- (Stabil, Bersih, Tidak Ada Physics Aneh-Aneh)
 -- ==============================================================================
+
 local Config = {
-    
-    Skillcheck = { Enable = true },
-
-    Teleport = {
-        Enable = true,          
-        Mode = "Instant",       
-        TweenSpeed = 1.25,      
-        SafeRadius = 30,        
-        PlayerRadius = 8,       
-        DelayNext = 1.0,        
-        
-        -- DYNAMIC ELEVATION
-        OffsetHidden = 1.0,     -- Kedalaman saat datang/sembunyi
-        OffsetFarming = -5      -- Kedalaman saat mode Skillcheck menyala
-    },
-
-    ESP = {
-        Enable = true,          
-        NormalColor = Color3.fromRGB(150, 150, 150),   
-        CompletedColor = Color3.fromRGB(255, 0, 255),  
-        PossessedColor = Color3.fromRGB(0, 255, 255)   
-    }
+    TeleportSpeed = 1.25,
+    SafeRadius = 35,     -- Jarak aman murni dari monster
+    PlayerRadius = 10,   -- Jarak agar tidak berebut dengan player lain
+    WaitTime = 1.5       -- Jeda antar mesin
 }
 
--- ==================== ANTI-TUMPUK (CLEANUP SCRIPT LAMA) ====================
-if _G.AutoFarmerRunning then
-    _G.KillOldFarmer = true
-    task.wait(0.5)
-end
-_G.AutoFarmerRunning = true
-_G.KillOldFarmer = false
 -- ==============================================================================
-
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-local isFarmerToggledON = false
-local activePlatform = nil
+local isFarming = false
+_G.StopNoxiousFarmer = false
 
--- ==================== FUNGSI GUI (DRAGGABLE ON/OFF) ====================
-local guiName = "AutoFarmerGUI_Akbar"
+-- ==================== FUNGSI GUI SEDERHANA ====================
+local guiName = "NoxiousAutoFarm_Akbar"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
-if targetGui:FindFirstChild(guiName) then
-    targetGui[guiName]:Destroy()
-end
+if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = guiName
 screenGui.ResetOnSpawn = false
 screenGui.Parent = targetGui
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 80)
-mainFrame.Position = UDim2.new(0.5, -100, 0, 20)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 180, 0, 50)
+frame.Position = UDim2.new(0.5, -90, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.Active = true
+frame.Draggable = true -- Bawaan Roblox agar bisa digeser
+frame.Parent = screenGui
 
 local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 8)
-uiCorner.Parent = mainFrame
+uiCorner.CornerRadius = UDim.new(0, 6)
+uiCorner.Parent = frame
 
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 0, 30)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "Auto Farmer (V11)"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 14
-titleLabel.Parent = mainFrame
-
-local toggleButton = Instance.new("TextButton")
-toggleButton.Size = UDim2.new(0.8, 0, 0, 35)
-toggleButton.Position = UDim2.new(0.1, 0, 0, 35)
-toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) 
-toggleButton.Text = "STATUS: OFF"
-toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.TextSize = 14
-toggleButton.Parent = mainFrame
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, -10, 1, -10)
+toggleBtn.Position = UDim2.new(0, 5, 0, 5)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+toggleBtn.Text = "AUTO FARM: OFF"
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 14
+toggleBtn.Parent = frame
 
 local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 6)
-btnCorner.Parent = toggleButton
+btnCorner.CornerRadius = UDim.new(0, 4)
+btnCorner.Parent = toggleBtn
 
-toggleButton.MouseButton1Click:Connect(function()
-    isFarmerToggledON = not isFarmerToggledON
-    if isFarmerToggledON then
-        toggleButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50) 
-        toggleButton.Text = "STATUS: ON"
+toggleBtn.MouseButton1Click:Connect(function()
+    isFarming = not isFarming
+    if isFarming then
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        toggleBtn.Text = "AUTO FARM: ON"
     else
-        toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) 
-        toggleButton.Text = "STATUS: OFF"
-        if rootPart then rootPart.Anchored = false end
-        if activePlatform then
-            activePlatform:Destroy()
-            activePlatform = nil
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        toggleBtn.Text = "AUTO FARM: OFF"
+        -- Lepaskan interaksi secara paksa jika dimatikan
+        local decoding = character:FindFirstChild("Decoding")
+        if decoding and decoding.Value ~= nil then
+            pcall(function() decoding.Value.Stats.StopInteracting:FireServer("Stop") end)
         end
     end
 end)
 
-local dragging, dragInput, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-mainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-
--- ==================== FUNGSI BANTUAN ====================
+-- ==================== FUNGSI BANTUAN NOXIOUS ====================
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
 
-local function getModelCenter(model)
-    if not model or not model:IsA("Model") then return nil end
-    local parts = {}
-    for _, part in pairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then table.insert(parts, part) end
-    end
-    if #parts == 0 then return nil end
-    local totalPosition = Vector3.zero
-    for _, part in pairs(parts) do totalPosition = totalPosition + part.Position end
-    return totalPosition / #parts
-end
-
--- Cari titik tengah Safe Place (Fake Elevator)
-local function getFakeElevatorPosition()
+-- Logika Elevator Noxious (Mencari di seluruh keturunan map)
+local function getElevatorCFrame()
     local map = getMap()
-    if map then
-        local freeArea = map:FindFirstChild("FreeArea")
-        if freeArea then
-            local fakeElevator = freeArea:FindFirstChild("FakeElevator")
-            if fakeElevator and fakeElevator:IsA("Model") then
-                return getModelCenter(fakeElevator)
+    if not map then return nil end
+    
+    for _, obj in ipairs(map:GetDescendants()) do
+        if obj:IsA("Model") and string.find(string.lower(obj.Name), "elevator") and not string.find(string.lower(obj.Name), "fake") then
+            -- Ambil PrimaryPart atau part pertama yang ada di dalamnya
+            local basePart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            if basePart then
+                return basePart.CFrame * CFrame.new(0, 3, 0)
             end
         end
     end
     return nil
 end
 
--- ==================== FUNGSI ANCAMAN MONSTER ====================
-local function forceStop()
-    local decoding = character:FindFirstChild("Decoding")
-    if decoding and decoding.Value ~= nil then
-        pcall(function()
-            decoding.Value.Stats.StopInteracting:FireServer("Stop")
-        end)
-    end
-end
-
--- Cek target monster
-local function isPlayerChased()
+local function isSafe(targetPos)
     local map = getMap()
-    if map then
-        local monstersFolder = map:FindFirstChild("Monsters")
-        if monstersFolder then
-            for _, monster in pairs(monstersFolder:GetChildren()) do
-                local chasingVal = monster:FindFirstChild("ChasingValue")
-                if chasingVal and chasingVal.Value == character then
-                    return true
-                end
+    if not map then return false end
+    
+    -- Cek Monster
+    local monstersFolder = map:FindFirstChild("Monsters")
+    if monstersFolder then
+        for _, monster in pairs(monstersFolder:GetChildren()) do
+            -- Jika dikejar, auto tidak aman
+            local chasing = monster:FindFirstChild("ChasingValue")
+            if chasing and chasing.Value == character then return false end
+            
+            -- Jika radius monster dekat mesin
+            if monster.PrimaryPart then
+                if (monster.PrimaryPart.Position - targetPos).Magnitude <= Config.SafeRadius then return false end
             end
         end
     end
-    return false
-end
-
--- Cek radius monster sekitar mesin
-local function isMonsterNear(generator, radius)
-    local map = getMap()
-    if map then
-        local monstersFolder = map:FindFirstChild("Monsters")
-        if monstersFolder then
-            for _, monster in pairs(monstersFolder:GetChildren()) do
-                if monster:IsA("Model") and monster.PrimaryPart and generator.PrimaryPart then
-                    local distance = (monster.PrimaryPart.Position - generator.PrimaryPart.Position).Magnitude
-                    if distance <= radius then return true end
-                end
-            end
-        end
-    end
-    return false
-end
-
-local function isMachineOccupied(generator, radius)
+    
+    -- Cek Player Lain
     local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
     if inGamePlayers then
-        for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
-            if otherPlayer.Name ~= player.Name then
-                local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
-                if otherRoot and generator.PrimaryPart then
-                    local distance = (otherRoot.Position - generator.PrimaryPart.Position).Magnitude
-                    if distance <= radius then return true end
-                end
+        for _, other in ipairs(inGamePlayers:GetChildren()) do
+            if other.Name ~= player.Name then
+                local otherRoot = other.FindFirstChild(other, "HumanoidRootPart")
+                if otherRoot and (otherRoot.Position - targetPos).Magnitude <= Config.PlayerRadius then return false end
             end
         end
     end
-    return false
+    
+    return true
 end
 
--- ==================== FUNGSI AUTO SKILLCHECK (V2 BYPASS) ====================
-local function setupAutoSkillcheck()
-    task.spawn(function()
-        while not _G.KillOldFarmer do
-            if isFarmerToggledON and Config.Skillcheck.Enable then
-                pcall(function()
-                    local events = ReplicatedStorage:FindFirstChild("Events")
-                    if events then
-                        local su = events:FindFirstChild("SkillcheckUpdate")
-                        if su then
-                            su.OnClientInvoke = function() return true end
-                        end
+-- ==================== CORE: AUTO SKILLCHECK ====================
+task.spawn(function()
+    while not _G.StopNoxiousFarmer do
+        if isFarming then
+            pcall(function()
+                local events = ReplicatedStorage:FindFirstChild("Events")
+                if events then
+                    local su = events:FindFirstChild("SkillcheckUpdate")
+                    if su then
+                        su.OnClientInvoke = function() return true end
                     end
-                end)
-            end
+                end
+            end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- ==================== CORE: MAIN FARMING LOOP ====================
+task.spawn(function()
+    while not _G.StopNoxiousFarmer do
+        if not isFarming then
             task.wait(1)
-        end
-    end)
-end
-
--- ==================== FUNGSI GENERATOR ESP ====================
-local function updateGeneratorESP()
-    local map = getMap()
-    if not map then return end
-    
-    local generatorsFolder = map:FindFirstChild("Generators")
-    if generatorsFolder then
-        for _, gen in pairs(generatorsFolder:GetChildren()) do
-            if gen:IsA("Model") then
-                
-                if not isFarmerToggledON or not Config.ESP.Enable then
-                    if gen:FindFirstChild("GenESP") then gen.GenESP:Destroy() end
-                    if gen:FindFirstChild("GenText") then gen.GenText:Destroy() end
-                    continue
-                end
-                
-                local highlight = gen:FindFirstChild("GenESP")
-                if not highlight then
-                    highlight = Instance.new("Highlight")
-                    highlight.Name = "GenESP"
-                    highlight.Parent = gen
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
-                end
-                
-                local billboard = gen:FindFirstChild("GenText")
-                local label
-                if not billboard then
-                    billboard = Instance.new("BillboardGui")
-                    billboard.Name = "GenText"
-                    billboard.Adornee = gen
-                    billboard.Size = UDim2.new(0, 100, 0, 50)
-                    billboard.AlwaysOnTop = true
-                    billboard.Parent = gen
-                    
-                    label = Instance.new("TextLabel")
-                    label.Name = "Text"
-                    label.Size = UDim2.new(1, 0, 1, 0)
-                    label.BackgroundTransparency = 1
-                    label.Font = Enum.Font.Nunito
-                    label.TextStrokeTransparency = 0.5
-                    label.TextSize = 16
-                    label.Parent = billboard
-                else
-                    label = billboard.Text
-                end
-
-                local stats = gen:FindFirstChild("Stats")
-                if stats then
-                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
-                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
-                    local current = stats:FindFirstChild("CurrentAmount") and math.floor(stats.CurrentAmount.Value + 0.5) or 0
-                    local required = stats:FindFirstChild("RequiredAmount") and stats.RequiredAmount.Value or 0
-                    
-                    local genName = gen.Name
-                    local textColor = Config.ESP.NormalColor
-                    
-                    if connie then
-                        textColor = Config.ESP.PossessedColor
-                        genName = genName .. "\n[POSSESSED]"
-                        highlight.FillColor = Config.ESP.PossessedColor
-                    elseif completed then
-                        textColor = Config.ESP.CompletedColor
-                        highlight.FillColor = Config.ESP.CompletedColor
-                    else
-                        textColor = Config.ESP.NormalColor
-                        highlight.FillColor = Config.ESP.NormalColor
-                    end
-                    
-                    label.TextColor3 = textColor
-                    label.Text = genName .. "\n(" .. current .. " / " .. required .. ")"
-                end
-            end
-        end
-    end
-end
-
--- ==================== FUNGSI INTERAKSI PAKSA ====================
-local function forceTriggerGenerator(generator)
-    for _, descendant in ipairs(generator:GetDescendants()) do
-        if descendant:IsA("ProximityPrompt") then
-            descendant.RequiresLineOfSight = false
-            descendant.MaxActivationDistance = 100 
-            pcall(function() descendant:InputHoldBegin() end)
-            return true
-        end
-    end
-    return false
-end
-
--- ==================== FUNGSI MOVEMENT & PLATFORM ====================
-local function moveToPosition(targetCFrame, usePlatform)
-    local originalGravity = Workspace.Gravity
-    Workspace.Gravity = 0
-    rootPart.AssemblyLinearVelocity = Vector3.zero
-    rootPart.Anchored = false
-    
-    if activePlatform then
-        activePlatform:Destroy()
-        activePlatform = nil
-    end
-    
-    if usePlatform then
-        activePlatform = Instance.new("Part")
-        activePlatform.Size = Vector3.new(15, 1, 15)
-        activePlatform.Anchored = true
-        activePlatform.CanCollide = true
-        activePlatform.Transparency = 0.5
-        activePlatform.Color = Color3.fromRGB(0, 255, 0)
-        activePlatform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
-        activePlatform.Parent = Workspace
-    end
-    
-    if Config.Teleport.Mode == "Instant" then
-        rootPart.CFrame = targetCFrame
-        task.wait(0.1) 
-    else
-        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
-        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
-        local duration = distance / (speed * Config.Teleport.TweenSpeed)
-        if duration <= 0 then duration = 0.1 end
-        
-        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
-        tween:Play()
-        tween.Completed:Wait()
-    end
-    
-    if usePlatform then
-        rootPart.CFrame = targetCFrame
-        rootPart.Anchored = true 
-    end
-    
-    Workspace.Gravity = originalGravity
-end
-
--- ==================== FUNGSI TELEPORT KE LIFT AKHIR ====================
-local function teleportToRealElevator()
-    local map = getMap()
-    if map then
-        rootPart.Anchored = false 
-        
-        local freeArea = map:FindFirstChild("FreeArea")
-        if freeArea then
-            for _, child in ipairs(freeArea:GetChildren()) do
-                if child:IsA("Model") and child.Name == "Elevator" and child.PrimaryPart then
-                    local targetCFrame = child.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
-                    moveToPosition(targetCFrame, false)
-                    return true
-                end
-            end
+            continue
         end
         
-        for _, child in ipairs(map:GetChildren()) do
-            if child:IsA("Model") and child.Name == "Elevator" and child.PrimaryPart then
-                local targetCFrame = child.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
-                moveToPosition(targetCFrame, false)
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- ==================== FUNGSI UTAMA FARMING ====================
-local function startAutoFarming()
-    task.spawn(function()
-        while not _G.KillOldFarmer do
-            if not isFarmerToggledON or not Config.Teleport.Enable then
-                task.wait(1)
-                continue
-            end
-            
-            -- CEK DULU: Apakah kita sedang dikejar monster?
-            if isPlayerChased() then
-                print("[EVASION] Dikejar Monster! Evakuasi ke Safe Place (Fake Elevator)...")
-                forceStop()
+        local map = getMap()
+        if map then
+            local genFolder = map:FindFirstChild("Generators")
+            if genFolder then
+                local targetGen = nil
+                local unfinished = 0
                 
-                local safePos = getFakeElevatorPosition()
-                if safePos then
-                    -- Teleport ke atas Fake Elevator agar aman (TIDAK butuh platform)
-                    moveToPosition(CFrame.new(safePos + Vector3.new(0, 4, 0)), false)
-                else
-                    -- Jika Fake Elevator tidak ada (jarang terjadi), terbang sedikit ke atas sebagai darurat
-                    moveToPosition(rootPart.CFrame * CFrame.new(0, 50, 0), true)
-                end
-                
-                -- Bersembunyi sampai indikator ChasingValue hilang
-                while isPlayerChased() and isFarmerToggledON and not _G.KillOldFarmer do
-                    task.wait(1)
-                end
-                
-                print("[INFO] Monster kehilangan jejak. Melanjutkan farming...")
-                task.wait(1)
-                continue -- Ulangi pencarian mesin
-            end
-            
-            local map = getMap()
-            if map then
-                local genFolder = map:FindFirstChild("Generators")
-                if genFolder then
-                    local targetGen = nil
-                    local uncompletedCount = 0
-                    
-                    for _, gen in pairs(genFolder:GetChildren()) do
-                        if gen:IsA("Model") and gen.PrimaryPart then
-                            local stats = gen:FindFirstChild("Stats")
-                            if stats then
-                                local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
-                                local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
-                                
-                                if not completed then
-                                    uncompletedCount = uncompletedCount + 1
-                                    if not connie and not targetGen then
-                                        if not isMonsterNear(gen, Config.Teleport.SafeRadius) then
-                                            if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
-                                                targetGen = gen
-                                            end
-                                        end
+                -- Evaluasi Generator
+                for _, gen in pairs(genFolder:GetChildren()) do
+                    if gen:IsA("Model") and gen.PrimaryPart then
+                        local stats = gen:FindFirstChild("Stats")
+                        if stats then
+                            local isCompleted = stats:FindFirstChild("Completed") and stats.Completed.Value
+                            local isPossessed = stats:FindFirstChild("Connie") and stats.Connie.Value
+                            
+                            if not isCompleted then
+                                unfinished = unfinished + 1
+                                if not isPossessed and not targetGen then
+                                    if isSafe(gen.PrimaryPart.Position) then
+                                        targetGen = gen
                                     end
                                 end
                             end
                         end
                     end
-                    
-                    if uncompletedCount == 0 then
-                        teleportToRealElevator()
+                end
+                
+                -- EKSEKUSI
+                if unfinished == 0 then
+                    -- Semua selesai -> Cari Lift
+                    local elevatorCF = getElevatorCFrame()
+                    if elevatorCF then
+                        print("[NOXIOUS] Menuju Elevator!")
+                        rootPart.CFrame = elevatorCF
                         task.wait(5)
-                        
-                    elseif targetGen then
-                        local centerPos = getModelCenter(targetGen)
-                        if centerPos and targetGen.PrimaryPart then
-                            local hiddenCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.OffsetHidden, centerPos.Z)
-                            local farmingCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.OffsetFarming, centerPos.Z)
-                            
-                            moveToPosition(hiddenCFrame, true)
-                            task.wait(0.1)
-                            
-                            while targetGen.Parent and isFarmerToggledON and not _G.KillOldFarmer do
-                                local stats = targetGen:FindFirstChild("Stats")
-                                if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
-                                    break 
-                                end
-                                
-                                -- JIKA TIBA-TIBA DIKEJAR MONSTER ATAU ADA PLAYER LAIN DATANG SAAT FARMING
-                                if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) or isMonsterNear(targetGen, Config.Teleport.SafeRadius) or isPlayerChased() then
-                                    print("[WARNING] Mesin didatangi ancaman! Membatalkan interaksi...")
-                                    forceStop()
-                                    break -- Keluar loop agar terbawa ke fungsi evakuasi (Safe Place) di atas
-                                end
-                                
-                                local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
-                                
-                                if isDecoding then
-                                    rootPart.CFrame = farmingCFrame
-                                    if activePlatform then activePlatform.CFrame = farmingCFrame * CFrame.new(0, -3.5, 0) end
-                                    rootPart.Anchored = true
-                                else
-                                    rootPart.CFrame = hiddenCFrame
-                                    if activePlatform then activePlatform.CFrame = hiddenCFrame * CFrame.new(0, -3.5, 0) end
-                                    rootPart.Anchored = true
-                                    forceTriggerGenerator(targetGen)
-                                end
-                                
-                                task.wait(0.1)
-                            end
-                            
-                            rootPart.Anchored = false
-                            if activePlatform then
-                                activePlatform:Destroy()
-                                activePlatform = nil
-                            end
-                            
-                            task.wait(Config.Teleport.DelayNext)
+                    end
+                elseif targetGen then
+                    print("[NOXIOUS] Farming: " .. targetGen.Name)
+                    
+                    -- Cari Prompt-nya dulu
+                    local prompt = nil
+                    for _, desc in ipairs(targetGen:GetDescendants()) do
+                        if desc:IsA("ProximityPrompt") then
+                            prompt = desc
+                            break
                         end
+                    end
+                    
+                    if prompt and prompt.Parent then
+                        -- Bypass Prompt Rules
+                        prompt.RequiresLineOfSight = false
+                        prompt.MaxActivationDistance = 50
+                        
+                        -- Teleport ke atas lantai (Normal) dekat mesin
+                        local targetPos = prompt.Parent.CFrame
+                        rootPart.CFrame = targetPos * CFrame.new(0, 0, 3) 
+                        
+                        task.wait(0.2)
+                        
+                        -- Tembak prompt HANYA 1 KALI
+                        pcall(function() prompt:InputHoldBegin() end)
+                        
+                        -- Tunggu sampai mesin selesai ATAU ada bahaya datang
+                        while targetGen.Parent and isFarming do
+                            local stats = targetGen:FindFirstChild("Stats")
+                            if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
+                                break -- Mesin beres!
+                            end
+                            
+                            if not isSafe(targetGen.PrimaryPart.Position) then
+                                print("[NOXIOUS] Bahaya Terdeteksi! Membatalkan mesin...")
+                                local decoding = character:FindFirstChild("Decoding")
+                                if decoding and decoding.Value ~= nil then
+                                    pcall(function() decoding.Value.Stats.StopInteracting:FireServer("Stop") end)
+                                end
+                                break -- Lari!
+                            end
+                            
+                            task.wait(0.5)
+                        end
+                        
+                        task.wait(Config.WaitTime)
                     end
                 end
             end
-            task.wait(1)
         end
-    end)
-    
-    task.spawn(function()
-        while not _G.KillOldFarmer do
-            updateGeneratorESP()
-            task.wait(0.5)
-        end
-    end)
-end
+        task.wait(1)
+    end
+end)
 
--- ==================== INISIALISASI ====================
-setupAutoSkillcheck()
-startAutoFarming()
+print("[INFO] Pure Noxious Hub Auto Farmer Loaded.")
