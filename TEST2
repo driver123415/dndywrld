@@ -1,5 +1,5 @@
 -- ==============================================================================
--- KATALOG NAMA ITEM (Bisa di-copy ke dalam Config di bawah)
+-- KATALOG NAMA ITEM DANDY'S WORLD
 -- ==============================================================================
 -- [Quest]  "Tape", "ResearchCapsule"
 -- [Heal]   "Bandage", "HealthKit"
@@ -13,10 +13,11 @@ local Config = {
     -- [1] PENGATURAN AUTO PICKUP
     Pickup = {
         Enable = true,              
-        TweenSpeed = 5.00, --ganti kecepatan dragTP       
+        MovementMode = "Instant",     -- PILIHAN: "Tween" (Aman, meluncur) ATAU "Instant" (Teleport kilat)
+        TweenSpeed = 1.25,          -- Kecepatan meluncur jika memakai mode "Tween"
         AuraRange = 30,             
         
-        -- 1. PRIORITAS (Diambil duluan sesuai urutan dari atas ke bawah)
+        -- 1. PRIORITAS (Diambil duluan dari atas ke bawah)
         PriorityList = {
             "ResearchCapsule",
             "HolidayCollectibleItem",
@@ -24,27 +25,31 @@ local Config = {
             "Tape"
         },
         
-        -- 2. DAFTAR HITAM (Item ini TIDAK AKAN PERNAH diambil)
+        -- 2. DAFTAR HITAM (TIDAK AKAN diambil, dibiarkan saja di map)
         IgnoreList = {
-            "FakeCapsule"
+             "FakeCapsule"
         }
     },
 
-    -- [2] PENGATURAN AUTO USE ITEM 
+    -- [2] PENGATURAN ESP ITEM
+    ESP = {
+        Enable = true               -- Ubah ke false jika tidak ingin melihat ESP Item
+    },
+
+    -- [3] PENGATURAN AUTO USE ITEM 
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.5,          -- Jeda 0.5 detik agar tidak lag/spam server
-        
+        UseInterval = 0.5,          
         Slots = {
             Slot1 = true,
             Slot2 = true,
             Slot3 = true,
-            Slot4 = false           -- Slot 4 tidak akan otomatis terpakai
+            Slot4 = false           
         }
     }
 }
 -- ==============================================================================
--- END OF CONFIGURATION (JANGAN UBAH KODE DI BAWAH KECUALI PAHAM)
+-- END OF CONFIGURATION
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -62,11 +67,52 @@ local isAutoUseActive = false
 -- ==================== FUNGSI CEK DAFTAR HITAM ====================
 local function isIgnored(itemName)
     for _, ignoreName in ipairs(Config.Pickup.IgnoreList) do
-        if itemName == ignoreName then
-            return true
-        end
+        if itemName == ignoreName then return true end
     end
     return false
+end
+
+-- ==================== FUNGSI ITEM ESP ====================
+local function applyItemESP()
+    if not Config.ESP.Enable then return end
+    
+    local map = Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+    if map and map:FindFirstChild("Items") then
+        for _, item in ipairs(map.Items:GetChildren()) do
+            if item:IsA("Model") and not item:FindFirstChild("ItemESP") then
+                
+                -- Buat Highlight
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ItemESP"
+                highlight.Parent = item
+                highlight.FillTransparency = 0.5
+                
+                -- Warna: Merah jika Blacklist, Hijau jika Target
+                if isIgnored(item.Name) then
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0) 
+                else
+                    highlight.FillColor = Color3.fromRGB(0, 255, 0) 
+                end
+                
+                -- Buat Text Label
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ItemESPText"
+                billboard.Adornee = item
+                billboard.Size = UDim2.new(0, 100, 0, 50)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = item
+                
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Text = item.Name
+                label.TextColor3 = highlight.FillColor
+                label.TextStrokeTransparency = 0.5
+                label.TextSize = 14
+                label.Parent = billboard
+            end
+        end
+    end
 end
 
 -- ==================== FUNGSI AUTO USE ITEM ====================
@@ -75,7 +121,6 @@ local function startAutoUse()
     isAutoUseActive = true
     
     task.spawn(function()
-        print("[INFO] Auto Use Item mulai berjalan...")
         while isAutoUseActive do
             local char = player.Character
             if char and char:FindFirstChild("Inventory") then
@@ -95,7 +140,7 @@ local function startAutoUse()
     end)
 end
 
--- ==================== FUNGSI AUTO PICKUP ====================
+-- ==================== FUNGSI MOVEMENT & AURA ====================
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
@@ -120,7 +165,6 @@ local function startItemAura()
                 local itemsFolder = map:FindFirstChild("Items")
                 if itemsFolder then
                     for _, item in pairs(itemsFolder:GetChildren()) do
-                        -- Cek agar aura TIDAK mengambil item di daftar hitam
                         if not isIgnored(item.Name) then
                             local promptPart = item:FindFirstChild("Prompt")
                             if promptPart then
@@ -141,44 +185,46 @@ local function startItemAura()
     end)
 end
 
-local function tweenToPosition(targetCFrame)
-    local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
-    local distance = (rootPart.Position - targetCFrame.Position).Magnitude
-    local duration = distance / (speed * Config.Pickup.TweenSpeed)
-    
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-    local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
-    
+-- Fungsi bergerak yang mendukung Tween dan Instant Teleport
+local function moveToPosition(targetCFrame)
     local originalGravity = Workspace.Gravity
     Workspace.Gravity = 0
     rootPart.AssemblyLinearVelocity = Vector3.zero
     
-    tween:Play()
-    tween.Completed:Wait()
+    if Config.Pickup.MovementMode == "Instant" then
+        -- Mode Instant Teleport
+        rootPart.CFrame = targetCFrame
+        task.wait(0.1) -- Jeda stabilisasi teleport
+    else
+        -- Mode Tween
+        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
+        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+        local duration = distance / (speed * Config.Pickup.TweenSpeed)
+        
+        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+        local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
+        tween:Play()
+        tween.Completed:Wait()
+    end
     
     Workspace.Gravity = originalGravity
 end
 
+-- ==================== FUNGSI UTAMA AUTO PICKUP ====================
 local function executePickup()
     if not Config.Pickup.Enable then return end
     
     local map = getMap()
-    if not map then 
-        print("[ERROR] Map tidak ditemukan.") 
-        return 
-    end
-
+    if not map then return end
     local itemsFolder = map:FindFirstChild("Items")
-    if not itemsFolder or #itemsFolder:GetChildren() == 0 then
-        print("[INFO] Tidak ada item tersisa di map ini.")
-        return
-    end
+    if not itemsFolder or #itemsFolder:GetChildren() == 0 then return end
 
-    print("[START] Menjalankan Auto Pickup...")
+    -- Nyalakan ESP agar terlihat jelas mana yang target dan mana yang ignore
+    applyItemESP()
+
     local originalPosition = rootPart.CFrame
     startItemAura()
     
-    -- Kumpulkan semua item yang BUKAN blacklist ke dalam antrean
     local validItems = {}
     for _, item in ipairs(itemsFolder:GetChildren()) do
         if item:IsA("Model") and not isIgnored(item.Name) then
@@ -186,19 +232,34 @@ local function executePickup()
         end
     end
 
-    local itemMendekat = 0
+    -- Fungsi bantuan untuk memproses item dengan validasi habis
+    local function processItem(item)
+        if item and item.Parent then
+            print("[PICKUP] Bergerak ke: " .. item.Name)
+            moveToPosition(item:GetPivot() * CFrame.new(0, -3.3, 0))
+            
+            -- VALIDASI: Tunggu sampai item benar-benar hilang (Max 25x cek = 2.5 detik)
+            local timeout = 25 
+            while item.Parent and timeout > 0 do
+                task.wait(0.1)
+                timeout = timeout - 1
+            end
+            
+            if item.Parent then
+                print("[WARNING] Gagal/Lama mengambil: " .. item.Name .. ". Melanjutkan ke item berikutnya...")
+            else
+                print("[SUCCESS] " .. item.Name .. " berhasil diambil!")
+            end
+        end
+    end
 
     -- LANGKAH 1: Ambil item PRIORITAS terlebih dahulu
     for _, priorityName in ipairs(Config.Pickup.PriorityList) do
         for i = #validItems, 1, -1 do
             local item = validItems[i]
-            -- Cek item.Parent untuk memastikan item belum terhapus dari map
             if item.Name == priorityName and item.Parent then
-                print("[PICKUP] Prioritas: " .. item.Name)
-                itemMendekat = itemMendekat + 1
-                tweenToPosition(item:GetPivot() * CFrame.new(0, -3.3, 0))
-                task.wait(0.1)
-                table.remove(validItems, i) -- Coret dari antrean karena sudah diambil
+                processItem(item)
+                table.remove(validItems, i) 
             end
         end
     end
@@ -206,19 +267,16 @@ local function executePickup()
     -- LANGKAH 2: Ambil sisa item yang TIDAK ADA di prioritas maupun blacklist
     for _, item in ipairs(validItems) do
         if item.Parent then
-            print("[PICKUP] Sisa item: " .. item.Name)
-            itemMendekat = itemMendekat + 1
-            tweenToPosition(item:GetPivot() * CFrame.new(0, -3.3, 0))
-            task.wait(0.1)
+            processItem(item)
         end
     end
 
-    print("[INFO] " .. itemMendekat .. " item diambil. Kembali ke posisi awal...")
-    tweenToPosition(originalPosition)
+    print("[INFO] Kembali ke posisi awal...")
+    moveToPosition(originalPosition)
     
     task.wait(0.2)
     isAuraActive = false
-    print("[SUCCESS] Auto Pickup selesai!")
+    print("[DONE] Auto Pickup Selesai!")
 end
 
 -- ==================== JALANKAN SCRIPT ====================
