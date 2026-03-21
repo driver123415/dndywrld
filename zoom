@@ -1,0 +1,39 @@
+-- ==================== Configuration ====================
+local ZOOM_DISTANCE = 50 -- Set your desired zoom out distance here (Default Roblox max is usually 128)
+local LOCK_ZOOM = false  -- Set to 'true' if you want to lock the camera at this distance. Set to 'false' if you still want to be able to scroll in/out.
+-- =======================================================
+
+-- ==================== Services ====================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Wait for character to fully load
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+task.wait(0.5) -- Small delay to ensure default game camera doesn't override this script
+
+-- ==================== Camera Logic ====================
+if LOCK_ZOOM then
+    -- Lock the camera exactly at the ZOOM_DISTANCE
+    LocalPlayer.CameraMinZoomDistance = ZOOM_DISTANCE
+    LocalPlayer.CameraMaxZoomDistance = ZOOM_DISTANCE
+    print("Camera locked at zoom distance:", ZOOM_DISTANCE)
+else
+    -- Temporarily store original limits
+    local defaultMin = LocalPlayer.CameraMinZoomDistance
+    local defaultMax = LocalPlayer.CameraMaxZoomDistance
+    
+    -- Force the camera to zoom out by setting both min and max to the target distance
+    LocalPlayer.CameraMinZoomDistance = ZOOM_DISTANCE
+    LocalPlayer.CameraMaxZoomDistance = ZOOM_DISTANCE
+    
+    -- Revert the limits so the player can use their scroll wheel again
+    task.wait(0.1)
+    LocalPlayer.CameraMinZoomDistance = defaultMin
+    -- Ensure the max limit allows the new zoom distance
+    if defaultMax < ZOOM_DISTANCE then
+        LocalPlayer.CameraMaxZoomDistance = ZOOM_DISTANCE
+    else
+        LocalPlayer.CameraMaxZoomDistance = defaultMax
+    end
+    print("Camera zoomed out to:", ZOOM_DISTANCE, "| Scroll is unlocked.")
+end
