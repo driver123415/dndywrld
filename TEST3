@@ -1,28 +1,20 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V5 (ABSOLUTE CENTER & DEEP UNDERGROUND)
+-- CONFIGURATION: AUTO MACHINE FARMER V6 (ANTI FAKE-ELEVATOR)
 -- ==============================================================================
 local Config = {
     
-    -- [1] PENGATURAN AUTO SKILLCHECK
-    Skillcheck = {
-        Enable = true,          
-    },
+    Skillcheck = { Enable = true },
 
-    -- [2] PENGATURAN TELEPORT & POSISI
     Teleport = {
         Enable = true,          
-        Mode = "Instant",       -- PILIHAN: "Tween" atau "Instant"
+        Mode = "Instant",       -- "Tween" atau "Instant"
         TweenSpeed = 1.25,      
-        SafeRadius = 30,        -- Jarak aman dari monster
-        PlayerRadius = 8,       -- Jarak aman dari player lain (Anti-Rebutan)
+        SafeRadius = 30,        
+        PlayerRadius = 8,       
         DelayNext = 1.0,        
-        
-        -- PENGATURAN SEMBUNYI DI BAWAH TANAH
-        -- Diperdalam menjadi -8 agar kepala tidak menyangkut di lantai tebal
         UndergroundOffset = -8 
     },
 
-    -- [3] PENGATURAN GENERATOR ESP
     ESP = {
         Enable = true,          
         NormalColor = Color3.fromRGB(150, 150, 150),   
@@ -51,7 +43,6 @@ local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
 
--- Mencari Titik Tengah Absolut dari seluruh part di dalam Generator
 local function getModelCenter(model)
     if not model or not model:IsA("Model") then return nil end
     local parts = {}
@@ -199,7 +190,7 @@ local function forceTriggerGenerator(generator)
             local oldMaxDist = descendant.MaxActivationDistance
             
             descendant.RequiresLineOfSight = false
-            descendant.MaxActivationDistance = 100 -- Jarak dimaksimalkan karena kita turun ke -8
+            descendant.MaxActivationDistance = 100 
             
             pcall(function()
                 descendant:InputHoldBegin()
@@ -251,33 +242,44 @@ local function moveToPosition(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
--- ==================== FUNGSI TELEPORT KE LIFT ====================
-local function teleportToElevator()
+-- ==================== FUNGSI TELEPORT KE LIFT (V2 - REAL ONLY) ====================
+local function teleportToRealElevator()
     local map = getMap()
     if map then
-        print("[INFO] Semua Generator Selesai! Mencari Elevator...")
+        print("[INFO] Semua Generator Selesai! Mencari Real Elevator...")
+        
+        -- Biasanya Real Elevator berada di dalam FreeArea, tapi kita cek namanya secara ketat
         local freeArea = map:FindFirstChild("FreeArea")
         if freeArea then
-            local elevator = freeArea:FindFirstChild("Elevator") or freeArea:FindFirstChild("FakeElevator")
-            if elevator and elevator:IsA("Model") then
-                print("[SUCCESS] Elevator ditemukan! Meluncur ke lantai berikutnya...")
-                local centerPos = getModelCenter(elevator)
-                if centerPos then
-                    moveToPosition(CFrame.new(centerPos + Vector3.new(0, 4, 0)), false)
-                end
-            end
-        else
-            for _, child in ipairs(map:GetChildren()) do
-                if child:IsA("Model") and string.find(child.Name:lower(), "elevator") then
+            for _, child in ipairs(freeArea:GetChildren()) do
+                -- SYARAT MUTLAK: Nama harus tepat "Elevator", BUKAN "FakeElevator"
+                if child:IsA("Model") and child.Name == "Elevator" then
+                    print("[SUCCESS] Real Elevator ditemukan! Meluncur ke lantai berikutnya...")
                     local centerPos = getModelCenter(child)
                     if centerPos then
                         moveToPosition(CFrame.new(centerPos + Vector3.new(0, 4, 0)), false)
-                        break
+                        return true
                     end
                 end
             end
         end
+        
+        -- Kalau di FreeArea tidak ada, sapu bersih seluruh map
+        -- TAPI TETAP ANTI FAKE-ELEVATOR
+        for _, child in ipairs(map:GetChildren()) do
+            if child:IsA("Model") and child.Name == "Elevator" then
+                print("[SUCCESS] Real Elevator ditemukan (di luar FreeArea)! Meluncur...")
+                local centerPos = getModelCenter(child)
+                if centerPos then
+                    moveToPosition(CFrame.new(centerPos + Vector3.new(0, 4, 0)), false)
+                    return true
+                end
+            end
+        end
+        
+        print("[WARNING] Elevator tidak ditemukan atau map sudah bersih.")
     end
+    return false
 end
 
 -- ==================== FUNGSI UTAMA FARMING ====================
@@ -318,16 +320,14 @@ local function startAutoFarming()
                         
                         -- 2. Ambil Keputusan
                         if uncompletedCount == 0 then
-                            teleportToElevator()
+                            teleportToRealElevator()
                             task.wait(5)
                             
                         elseif targetGen then
                             print("[FARMER] Menuju Generator: " .. targetGen.Name)
                             
-                            -- MENGGUNAKAN ABSOLUTE CENTER (Tengah mesin, bukan ujung PrimaryPart)
                             local centerPos = getModelCenter(targetGen)
                             if centerPos then
-                                -- Tarik garis lurus murni ke bawah (Sumbu Y dikurangi) tanpa efek rotasi
                                 local targetCFrame = CFrame.new(centerPos.X, centerPos.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
                                 
                                 moveToPosition(targetCFrame, true)
@@ -346,7 +346,7 @@ local function startAutoFarming()
                                         break
                                     end
                                     
-                                    -- PAKSA posisi karakter diam di tempat (mencegah terpental physics)
+                                    -- PAKSA posisi karakter diam di tempat 
                                     rootPart.CFrame = targetCFrame
                                     rootPart.AssemblyLinearVelocity = Vector3.zero
                                     
@@ -384,7 +384,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V5 BERHASIL DIJALANKAN")
+print(" AUTO MACHINE FARMER V6 BERHASIL DIJALANKAN")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
