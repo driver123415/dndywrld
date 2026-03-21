@@ -1,5 +1,6 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN uhuy)
+-- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN uhuyvehveh)
+-- + DYNAMIC ELEVATION / KAPAL SELAM
 -- ==============================================================================
 local Config = {
     
@@ -13,9 +14,9 @@ local Config = {
         PlayerRadius = 8,       
         DelayNext = 1.0,        
         
-        -- KEDALAMAN: Dinaikkan menjadi -5.5 (Ubah angka ini jika masih kurang pas)
-        -- Semakin mendekati angka 0, posisi kamu akan semakin ke atas
-        UndergroundOffset = 1.0
+        -- DYNAMIC ELEVATION (Ide Gilamu!)
+        OffsetHidden = -5,      -- Kedalaman saat datang/sembunyi agar 100% aman
+        OffsetFarming = 1.0     -- Kedalaman otomatis saat mode Skillcheck menyala
     },
 
     ESP = {
@@ -326,9 +327,12 @@ local function startAutoFarming()
                             
                             local centerPos = getModelCenter(targetGen)
                             if centerPos and targetGen.PrimaryPart then
-                                local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
+                                -- Bikin dua koordinat: Satu sembunyi, Satu kerja
+                                local hiddenCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.OffsetHidden, centerPos.Z)
+                                local farmingCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.OffsetFarming, centerPos.Z)
                                 
-                                moveToPosition(targetCFrame, true)
+                                -- Datang ke lokasi dengan mode Sembunyi (-5)
+                                moveToPosition(hiddenCFrame, true)
                                 task.wait(0.1)
                                 
                                 while isFarming and targetGen.Parent do
@@ -343,10 +347,21 @@ local function startAutoFarming()
                                         break
                                     end
                                     
-                                    rootPart.CFrame = targetCFrame
-                                    
                                     local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
-                                    if not isDecoding then
+                                    
+                                    if isDecoding then
+                                        -- NAIK KE ATAS (FARMING MODE)
+                                        rootPart.CFrame = farmingCFrame
+                                        if activePlatform then
+                                            activePlatform.CFrame = farmingCFrame * CFrame.new(0, -3.5, 0)
+                                        end
+                                    else
+                                        -- TURUN KE BAWAH (SEMBUNYI & TEMBAK PROMPT)
+                                        rootPart.CFrame = hiddenCFrame
+                                        if activePlatform then
+                                            activePlatform.CFrame = hiddenCFrame * CFrame.new(0, -3.5, 0)
+                                        end
+                                        
                                         forceTriggerGenerator(targetGen)
                                     end
                                     
@@ -379,7 +394,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN uhuyvehveh")
+print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN brahbrah1")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
