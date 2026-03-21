@@ -15,7 +15,7 @@ local Config = {
         
         -- KEDALAMAN: Dinaikkan menjadi -5.5 (Ubah angka ini jika masih kurang pas)
         -- Semakin mendekati angka 0, posisi kamu akan semakin ke atas
-        UndergroundOffset = -1.0
+        UndergroundOffset = 1.0
     },
 
     ESP = {
@@ -379,7 +379,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN uhuy")
+print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN uhuyvehveh")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
