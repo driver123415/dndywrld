@@ -1,0 +1,69 @@
+-- ==================== Configuration ====================
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game (Run)
+local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
+-- =======================================================
+
+if game.PlaceId == INGAME_PLACE_ID then
+    print("[DEBUG] In-game detected. Memantau DeathGui -> SpectateButton...")
+
+    local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local hasTeleported = false
+
+    -- Fungsi untuk mengeksekusi teleportasi
+    local function teleportToLobby()
+        if hasTeleported then return end
+        hasTeleported = true -- Mengunci agar tidak spam teleport
+        
+        print("[SUCCESS] SpectateButton.Visible = true terdeteksi!")
+        print("[SUCCESS] Teleporting back to Lobby...")
+        
+        -- Hapus tanda komentar (--) pada baris di bawah ini jika ingin langsung teleport
+        TeleportService:Teleport(LOBBY_PLACE_ID, player)
+    end
+
+    -- Fungsi untuk memantau DeathGui secara akurat
+    local function monitorDeathGui(gui)
+        -- Memastikan kita menargetkan DeathGui sesuai screenshot-mu
+        if gui.Name == "DeathGui" then
+            print("[DEBUG] DeathGui ditemukan! Mencari SpectateButton...")
+            
+            local spectateButton = gui:WaitForChild("SpectateButton", 10)
+            
+            if spectateButton then
+                print("[DEBUG] SpectateButton ditemukan. Memantau properti 'Visible'...")
+                
+                -- 1. Pantau jika game mengubah centang Visible pada tombol tersebut
+                spectateButton:GetPropertyChangedSignal("Visible"):Connect(function()
+                    print("[DEBUG] Update: SpectateButton Visible berubah menjadi ->", spectateButton.Visible)
+                    if spectateButton.Visible == true then
+                        teleportToLobby()
+                    end
+                end)
+                
+                -- 2. Cek saat ini juga (jaga-jaga jika tombolnya sudah Visible saat script di-load)
+                if spectateButton.Visible == true then
+                    teleportToLobby()
+                end
+            else
+                print("[ERROR] SpectateButton tidak ditemukan di dalam DeathGui.")
+            end
+        end
+    end
+
+    -- Pantau GUI yang sudah ada di layar saat ini
+    for _, child in ipairs(playerGui:GetChildren()) do
+        monitorDeathGui(child)
+    end
+
+    -- Pantau GUI jika game baru membuat (clone) DeathGui setelah player mati
+    playerGui.ChildAdded:Connect(function(child)
+        monitorDeathGui(child)
+    end)
+
+else
+    print("Not in-game (Place ID mismatch). Auto-Teleport to Lobby is disabled.")
+end
