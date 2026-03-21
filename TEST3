@@ -1,5 +1,5 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN Ahayyyyyyy)
+-- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN uhuy)
 -- ==============================================================================
 local Config = {
     
@@ -379,7 +379,7 @@ end
 
 -- ==================== INISIALISASI ====================
 print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN Ahayyyyyyy")
+print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN uhuy")
 print("==================================================")
 setupAutoSkillcheck()
 startAutoFarming()
