@@ -4,56 +4,58 @@ local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
 -- =======================================================
 
 if game.PlaceId == INGAME_PLACE_ID then
-    print("[DEBUG] In-game detected. Memulai pemantauan Kematian/Spectate...")
+    print("In-game detected. Auto-Teleport on Death is ready.")
 
     local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    
     local player = Players.LocalPlayer
-    local hasTriggered = false -- Kunci agar print tidak spam jika kedua metode terpicu bersamaan
+    local hasTeleported = false
 
-    -- Fungsi simulasi teleportasi (hanya print ke konsol)
-    local function triggerTeleport(sumber)
-        if hasTriggered then return end
-        hasTriggered = true 
+    -- Fungsi untuk mengeksekusi teleportasi
+    local function teleportToLobby()
+        if hasTeleported then return end
+        hasTeleported = true -- Kunci agar tidak spam teleport
         
-        print("======================================================")
-        print("[SUCCESS] Kematian terdeteksi dari: " .. sumber)
-        print("[SUCCESS] --> SEHARUSNYA PLAYER DI-TELEPORT KE LOBBY SEKARANG! <--")
-        print("======================================================")
+        print("Kematian terdeteksi! Teleporting back to Lobby...")
+        TeleportService:Teleport(LOBBY_PLACE_ID, player)
     end
 
     -- METODE 1: Deteksi kematian lewat Humanoid
     local function setupDeathDetection(character)
         local humanoid = character:WaitForChild("Humanoid", 10)
         if humanoid then
+            -- Memicu teleport saat darah (Health) habis
             humanoid.Died:Connect(function()
-                print("[DEBUG] Trigger ditarik: Humanoid darahnya habis (Died event).")
-                triggerTeleport("Humanoid.Died")
+                print("[DEBUG] Humanoid.Died terpanggil.")
+                teleportToLobby()
             end)
         end
     end
 
-    -- Pasang deteksi ke karakter yang sedang dipakai saat ini
+    -- Pasang deteksi ke karakter yang sedang dipakai
     if player.Character then
         setupDeathDetection(player.Character)
     end
 
-    -- Pasang ulang jika karakter di-spawn ulang (respawn)
+    -- Pasang ulang jika karakter di-spawn ulang
     player.CharacterAdded:Connect(setupDeathDetection)
 
-    -- METODE 2: Deteksi jika game menghapus karaktermu dari InGamePlayers
+    -- METODE 2 (Cadangan): Deteksi jika game menghapus karaktermu dari InGamePlayers
+    -- Di Dandy's World, saat pemain mati, modelnya sering dihapus dari folder ini
     task.spawn(function()
         local inGamePlayers = workspace:WaitForChild("InGamePlayers", 10)
         if inGamePlayers then
             inGamePlayers.ChildRemoved:Connect(function(child)
-                -- Mengecek apakah yang dihapus dari map adalah model karakter kita
+                -- Jika yang dihapus adalah karakter kita sendiri
                 if child.Name == player.Name then
-                    print("[DEBUG] Trigger ditarik: Karakter dihapus dari InGamePlayers.")
-                    triggerTeleport("InGamePlayers.ChildRemoved")
+                    print("[DEBUG] Karakter dihapus dari InGamePlayers.")
+                    teleportToLobby()
                 end
             end)
         end
     end)
 
 else
-    print("[DEBUG] Not in-game (Place ID mismatch). Script pemantau mati.")
+    print("Not in-game (Place ID mismatch). Script disabled.")
 end
