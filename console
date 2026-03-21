@@ -44,10 +44,10 @@ local uigradient = Instance.new("UIGradient")
 uigradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(0.0862745, 0, 0.72549)), ColorSequenceKeypoint.new(1, Color3.new(0.294118, 0.380392, 0.435294))})
 uigradient.Parent = uistroke
 
---// Tombol Minimize (-)
+--// Tombol Minimize (-) - Dipindahkan ke posisi yang lebih estetis
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -35, 0, 5)
+minimizeBtn.Position = UDim2.new(1, -35, 0, 10) -- Diturunkan sedikit
 minimizeBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
 minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
 minimizeBtn.Font = Enum.Font.SourceSansBold
@@ -90,8 +90,8 @@ console_2.Active = true
 console_2.BackgroundColor3 = Color3.new(0.101961, 0.101961, 0.101961)
 console_2.BackgroundTransparency = 1
 console_2.BorderSizePixel = 0
-console_2.Position = UDim2.new(0.02, 0, 0.12, 0) -- Diturunkan agar tidak menutupi tombol minimize
-console_2.Size = UDim2.new(0.96, 0, 0.85, 0)
+console_2.Position = UDim2.new(0.02, 0, 0.15, 0) -- Diturunkan agar tidak menutupi tombol minimize
+console_2.Size = UDim2.new(0.96, 0, 0.82, 0) -- Disesuaikan
 console_2.Visible = true
 console_2.Name = "ConsoleList"
 console_2.Parent = console
@@ -101,11 +101,12 @@ logs.Name = "Logs"
 logs.Parent = console_2
 
 local uilist_layout = Instance.new("UIListLayout")
-uilist_layout.Padding = UDim.new(0, 5)
+uilist_layout.Padding = UDim.new(0, 10) -- Padding antar log lebih besar
 uilist_layout.SortOrder = Enum.SortOrder.LayoutOrder
+uilist_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Log akan di tengah frame
 uilist_layout.Parent = logs
 
---// Template Frame Log (Example)
+--// Template Frame Log (Example) - Perbaikan Total
 local example = Instance.new("Frame")
 example.BackgroundColor3 = Color3.new(1, 1, 1)
 example.BackgroundTransparency = 1
@@ -114,35 +115,40 @@ example.Visible = false -- Disembunyikan agar template asli tidak terlihat
 example.Name = "Example"
 example.Parent = logs
 
-local line = Instance.new("TextLabel")
-line.Font = Enum.Font.SourceSans
-line.Text = "1 - "
-line.TextColor3 = Color3.new(0.282353, 0.282353, 0.282353)
-line.TextSize = 14
-line.BackgroundColor3 = Color3.new(1, 1, 1)
-line.BackgroundTransparency = 1
-line.Position = UDim2.new(0, 5, 0, 0)
-line.Size = UDim2.new(0, 30, 1, 0)
-line.Visible = true
-line.Name = "Line"
-line.Parent = example
+-- Label Baris ("1 - ") - Dipisahkan ke frame sendiri
+local lineLabel = Instance.new("TextLabel")
+lineLabel.Font = Enum.Font.Code -- Font monospace lebih rapi
+lineLabel.Text = "1 - "
+lineLabel.TextColor3 = Color3.new(0.282353, 0.282353, 0.282353)
+lineLabel.TextSize = 14
+lineLabel.BackgroundColor3 = Color3.new(1, 1, 1)
+lineLabel.BackgroundTransparency = 1
+lineLabel.Position = UDim2.new(0, 5, 0, 0)
+lineLabel.Size = UDim2.new(0, 30, 1, 0) -- Lebar wadah label baris
+lineLabel.TextXAlignment = Enum.TextXAlignment.Left -- Teks di kiri
+lineLabel.Visible = true
+lineLabel.Name = "LineLabel"
+lineLabel.Parent = example
 
-local text = Instance.new("TextLabel")
-text.Font = Enum.Font.Cartoon
-text.Text = "Log: Hello, World"
-text.TextColor3 = Color3.new(0.423529, 0.8, 1)
-text.TextSize = 14
-text.TextXAlignment = Enum.TextXAlignment.Left
-text.BackgroundColor3 = Color3.new(1, 1, 1)
-text.BackgroundTransparency = 1
-text.Position = UDim2.new(1, 5, 0, 0)
-text.Size = UDim2.new(1, -110, 1, 0) -- Disesuaikan agar muat tombol copy
-text.Visible = true
-text.TextWrapped = true
-text.Name = "txt"
-text.Parent = line
+-- Label Teks Log Utama - Diberi ruang besar dan pembungkusan
+local logLabel = Instance.new("TextLabel")
+logLabel.Font = Enum.Font.Cartoon -- Sesuai permintaan
+logLabel.Text = "Log: Hello, World"
+logLabel.TextColor3 = Color3.new(0.423529, 0.8, 1)
+logLabel.TextSize = 14
+logLabel.BackgroundColor3 = Color3.new(1, 1, 1)
+logLabel.BackgroundTransparency = 1
+logLabel.Position = UDim2.new(0, 35, 0, 0) -- Di kanan label baris
+logLabel.Size = UDim2.new(1, -110, 1, 0) -- Disesuaikan agar muat tombol copy
+logLabel.TextXAlignment = Enum.TextXAlignment.Left -- Teks di kiri
+logLabel.TextYAlignment = Enum.TextYAlignment.Center -- Teks di tengah vertikal
+logLabel.TextWrapped = true -- Teks terbungkus ke baris baru
+logLabel.TextScaled = false -- Jangan diskalakan agar keterbacaan terjaga
+logLabel.Visible = true
+logLabel.Name = "LogLabel"
+logLabel.Parent = example
 
---// Tombol Copy di dalam log
+--// Tombol Copy di dalam log - Tetap sama
 local copyBtn = Instance.new("TextButton")
 copyBtn.Size = UDim2.new(0, 50, 0, 22)
 copyBtn.Position = UDim2.new(1, -55, 0.5, -11)
@@ -229,15 +235,22 @@ task.spawn(function()
 		NewFrame.LayoutOrder = LineCount
 		NewFrame.Visible = true
 		
-		NewFrame.Line.Text = tostring(LineCount) .. " - "
-		NewFrame.Line.txt.Text = tostring(msgText)
-		
-		-- Fungsi Copy untuk log ini
-		NewFrame.CopyBtn.MouseButton1Click:Connect(function()
-			if setclipboard then
-				setclipboard(tostring(msgText))
-			end
-		end)
+		-- Merujuk ke struktur template yang baru
+		local line = NewFrame:FindFirstChild("LineLabel")
+		local txt = NewFrame:FindFirstChild("LogLabel")
+		local copyBtn = NewFrame:FindFirstChild("CopyBtn")
+
+		if line and txt and copyBtn then
+			line.Text = tostring(LineCount) .. " - "
+			txt.Text = tostring(msgText)
+			
+			-- Fungsi Copy untuk log ini
+			copyBtn.MouseButton1Click:Connect(function()
+				if setclipboard then
+					setclipboard(tostring(msgText))
+				end
+			end)
+		end
 
 		NewFrame.Parent = Logs
 		
