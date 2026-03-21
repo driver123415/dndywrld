@@ -13,7 +13,7 @@ local Config = {
     -- [1] PENGATURAN AUTO PICKUP
     Pickup = {
         Enable = true,              
-        TweenSpeed = 3.00,          
+        TweenSpeed = 2.00, --ganti kecepatan dragTP       
         AuraRange = 30,             
         
         -- 1. PRIORITAS (Diambil duluan sesuai urutan dari atas ke bawah)
