@@ -1,6 +1,6 @@
- print("Updated V1")
+print("Updated V2 - Fully Automated Auto-Farm")
 -- ==============================================================================
--- KATALOG NAMA ITEM FIX
+-- KATALOG NAMA ITEM FIX jadi 90 persen
 -- ==============================================================================
 -- [Quest]  "Tape", "ResearchCapsule"
 -- [Heal]   "Bandage", "HealthKit"
@@ -67,6 +67,7 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 
 local isAuraActive = false
 local isAutoUseActive = false
+local isFarming = false -- Indikator apakah script sedang bekerja
 
 -- ==================== FUNGSI FILTERING ITEM ====================
 local function isIgnored(itemName)
@@ -298,23 +299,19 @@ local function executePickup()
             if item and item.Parent and not isIgnored(item.Name) then
                 print("[PICKUP] Bergerak ke: " .. item.Name)
                 
-                -- PERBAIKAN 1: Dikurangi dari -3.3 menjadi -2.5 agar tubuhmu lebih dekat ke item (tapi tetap di bawah tanah)
                 local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
                 
                 local platform = Instance.new("Part")
-                -- Diperlebar menjadi 15x15 agar kaki tidak meleset
                 platform.Size = Vector3.new(15, 1, 15) 
                 platform.Anchored = true
                 platform.CanCollide = true
                 platform.Transparency = 0.5 
                 platform.Color = Color3.fromRGB(0, 255, 0)
-                -- PERBAIKAN 2: Platform diposisikan 3.5 stud di bawah titik pusat dada, pas di telapak kakimu
                 platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
                 platform.Parent = Workspace
                 
                 moveToPosition(targetCFrame)
                 
-                -- PERBAIKAN 3: Jeda PENTING agar server game tahu posisimu sudah dekat sebelum kamu mengambil item
                 task.wait(0.15)
                 
                 local promptPart = item:FindFirstChild("Prompt")
@@ -359,9 +356,47 @@ local function executePickup()
         print("[WARNING] FreeArea tidak ditemukan!")
     end
 
-    print("[DONE] Script Eksekusi Selesai!")
+    print("[DONE] Script Eksekusi Selesai. Menunggu lantai berikutnya...")
 end
 
--- ==================== JALANKAN SCRIPT ====================
+-- ==================== SISTEM PEMANTAU (WATCHER) ====================
 startAutoUse()
-executePickup()
+
+-- Loop ini akan berjalan terus menerus di latar belakang untuk memantau map
+task.spawn(function()
+    while task.wait(1) do
+        -- Jika config dimatikan atau script sedang bekerja, lewati pengecekan
+        if not Config.Pickup.Enable or isFarming then continue end
+
+        local map = getMap()
+        if map then
+            local itemsFolder = map:FindFirstChild("Items")
+            if itemsFolder then
+                -- Cek apakah masih ada item valid (bukan blacklist) di map
+                local hasValidItems = false
+                for _, item in ipairs(itemsFolder:GetChildren()) do
+                    if item:IsA("Model") and not isIgnored(item.Name) then
+                        hasValidItems = true
+                        break
+                    end
+                end
+
+                -- Jika terdeteksi ada item baru, langsung nyalakan sistem!
+                if hasValidItems then
+                    isFarming = true -- Kunci script agar tidak mengeksekusi dobel
+                    print("\n==============================================")
+                    print("[SYSTEM] Mendeteksi Item Baru / Lantai Baru!")
+                    print("==============================================")
+                    
+                    -- Update character info (berjaga-jaga jika player respawn)
+                    character = player.Character or player.CharacterAdded:Wait()
+                    rootPart = character:WaitForChild("HumanoidRootPart")
+                    
+                    executePickup()
+                    
+                    isFarming = false -- Buka kunci setelah selesai, siap menunggu map selanjutnya
+                end
+            end
+        end
+    end
+end)
