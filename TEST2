@@ -1,11 +1,15 @@
 -- ==============================================================================
--- KATALOG NAMA ITEM 
+-- KATALOG NAMA ITEM FIX
 -- ==============================================================================
 -- [Quest]  "Tape", "ResearchCapsule"
 -- [Heal]   "Bandage", "HealthKit"
 -- [Mesin]  "JumperCable", "Valve"
 -- [Lempar] "SmokeBomb", "EjectButton", "Box chocolates", "ChocolateBox", "AirHorn", "EnigmaCandy", "PopBottle"
 -- [Event]  "HolidayCollectibleItem", "Holiday Collectible Item", "FakeCapsule"
+-- 3 warna di ESP:
+-- Kuning: Item Prioritas (Diambil pertama).
+-- Hijau: Item Normal (Diambil setelah prioritas habis).
+-- Merah: Item Blacklist (Ditinggalkan selamanya).
 -- ==============================================================================
 
 local Config = {
