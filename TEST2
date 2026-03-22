@@ -1,28 +1,55 @@
+print("Updated V2 - Fully Automated Auto-Farm")
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN Ahayyyyyyy)
+-- KATALOG NAMA ITEM FIX jadi 99 persen
 -- ==============================================================================
-local Config = {
-    
-    Skillcheck = { Enable = true },
+-- [Quest]  "Tape", "ResearchCapsule"
+-- [Heal]   "Bandage", "HealthKit"
+-- [Mesin]  "JumperCable", "Valve"
+-- [Lempar] "SmokeBomb", "EjectButton", "Box chocolates", "ChocolateBox", "AirHorn", "EnigmaCandy", "PopBottle"
+-- [Event]  "HolidayCollectibleItem", "Holiday Collectible Item", "FakeCapsule"
+-- 3 warna di ESP:
+-- Kuning: Item Prioritas (Diambil pertama).
+-- Hijau: Item Normal (Diambil setelah prioritas habis).
+-- Merah: Item Blacklist (Ditinggalkan selamanya).
+-- ==============================================================================
 
-    Teleport = {
-        Enable = true,          
-        Mode = "Instant",       -- PILIHAN: "Tween" atau "Instant"
-        TweenSpeed = 1.25,      
-        SafeRadius = 30,        
-        PlayerRadius = 8,       
-        DelayNext = 1.0,        
+local Config = {
+    -- [1] PENGATURAN AUTO PICKUP
+    Pickup = {
+        Enable = true,              
+        MovementMode = "Instant",   -- PILIHAN: "Tween" (Aman, meluncur) ATAU "Instant" (Teleport kilat)
+        TweenSpeed = 1.25,          
+        AuraRange = 30,             
         
-        -- KEDALAMAN: Dinaikkan menjadi -5.5 (Ubah angka ini jika masih kurang pas)
-        -- Semakin mendekati angka 0, posisi kamu akan semakin ke atas
-        UndergroundOffset = 10
+        -- 1. PRIORITAS (Wajib diambil paling pertama sebelum item lain)
+        PriorityList = {
+            "ResearchCapsule",
+            "HolidayCollectibleItem",
+            "Holiday Collectible Item",
+            "Tape"
+        },
+        
+        -- 2. DAFTAR HITAM (Mutlak TIDAK AKAN diambil, dibiarkan saja di map)
+        IgnoreList = {
+             "FakeCapsule"
+        }
     },
 
+    -- [2] PENGATURAN ESP ITEM
     ESP = {
-        Enable = true,          
-        NormalColor = Color3.fromRGB(150, 150, 150),   
-        CompletedColor = Color3.fromRGB(255, 0, 255),  
-        PossessedColor = Color3.fromRGB(0, 255, 255)   
+        Enable = true               
+    },
+
+    -- [3] PENGATURAN AUTO USE ITEM 
+    AutoUse = {
+        Enable = true,              
+        UseInterval = 0.1,          
+        Slots = {
+            Slot1 = true,
+            Slot2 = true,
+            Slot3 = true,
+            Slot4 = false            
+        }
     }
 }
 -- ==============================================================================
@@ -38,14 +65,167 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
-local isFarming = false
-local activePlatform = nil
+local isAuraActive = false
+local isAutoUseActive = false
+local isFarming = false -- Indikator apakah script sedang bekerja
 
--- ==================== FUNGSI BANTUAN ====================
+-- ==================== FUNGSI FILTERING ITEM ====================
+local function isIgnored(itemName)
+    local nameLower = string.lower(itemName)
+    for _, blackName in ipairs(Config.Pickup.IgnoreList) do
+        if string.find(nameLower, string.lower(blackName), 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function isPriority(itemName)
+    local nameLower = string.lower(itemName)
+    for _, prioName in ipairs(Config.Pickup.PriorityList) do
+        if string.find(nameLower, string.lower(prioName), 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+-- ==================== FUNGSI ITEM ESP ====================
+local function applyItemESP()
+    if not Config.ESP.Enable then return end
+    
+    local map = Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+    if map and map:FindFirstChild("Items") then
+        for _, item in ipairs(map.Items:GetChildren()) do
+            if item:IsA("Model") and not item:FindFirstChild("ItemESP") then
+                
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ItemESP"
+                highlight.Parent = item
+                highlight.FillTransparency = 0.5
+                
+                if isIgnored(item.Name) then
+                    highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Merah
+                elseif isPriority(item.Name) then
+                    highlight.FillColor = Color3.fromRGB(255, 255, 0) -- Kuning
+                else
+                    highlight.FillColor = Color3.fromRGB(0, 255, 0) -- Hijau
+                end
+                
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ItemESPText"
+                billboard.Adornee = item
+                billboard.Size = UDim2.new(0, 100, 0, 50)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = item
+                
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Text = item.Name
+                label.TextColor3 = highlight.FillColor
+                label.TextStrokeTransparency = 0.5
+                label.TextSize = 14
+                label.Parent = billboard
+            end
+        end
+    end
+end
+
+-- ==================== FUNGSI AUTO USE ITEM ====================
+local function startAutoUse()
+    if not Config.AutoUse.Enable then return end
+    isAutoUseActive = true
+    
+    task.spawn(function()
+        while isAutoUseActive do
+            local char = player.Character
+            if char and char:FindFirstChild("Inventory") then
+                for slotName, isActive in pairs(Config.AutoUse.Slots) do
+                    if isActive then
+                        local slotItem = char.Inventory:FindFirstChild(slotName)
+                        if slotItem then
+                            pcall(function()
+                                ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem)
+                            end)
+                        end
+                    end
+                end
+            end
+            task.wait(Config.AutoUse.UseInterval)
+        end
+    end)
+end
+
+-- ==================== FUNGSI MOVEMENT & INTERAKSI ====================
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
 
+local function interactWithPrompt(prompt)
+    if prompt.HoldDuration == 0 then
+        prompt:InputHoldBegin()
+        prompt:InputHoldEnd()
+    else
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration)
+        prompt:InputHoldEnd()
+    end
+end
+
+local function startItemAura()
+    isAuraActive = true
+    task.spawn(function()
+        while isAuraActive do
+            local map = getMap()
+            if map and rootPart then
+                local itemsFolder = map:FindFirstChild("Items")
+                if itemsFolder then
+                    for _, item in pairs(itemsFolder:GetChildren()) do
+                        if not isIgnored(item.Name) then
+                            local promptPart = item:FindFirstChild("Prompt")
+                            if promptPart then
+                                local proximityPrompt = promptPart:FindFirstChild("ProximityPrompt")
+                                if proximityPrompt and proximityPrompt.Enabled then
+                                    local distance = (promptPart.Position - rootPart.Position).Magnitude
+                                    if distance <= Config.Pickup.AuraRange then
+                                        interactWithPrompt(proximityPrompt)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function moveToPosition(targetCFrame)
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    
+    if Config.Pickup.MovementMode == "Instant" then
+        rootPart.CFrame = targetCFrame
+        task.wait(0.05)
+    else
+        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
+        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+        local duration = distance / (speed * Config.Pickup.TweenSpeed)
+        if duration <= 0 then duration = 0.1 end
+        
+        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+        local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
+        tween:Play()
+        tween.Completed:Wait()
+    end
+    
+    Workspace.Gravity = originalGravity
+end
+
+-- ==================== FUNGSI PUSAT (CENTER LOCATOR) ====================
 local function getModelCenter(model)
     if not model or not model:IsA("Model") then return nil end
     local parts = {}
@@ -62,324 +242,161 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
-local function isMonsterNear(generator, radius)
-    local map = getMap()
-    if map then
-        local monstersFolder = map:FindFirstChild("Monsters")
-        if monstersFolder then
-            for _, monster in pairs(monstersFolder:GetChildren()) do
-                if monster:IsA("Model") and monster.PrimaryPart then
-                    local distance = (monster.PrimaryPart.Position - generator.PrimaryPart.Position).Magnitude
-                    if distance <= radius then return true end
-                end
-            end
-        end
-    end
-    return false
-end
-
-local function isMachineOccupied(generator, radius)
-    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
-    if inGamePlayers then
-        for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
-            if otherPlayer.Name ~= player.Name then
-                local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
-                if otherRoot and generator.PrimaryPart then
-                    local distance = (otherRoot.Position - generator.PrimaryPart.Position).Magnitude
-                    if distance <= radius then return true end
-                end
-            end
-        end
-    end
-    return false
-end
-
--- ==================== FUNGSI AUTO SKILLCHECK (V2 BYPASS) ====================
-local function setupAutoSkillcheck()
-    if not Config.Skillcheck.Enable then return end
-    task.spawn(function()
-        print("[INFO] Memulai Auto Skillcheck Bypass (V2)...")
-        while Config.Skillcheck.Enable do
-            pcall(function()
-                local events = ReplicatedStorage:FindFirstChild("Events")
-                if events then
-                    local su = events:FindFirstChild("SkillcheckUpdate")
-                    if su then
-                        su.OnClientInvoke = function() return true end
-                    end
-                end
-            end)
-            task.wait(1)
-        end
-    end)
-end
-
--- ==================== FUNGSI GENERATOR ESP ====================
-local function updateGeneratorESP()
-    if not Config.ESP.Enable then return end
+-- ==================== FUNGSI UTAMA AUTO PICKUP ====================
+local function executePickup()
+    if not Config.Pickup.Enable then return end
+    
     local map = getMap()
     if not map then return end
+
+    applyItemESP()
+    startItemAura()
     
-    local generatorsFolder = map:FindFirstChild("Generators")
-    if generatorsFolder then
-        for _, gen in pairs(generatorsFolder:GetChildren()) do
-            if gen:IsA("Model") then
-                local highlight = gen:FindFirstChild("GenESP")
-                if not highlight then
-                    highlight = Instance.new("Highlight")
-                    highlight.Name = "GenESP"
-                    highlight.Parent = gen
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
+    local maxLoops = 8 
+    local currentLoop = 1
+    local hasCleanedAll = false
+
+    while currentLoop <= maxLoops and not hasCleanedAll do
+        local itemsFolder = map:FindFirstChild("Items")
+        if not itemsFolder then break end
+        
+        local priorityItems = {}
+        local normalItems = {}
+
+        for _, item in ipairs(itemsFolder:GetChildren()) do
+            if item:IsA("Model") and not isIgnored(item.Name) then
+                if isPriority(item.Name) then
+                    table.insert(priorityItems, item)
+                else
+                    table.insert(normalItems, item)
+                end
+            end
+        end
+
+        if #priorityItems == 0 and #normalItems == 0 then
+            hasCleanedAll = true
+            print("[INFO] Pengecekan Loop " .. currentLoop .. ": Seluruh item di map telah habis dibersihkan!")
+            break
+        end
+
+        local itemsToProcess = {}
+        
+        if #priorityItems > 0 then
+            print("[INFO] Ditemukan " .. #priorityItems .. " item PRIORITAS. Membersihkan prioritas terlebih dahulu...")
+            itemsToProcess = priorityItems
+        else
+            print("[INFO] Prioritas habis. Mengambil " .. #normalItems .. " item sisa (NORMAL)...")
+            itemsToProcess = normalItems
+        end
+
+        table.sort(itemsToProcess, function(a, b)
+            local distA = (rootPart.Position - a:GetPivot().Position).Magnitude
+            local distB = (rootPart.Position - b:GetPivot().Position).Magnitude
+            return distA < distB
+        end)
+
+        for _, item in ipairs(itemsToProcess) do
+            if item and item.Parent and not isIgnored(item.Name) then
+                print("[PICKUP] Bergerak ke: " .. item.Name)
+                
+                local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
+                
+                local platform = Instance.new("Part")
+                platform.Size = Vector3.new(15, 1, 15) 
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.Transparency = 0.5 
+                platform.Color = Color3.fromRGB(0, 255, 0)
+                platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+                platform.Parent = Workspace
+                
+                moveToPosition(targetCFrame)
+                
+                task.wait(0.15)
+                
+                local promptPart = item:FindFirstChild("Prompt")
+                if promptPart then
+                    local proximityPrompt = promptPart:FindFirstChild("ProximityPrompt")
+                    if proximityPrompt and proximityPrompt.Enabled then
+                        interactWithPrompt(proximityPrompt)
+                    end
                 end
                 
-                local billboard = gen:FindFirstChild("GenText")
-                local label
-                if not billboard then
-                    billboard = Instance.new("BillboardGui")
-                    billboard.Name = "GenText"
-                    billboard.Adornee = gen
-                    billboard.Size = UDim2.new(0, 100, 0, 50)
-                    billboard.AlwaysOnTop = true
-                    billboard.Parent = gen
-                    
-                    label = Instance.new("TextLabel")
-                    label.Name = "Text"
-                    label.Size = UDim2.new(1, 0, 1, 0)
-                    label.BackgroundTransparency = 1
-                    label.Font = Enum.Font.Nunito
-                    label.TextStrokeTransparency = 0.5
-                    label.TextSize = 16
-                    label.Parent = billboard
-                else
-                    label = billboard.Text
+                local timeout = 15 
+                while item.Parent and timeout > 0 do
+                    task.wait(0.1)
+                    timeout = timeout - 1
                 end
-
-                local stats = gen:FindFirstChild("Stats")
-                if stats then
-                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
-                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
-                    local current = stats:FindFirstChild("CurrentAmount") and math.floor(stats.CurrentAmount.Value + 0.5) or 0
-                    local required = stats:FindFirstChild("RequiredAmount") and stats.RequiredAmount.Value or 0
-                    
-                    local genName = gen.Name
-                    local textColor = Config.ESP.NormalColor
-                    
-                    if connie then
-                        textColor = Config.ESP.PossessedColor
-                        genName = genName .. "\n[POSSESSED]"
-                        highlight.FillColor = Config.ESP.PossessedColor
-                    elseif completed then
-                        textColor = Config.ESP.CompletedColor
-                        highlight.FillColor = Config.ESP.CompletedColor
-                    else
-                        textColor = Config.ESP.NormalColor
-                        highlight.FillColor = Config.ESP.NormalColor
-                    end
-                    
-                    label.TextColor3 = textColor
-                    label.Text = genName .. "\n(" .. current .. " / " .. required .. ")"
+                
+                if platform then
+                    platform:Destroy()
                 end
             end
         end
+        currentLoop = currentLoop + 1
+        task.wait(0.5) 
     end
-end
 
--- ==================== FUNGSI INTERAKSI PAKSA ====================
-local function forceTriggerGenerator(generator)
-    for _, descendant in ipairs(generator:GetDescendants()) do
-        if descendant:IsA("ProximityPrompt") then
-            local oldLineOfSight = descendant.RequiresLineOfSight
-            local oldMaxDist = descendant.MaxActivationDistance
-            
-            descendant.RequiresLineOfSight = false
-            descendant.MaxActivationDistance = 100 
-            
-            pcall(function()
-                descendant:InputHoldBegin()
-            end)
-            
-            return true
+    isAuraActive = false
+
+    print("[INFO] Semua item telah diambil. Mencari FakeElevator di map...")
+    local freeArea = map:FindFirstChild("FreeArea")
+    if freeArea then
+        local fakeElevator = freeArea:FindFirstChild("FakeElevator")
+        if fakeElevator and fakeElevator:IsA("Model") then
+            print("[SUCCESS] FakeElevator ditemukan! Memulai Teleportasi...")
+            local centerPos = getModelCenter(fakeElevator)
+            if centerPos then
+                moveToPosition(CFrame.new(centerPos + Vector3.new(0, 4, 0)))
+            end
+        else
+            print("[WARNING] FakeElevator tidak ditemukan di FreeArea!")
         end
-    end
-    return false
-end
-
--- ==================== FUNGSI MOVEMENT & PLATFORM ====================
-local function moveToPosition(targetCFrame, usePlatform)
-    local originalGravity = Workspace.Gravity
-    Workspace.Gravity = 0
-    rootPart.AssemblyLinearVelocity = Vector3.zero
-    rootPart.Anchored = false
-    
-    if activePlatform then
-        activePlatform:Destroy()
-        activePlatform = nil
-    end
-    
-    if usePlatform then
-        activePlatform = Instance.new("Part")
-        activePlatform.Size = Vector3.new(15, 1, 15)
-        activePlatform.Anchored = true
-        activePlatform.CanCollide = true
-        activePlatform.Transparency = 0.5
-        activePlatform.Color = Color3.fromRGB(0, 255, 0)
-        activePlatform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
-        activePlatform.Parent = Workspace
-    end
-    
-    if Config.Teleport.Mode == "Instant" then
-        rootPart.CFrame = targetCFrame
-        task.wait(0.1) 
     else
-        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
-        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
-        local duration = distance / (speed * Config.Teleport.TweenSpeed)
-        if duration <= 0 then duration = 0.1 end
-        
-        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
-        tween:Play()
-        tween.Completed:Wait()
+        print("[WARNING] FreeArea tidak ditemukan!")
     end
-    
-    if usePlatform then
-        rootPart.CFrame = targetCFrame
-        rootPart.Anchored = true 
-    end
-    
-    Workspace.Gravity = originalGravity
+
+    print("[DONE] Script Eksekusi Selesai. Menunggu lantai berikutnya...")
 end
 
--- ==================== FUNGSI TELEPORT KE LIFT ====================
-local function teleportToRealElevator()
-    local map = getMap()
-    if map then
-        print("[INFO] Semua Generator Selesai! Mencari Real Elevator...")
-        rootPart.Anchored = false 
-        
-        local freeArea = map:FindFirstChild("FreeArea")
-        if freeArea then
-            for _, child in ipairs(freeArea:GetChildren()) do
-                if child:IsA("Model") and child.Name == "Elevator" and child.PrimaryPart then
-                    print("[SUCCESS] Real Elevator ditemukan! Meluncur...")
-                    local targetCFrame = child.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
-                    moveToPosition(targetCFrame, false)
-                    return true
-                end
-            end
-        end
-        
-        for _, child in ipairs(map:GetChildren()) do
-            if child:IsA("Model") and child.Name == "Elevator" and child.PrimaryPart then
-                local targetCFrame = child.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
-                moveToPosition(targetCFrame, false)
-                return true
-            end
-        end
-        print("[WARNING] Elevator tidak ditemukan.")
-    end
-    return false
-end
+-- ==================== SISTEM PEMANTAU (WATCHER) ====================
+startAutoUse()
 
--- ==================== FUNGSI UTAMA FARMING ====================
-local function startAutoFarming()
-    isFarming = true
-    
-    task.spawn(function()
-        while isFarming do
-            if Config.Teleport.Enable then
-                local map = getMap()
-                if map then
-                    local genFolder = map:FindFirstChild("Generators")
-                    if genFolder then
-                        local targetGen = nil
-                        local uncompletedCount = 0
-                        
-                        for _, gen in pairs(genFolder:GetChildren()) do
-                            if gen:IsA("Model") and gen.PrimaryPart then
-                                local stats = gen:FindFirstChild("Stats")
-                                if stats then
-                                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
-                                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
-                                    
-                                    if not completed then
-                                        uncompletedCount = uncompletedCount + 1
-                                        if not connie and not targetGen then
-                                            if not isMonsterNear(gen, Config.Teleport.SafeRadius) then
-                                                if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
-                                                    targetGen = gen
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        
-                        if uncompletedCount == 0 then
-                            teleportToRealElevator()
-                            task.wait(5)
-                            
-                        elseif targetGen then
-                            print("[FARMER] Menuju Generator: " .. targetGen.Name)
-                            
-                            local centerPos = getModelCenter(targetGen)
-                            if centerPos and targetGen.PrimaryPart then
-                                local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
-                                
-                                moveToPosition(targetCFrame, true)
-                                task.wait(0.1)
-                                
-                                while isFarming and targetGen.Parent do
-                                    local stats = targetGen:FindFirstChild("Stats")
-                                    if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
-                                        print("[FARMER] Generator Selesai!")
-                                        break 
-                                    end
-                                    
-                                    if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                        print("[WARNING] Ada player lain mendekat! Pindah cari mesin lain...")
-                                        break
-                                    end
-                                    
-                                    rootPart.CFrame = targetCFrame
-                                    
-                                    local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
-                                    if not isDecoding then
-                                        forceTriggerGenerator(targetGen)
-                                    end
-                                    
-                                    task.wait(0.1)
-                                end
-                                
-                                rootPart.Anchored = false
-                                if activePlatform then
-                                    activePlatform:Destroy()
-                                    activePlatform = nil
-                                end
-                                
-                                task.wait(Config.Teleport.DelayNext)
-                            end
-                        end
+-- Loop ini akan berjalan terus menerus di latar belakang untuk memantau map
+task.spawn(function()
+    while task.wait(1) do
+        -- Jika config dimatikan atau script sedang bekerja, lewati pengecekan
+        if not Config.Pickup.Enable or isFarming then continue end
+
+        local map = getMap()
+        if map then
+            local itemsFolder = map:FindFirstChild("Items")
+            if itemsFolder then
+                -- Cek apakah masih ada item valid (bukan blacklist) di map
+                local hasValidItems = false
+                for _, item in ipairs(itemsFolder:GetChildren()) do
+                    if item:IsA("Model") and not isIgnored(item.Name) then
+                        hasValidItems = true
+                        break
                     end
                 end
-            end
-            task.wait(1)
-        end
-    end)
-    
-    task.spawn(function()
-        while isFarming do
-            updateGeneratorESP()
-            task.wait(0.5)
-        end
-    end)
-end
 
--- ==================== INISIALISASI ====================
-print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN Ahayyyyyyy")
-print("==================================================")
-setupAutoSkillcheck()
-startAutoFarming()
+                -- Jika terdeteksi ada item baru, langsung nyalakan sistem!
+                if hasValidItems then
+                    isFarming = true -- Kunci script agar tidak mengeksekusi dobel
+                    print("\n==============================================")
+                    print("[SYSTEM] Mendeteksi Item Baru / Lantai Baru!")
+                    print("==============================================")
+                    
+                    -- Update character info (berjaga-jaga jika player respawn)
+                    character = player.Character or player.CharacterAdded:Wait()
+                    rootPart = character:WaitForChild("HumanoidRootPart")
+                    
+                    executePickup()
+                    
+                    isFarming = false -- Buka kunci setelah selesai, siap menunggu map selanjutnya
+                end
+            end
+        end
+    end
+end)
