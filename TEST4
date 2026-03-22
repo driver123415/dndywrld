@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 OPTIMIZED FIXED (NO BUG, SMART EVASION, FREE ELEVATOR)")
+print("tesasdtis123 - V14 PERFECTED (NO FLOAT BUG, SYNC FIX, SMART EVASION)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -52,7 +52,7 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
--- ==================== CEK STATUS INTERAKSI (IDE AKBAR) ====================
+-- ==================== CEK STATUS INTERAKSI ====================
 local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
@@ -407,13 +407,43 @@ local function startAutoFarming()
                                     if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
                                         print("[SAFETY] Ancaman terdeteksi sangat dekat! Mengevakuasi...")
                                         forceStop()
+                                        task.wait(0.1) -- JEDA SINKRONISASI: Biarkan server tahu interaksi dibatalkan
                                         rootPart.Anchored = false
-                                        instantNext = true -- Langsung pindah
-                                        break
+                                        
+                                        local safeAlternative = false
+                                        for _, genAlt in pairs(genFolder:GetChildren()) do
+                                            if genAlt ~= targetGen and genAlt:IsA("Model") and genAlt.PrimaryPart then
+                                                local altStats = genAlt:FindFirstChild("Stats")
+                                                if altStats and not (altStats:FindFirstChild("Completed") and altStats.Completed.Value) and not (altStats:FindFirstChild("Connie") and altStats.Connie.Value) then
+                                                    if not isThreatened(genAlt.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(genAlt, Config.Teleport.PlayerRadius) then
+                                                        safeAlternative = true
+                                                        break
+                                                    end
+                                                end
+                                            end
+                                        end
+                                        
+                                        if safeAlternative then
+                                            print("[SAFETY] Pindah ke mesin alternatif yang aman...")
+                                            instantNext = true
+                                            break 
+                                        else
+                                            print("[SAFETY] Semua mesin penuh ancaman. Mengungsi ke Fake Elevator...")
+                                            local safePos = getFakeElevatorPosition()
+                                            if safePos then
+                                                teleportplr(CFrame.new(safePos))
+                                            else
+                                                teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0))
+                                            end
+                                            task.wait(5) 
+                                            instantNext = true
+                                            break
+                                        end
                                     end
                                     
                                     if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                         forceStop()
+                                        task.wait(0.1) -- JEDA SINKRONISASI
                                         instantNext = true
                                         break
                                     end
@@ -424,9 +454,9 @@ local function startAutoFarming()
                                     if currentlyInteracting then
                                         hasStartedInteracting = true
                                     elseif hasStartedInteracting and not currentlyInteracting then
-                                        -- INSTANT TELEPORT AMAN: Hanya memutus loop saat UI hilang.
-                                        -- Tidak memaksakan lari ke Fake Elevator agar mesin tetap terhitung "Completed".
                                         print("[INFO] Extraction putus (UI Hilang). Instan berpindah!")
+                                        forceStop()
+                                        task.wait(0.1) -- JEDA SINKRONISASI
                                         instantNext = true
                                         break
                                     else
@@ -454,14 +484,14 @@ local function startAutoFarming()
                             local safePos = getFakeElevatorPosition()
                             if safePos then 
                                 teleportplr(CFrame.new(safePos)) 
-                                rootPart.Anchored = true
+                                -- DI SINI SUDAH TIDAK DI-ANCHORED (BEBAS BERDIRI)
                             end
                             task.wait(1) 
                         end
                     end
                 end
             end
-            task.wait(0.1)
+            task.wait(0.1) -- Loop utama dipercepat agar lebih responsif
         end
     end)
 end
