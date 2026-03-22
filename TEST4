@@ -1,6 +1,5 @@
-print("testis123")
--- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V12 (FIXED EVASION, ELEVATOR & VISUAL RADIUS)
+print("testis12sadasd3")
+-- CONFIGURATION: AUTO MACHINE FARMER V13 (BRUTE-FORCE ELEVATOR & FIXED RADIUS)
 -- ==============================================================================
 local Config = {
     Skillcheck = { Enable = false }, 
@@ -15,7 +14,7 @@ local Config = {
     },
     ESP = {
         Enable = true,          
-        ShowSafeRadius = true,  -- [BARU] Ubah ke false jika lingkaran merahnya mengganggu
+        ShowSafeRadius = true,  -- Lingkaran merah penanda batas aman
         NormalColor = Color3.fromRGB(150, 150, 150),   
         CompletedColor = Color3.fromRGB(255, 0, 255),  
         PossessedColor = Color3.fromRGB(0, 255, 255)   
@@ -34,7 +33,6 @@ local CoreGui = game:GetService("CoreGui")
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
-local playerGui = player:WaitForChild("PlayerGui")
 
 local isFarming = false
 
@@ -55,8 +53,28 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
-local function howfar(plrObj, cframe)
-    return (plrObj.Character.HumanoidRootPart.Position - cframe.Position).Magnitude
+-- ==================== FUNGSI VISUALISASI RADIUS AMAN (DIPERBAIKI) ====================
+local safeRadiusAdornment
+local function updateSafeRadiusVisual()
+    if not Config.ESP.ShowSafeRadius then
+        if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
+        return
+    end
+    
+    if not safeRadiusAdornment and rootPart then
+        -- Menggunakan CylinderHandleAdornment agar tidak terpengaruh fisika/tanah
+        safeRadiusAdornment = Instance.new("CylinderHandleAdornment")
+        safeRadiusAdornment.Name = "SafeRadiusVisual"
+        safeRadiusAdornment.Radius = Config.Teleport.SafeRadius
+        safeRadiusAdornment.Height = 0.1
+        safeRadiusAdornment.Color3 = Color3.fromRGB(255, 50, 50)
+        safeRadiusAdornment.Transparency = 0.5
+        safeRadiusAdornment.CFrame = CFrame.Angles(math.rad(90), 0, 0)
+        safeRadiusAdornment.ZIndex = 0
+        safeRadiusAdornment.AlwaysOnTop = true -- Memastikan selalu terlihat menembus tembok/lantai
+        safeRadiusAdornment.Adornee = rootPart
+        safeRadiusAdornment.Parent = rootPart
+    end
 end
 
 -- ==================== SISTEM DETEKSI ANCAMAN ====================
@@ -135,35 +153,6 @@ local function teleportplr(cf)
     Workspace.Gravity = originalGravity
 end
 
--- ==================== FUNGSI VISUALISASI RADIUS AMAN ====================
-local safeRadiusPart
-local function updateSafeRadiusVisual()
-    if not Config.ESP.ShowSafeRadius then
-        if safeRadiusPart then safeRadiusPart:Destroy(); safeRadiusPart = nil end
-        return
-    end
-    
-    if not safeRadiusPart then
-        safeRadiusPart = Instance.new("Part")
-        safeRadiusPart.Name = "SafeRadiusVisual"
-        safeRadiusPart.Shape = Enum.PartType.Cylinder
-        -- Membuat silinder pipih (seperti kepingan)
-        safeRadiusPart.Size = Vector3.new(0.2, Config.Teleport.SafeRadius * 2, Config.Teleport.SafeRadius * 2)
-        safeRadiusPart.Material = Enum.Material.ForceField
-        safeRadiusPart.Color = Color3.fromRGB(255, 50, 50)
-        safeRadiusPart.Transparency = 0.85
-        safeRadiusPart.Anchored = true
-        safeRadiusPart.CanCollide = false
-        safeRadiusPart.CastShadow = false
-        safeRadiusPart.Parent = Workspace
-    end
-    
-    if rootPart then
-        -- Menempatkan lingkaran pipih tegak lurus di bawah kaki player
-        safeRadiusPart.CFrame = CFrame.new(rootPart.Position.X, rootPart.Position.Y - 2.5, rootPart.Position.Z) * CFrame.Angles(0, 0, math.rad(90))
-    end
-end
-
 -- ==================== FUNGSI ESP GENERATOR ====================
 local function updateGeneratorESP()
     if not Config.ESP.Enable then return end
@@ -225,7 +214,7 @@ local function updateGeneratorESP()
     end
 end
 
--- ==================== FUNGSI GERAKAN & ELEVATOR ====================
+-- ==================== FUNGSI GERAKAN & ELEVATOR (BRUTE FORCE METHOD) ====================
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
@@ -267,52 +256,54 @@ end
 local function teleportToRealElevator()
     local map = getMap()
     if not map then return false end
-    print("[INFO] Semua Generator Selesai! Mencari Real Elevator...")
+    print("[INFO] Semua Mesin Selesai! Mencoba Semua Elevator...")
     rootPart.Anchored = false 
     
-    local targetCF = nil
+    local elevatorList = {}
     
-    -- Pencarian Mendalam (Deep Search) untuk Elevator yang benar
+    -- Mengumpulkan semua model bernama Elevator
     for _, descendant in ipairs(map:GetDescendants()) do
         if descendant:IsA("Model") and string.find(string.lower(descendant.Name), "elevator") and not string.find(string.lower(descendant.Name), "fake") then
-            if descendant.PrimaryPart then
-                targetCF = descendant.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
-                break
-            else
-                for _, part in ipairs(descendant:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        targetCF = part.CFrame * CFrame.new(0, 4, 0)
-                        break
-                    end
-                end
-            end
+            table.insert(elevatorList, descendant)
         end
     end
     
-    if targetCF then
-        print("[SUCCESS] Meluncur ke Elevator Asli!")
-        moveToPosition(targetCF, false)
-        return true
+    if #elevatorList == 0 then
+        print("[WARNING] Tidak ada elevator sama sekali di map ini!")
+        return false
     end
     
-    print("[WARNING] Elevator Asli tidak ditemukan di map!")
-    return false
+    -- Mencoba masuk ke setiap Elevator satu per satu
+    for index, elev in ipairs(elevatorList) do
+        print("[ELEVATOR] Mencoba masuk ke Elevator #" .. index)
+        local centerPos = getModelCenter(elev)
+        
+        if centerPos then
+            moveToPosition(CFrame.new(centerPos) * CFrame.new(0, 4, 0), false)
+        elseif elev.PrimaryPart then
+            moveToPosition(elev.PrimaryPart.CFrame * CFrame.new(0, 4, 0), false)
+        end
+        
+        -- Diam selama 2 detik untuk memastikan apakah gamenya ter-trigger pindah lantai
+        task.wait(2)
+        
+        if not isFarming then break end -- Jika player mematikan script saat mencoba
+    end
+    
+    return true
 end
 
 -- ==================== FUNGSI UTAMA FARMING ====================
 local function startAutoFarming()
-    -- Sub-task ESP & Visual
     task.spawn(function()
         while isFarming do
             updateGeneratorESP()
             updateSafeRadiusVisual()
             task.wait(0.1)
         end
-        -- Bersihkan visual jika farming mati
-        if safeRadiusPart then safeRadiusPart:Destroy(); safeRadiusPart = nil end
+        if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
     end)
 
-    -- Task Auto Skillcheck
     task.spawn(function()
         while isFarming do
             pcall(function()
@@ -326,7 +317,6 @@ local function startAutoFarming()
         end
     end)
 
-    -- Task Farming Utama
     task.spawn(function()
         while isFarming do
             if Config.Teleport.Enable then
@@ -337,7 +327,6 @@ local function startAutoFarming()
                         local targetGen = nil
                         local uncompletedCount = 0
                         
-                        -- Cari generator yang aman
                         for _, gen in pairs(genFolder:GetChildren()) do
                             if gen:IsA("Model") and gen.PrimaryPart then
                                 local stats = gen:FindFirstChild("Stats")
@@ -348,7 +337,6 @@ local function startAutoFarming()
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
                                         if not connie and not targetGen then
-                                            -- Cek monster berdasarkan posisi generator
                                             if not isMonsterNear(gen.PrimaryPart.Position, Config.Teleport.SafeRadius) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                 targetGen = gen
                                             end
@@ -360,7 +348,7 @@ local function startAutoFarming()
                         
                         if uncompletedCount == 0 then
                             teleportToRealElevator()
-                            task.wait(5)
+                            task.wait(3) -- Tunggu sebelum memindai generator lagi
                             
                         elseif targetGen then
                             local centerPos = getModelCenter(targetGen)
@@ -369,14 +357,12 @@ local function startAutoFarming()
                                 moveToPosition(targetCFrame, true)
                                 task.wait(0.1)
                                 
-                                -- LOOP SAAT MENGERJAKAN MESIN
                                 while isFarming and targetGen.Parent do
                                     local stats = targetGen:FindFirstChild("Stats")
                                     if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
                                         break 
                                     end
                                     
-                                    -- CEK KEAMANAN SAAT MENGERJAKAN MESIN
                                     if isTargetedByMonster() or isMonsterNear(rootPart.Position, Config.Teleport.SafeRadius) then
                                         print("[SAFETY] Bahaya! Monster terdeteksi! Mengevakuasi...")
                                         forceStop()
@@ -386,11 +372,9 @@ local function startAutoFarming()
                                         if safePos then
                                             teleportplr(CFrame.new(safePos))
                                         else
-                                            -- Jika tidak ada fake elevator, terbang ke udara sementara
                                             teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0))
                                         end
                                         
-                                        -- BERI JEDA WAKTU (COOLDOWN) SEBELUM MENCARI MESIN LAGI
                                         task.wait(5)
                                         break
                                     end
@@ -446,6 +430,7 @@ toggleBtn.MouseButton1Click:Connect(function()
         isFarming = false
         rootPart.Anchored = false
         forceStop() 
+        if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
         toggleBtn.Text = "START FARMING"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     else
