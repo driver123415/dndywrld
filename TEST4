@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 FINAL OPTIMIZED (ANTI-BENGONG, SMART EVASION, FREE ELEVATOR)")
+print("tesasdtis123 - V14 OPTIMIZED (INSTANT TELEPORT ON FINISH)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -52,7 +52,7 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
--- ==================== CEK STATUS INTERAKSI ====================
+-- ==================== CEK STATUS INTERAKSI (IDE AKBAR) ====================
 local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
@@ -93,7 +93,7 @@ local function updateSafeRadiusVisual()
     end
 end
 
--- ==================== SISTEM DETEKSI ANCAMAN ====================
+-- ==================== SISTEM DETEKSI ANCAMAN (HIGH SENSITIVITY) ====================
 local function isThreatened(targetPosition, radius)
     local map = getMap()
     if map then
@@ -382,7 +382,6 @@ local function startAutoFarming()
                                 if rootPart then rootPart.Anchored = false end
                                 print("[INFO] Mode Standby Aktif. Silakan jalan bebas di dalam lift.")
                                 
-                                -- Matikan tombol UI secara otomatis agar player tidak perlu klik manual
                                 isFarming = false
                                 local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
                                 local screenGui = guiContainer:FindFirstChild("FarmToggleUI")
@@ -406,8 +405,8 @@ local function startAutoFarming()
                                 moveToPosition(targetCFrame, true)
                                 task.wait(0.1)
                                 
-                                -- PENGHITUNG KEGAGALAN UI (ANTI-BENGONG)
-                                local failedInteractCount = 0
+                                -- [PENAMBAHAN] Variabel untuk mengingat apakah UI sempat muncul
+                                local hasStartedInteracting = false
                                 
                                 while isFarming and targetGen.Parent do
                                     local stats = targetGen:FindFirstChild("Stats")
@@ -434,7 +433,7 @@ local function startAutoFarming()
                                         end
                                         
                                         if safeAlternative then
-                                            print("[SAFETY] Pindah ke mesin alternatif yang aman...")
+                                            print("[SAFETY] Ada mesin lain yang aman. Segera berpindah...")
                                             task.wait(0.5)
                                             break 
                                         else
@@ -457,20 +456,21 @@ local function startAutoFarming()
                                     
                                     rootPart.CFrame = targetCFrame
                                     
-                                    -- SISTEM ANTI-BENGONG
-                                    if not isInteractingUI() then
-                                        forceTriggerGenerator(targetGen)
-                                        failedInteractCount = failedInteractCount + 1
-                                        
-                                        -- Jika dalam 1.5 detik (15 putaran) UI tetap tidak menyala, batalkan!
-                                        if failedInteractCount > 15 then
-                                            print("[BUG FIX] Gagal masuk mode skillcheck! Mencari opsi lain...")
-                                            forceStop()
-                                            break
-                                        end
+                                    -- [LOGIKA BARU INSTANT TELEPORT BERBASIS UI VISIBLE]
+                                    local currentlyInteracting = isInteractingUI()
+                                    
+                                    if currentlyInteracting then
+                                        -- Player sedang asyik ngerjain mesin
+                                        hasStartedInteracting = true
+                                    elseif hasStartedInteracting and not currentlyInteracting then
+                                        -- Player TADI sedang ngerjain mesin, TAPI SEKARANG UI-nya mati.
+                                        -- Ini berarti mesin sudah selesai diekstrak atau terputus! 
+                                        -- Langsung BREAK loop ini agar instan teleport.
+                                        print("[INFO] Extraction selesai (UI StopGenerator hilang). Instan teleport!")
+                                        break
                                     else
-                                        -- Reset hitungan jika UI berhasil menyala
-                                        failedInteractCount = 0
+                                        -- UI belum muncul, terus tembak tombolnya
+                                        forceTriggerGenerator(targetGen)
                                     end
                                     
                                     task.wait(0.1)
