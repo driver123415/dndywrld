@@ -18,12 +18,12 @@ local Config = {
         Enable = true,
         VoteRandomIfNotFound = true,
         PriorityCards = {
-            "Skillcheck",       
-            "Stamina",          
-            "Stealth",          
-            "Speed",            
-            "Health",           
-            "Heal"              
+            "Skillcheck",       -- Prioritas 1: Segala jenis kartu Speed (Movement Speed)
+            "Stamina",          -- Prioritas 2: Segala jenis kartu Stamina
+            "Stealth",          -- Prioritas 3: Bonus Skillcheck / Ichor Extraction
+            "Speed",            -- Prioritas 4: Kartu Stealth / Anti ketahuan
+            "Health",           -- Prioritas 5: Max Health
+            "Heal"              -- Prioritas 6: Healing       
         }
     },
 
