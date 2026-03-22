@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 ORIGINAL (NO CAMERA TRICK & FIX ELEVATOR)")
+print("tesasdtis123 - V14 FINAL (GLOBAL ELEVATOR SWEEP & GREEN PLATFORM)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -230,39 +230,6 @@ local function updateGeneratorESP()
     end
 end
 
--- ==================== FUNGSI REAL ELEVATOR ====================
-local function teleportToRealElevator()
-    print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
-    rootPart.Anchored = false 
-    
-    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
-    if elevatorsFolder then
-        for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
-            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
-                print("[SUCCESS] Real ElevatorPrompt Ditemukan!")
-                moveToPosition(obj.CFrame * CFrame.new(0, 2, 0), false)
-                return true
-            end
-        end
-        
-        for _, obj in ipairs(elevatorsFolder:GetChildren()) do
-            if obj.Name == "Elevator" and obj:IsA("Model") then
-                print("[SUCCESS] Model Elevator Ditemukan (Pengganti Prompt)!")
-                local centerPos = getModelCenter(obj)
-                if centerPos then
-                    moveToPosition(CFrame.new(centerPos) * CFrame.new(0, 4, 0), false)
-                    return true
-                elseif obj.PrimaryPart then
-                    moveToPosition(obj.PrimaryPart.CFrame * CFrame.new(0, 4, 0), false)
-                    return true
-                end
-            end
-        end
-    end
-    print("[WARNING] Real Elevator gagal ditemukan di map!")
-    return false
-end
-
 -- ==================== FUNGSI GERAKAN & FIRE PROMPT ====================
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
@@ -270,7 +237,6 @@ local function forceTriggerGenerator(generator)
             descendant.RequiresLineOfSight = false
             descendant.MaxActivationDistance = math.huge 
             
-            -- Pendekatan Baru: Bypass kamera menggunakan fungsi executor
             if fireproximityprompt then
                 fireproximityprompt(descendant, 1)
             else
@@ -289,6 +255,10 @@ local function moveToPosition(targetCFrame, usePlatform)
     rootPart.AssemblyLinearVelocity = Vector3.zero
     rootPart.Anchored = false
     
+    -- Tangkap part lama jika ada
+    local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
+    if oldPlatform then oldPlatform:Destroy() end
+    
     if Config.Teleport.Mode == "Instant" then
         rootPart.CFrame = targetCFrame
         task.wait(0.1) 
@@ -303,10 +273,78 @@ local function moveToPosition(targetCFrame, usePlatform)
     end
     
     if usePlatform then
+        -- Membuat Pijakan Hijau Kuat agar tidak tembus/jatuh ke void
+        local platform = Instance.new("Part")
+        platform.Name = "FarmPlatform"
+        platform.Size = Vector3.new(10, 1, 10)
+        platform.Anchored = true
+        platform.CanCollide = true
+        platform.Transparency = 0.5
+        platform.Color = Color3.fromRGB(0, 255, 0)
+        platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+        platform.Parent = Workspace
+        
         rootPart.CFrame = targetCFrame
         rootPart.Anchored = true 
     end
     Workspace.Gravity = originalGravity
+end
+
+-- ==================== PENCARIAN REAL ELEVATOR (3 LAPIS SWEEP) ====================
+local function teleportToRealElevator()
+    print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
+    rootPart.Anchored = false 
+    local targetCFrame = nil
+    
+    -- LAPIS 1: Cari ElevatorPrompt di folder Elevators
+    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
+    if elevatorsFolder then
+        for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
+                print("[SUCCESS] Real ElevatorPrompt Ditemukan di folder utama!")
+                break
+            end
+        end
+        
+        -- LAPIS 2: Jika Prompt ga ada, cari Model Elevator-nya
+        if not targetCFrame then
+            for _, obj in ipairs(elevatorsFolder:GetChildren()) do
+                if obj.Name == "Elevator" and obj:IsA("Model") then
+                    if obj.PrimaryPart then
+                        targetCFrame = obj.PrimaryPart.CFrame * CFrame.new(0, 3, 0)
+                    else
+                        local centerPos = getModelCenter(obj)
+                        if centerPos then targetCFrame = CFrame.new(centerPos) * CFrame.new(0, 3, 0) end
+                    end
+                    print("[SUCCESS] Model Elevator Ditemukan sebagai cadangan!")
+                    break
+                end
+            end
+        end
+    end
+    
+    -- LAPIS 3: SAPU BERSIH SELURUH MAP! (Jika Folder Elevators tidak ada)
+    if not targetCFrame then
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            -- Abaikan FakeElevator
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") and not string.find(string.lower(obj.Parent and obj.Parent.Name or ""), "fake") then
+                targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
+                print("[SUCCESS] ElevatorPrompt ditemukan dari pencarian Global Sweep!")
+                break
+            end
+        end
+    end
+    
+    -- EKSEKUSI TELEPORT
+    if targetCFrame then
+        -- MENGGUNAKAN PLATFORM HIJAU (TRUE) AGAR TIDAK JATUH KE VOID!
+        moveToPosition(targetCFrame, true)
+        return true
+    else
+        print("[WARNING] Real Elevator benar-benar gagal ditemukan di map!")
+        return false
+    end
 end
 
 -- ==================== FUNGSI UTAMA FARMING ====================
@@ -318,6 +356,8 @@ local function startAutoFarming()
             task.wait(0.1)
         end
         if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
+        local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
+        if oldPlatform then oldPlatform:Destroy() end
     end)
 
     task.spawn(function()
@@ -335,7 +375,6 @@ local function startAutoFarming()
 
     task.spawn(function()
         while isFarming do
-            -- Refresh karakter jika spawn ulang
             character = player.Character or player.CharacterAdded:Wait()
             rootPart = character:WaitForChild("HumanoidRootPart")
 
@@ -367,6 +406,7 @@ local function startAutoFarming()
                         end
                         
                         if uncompletedCount == 0 then
+                            -- Panggil fungsi ke Elevator Asli
                             teleportToRealElevator()
                             task.wait(3) 
                             
@@ -417,6 +457,8 @@ local function startAutoFarming()
                                 end
                                 
                                 rootPart.Anchored = false
+                                local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
+                                if oldPlatform then oldPlatform:Destroy() end
                                 task.wait(Config.Teleport.DelayNext)
                             end
                         end
@@ -454,6 +496,8 @@ toggleBtn.MouseButton1Click:Connect(function()
         rootPart.Anchored = false
         forceStop() 
         if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
+        local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
+        if oldPlatform then oldPlatform:Destroy() end
         toggleBtn.Text = "START FARMING"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     else
