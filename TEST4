@@ -1,5 +1,5 @@
-print("testis12sadasd3")
--- CONFIGURATION: AUTO MACHINE FARMER V13 (BRUTE-FORCE ELEVATOR & FIXED RADIUS)
+print("tesasdtis123")
+-- CONFIGURATION: AUTO MACHINE FARMER V14 (ULTIMATE ELEVATOR SWEEP)
 -- ==============================================================================
 local Config = {
     Skillcheck = { Enable = false }, 
@@ -7,14 +7,14 @@ local Config = {
         Enable = true,          
         Mode = "Instant",       
         TweenSpeed = 1.25,      
-        SafeRadius = 30,        -- Jarak aman dari monster
+        SafeRadius = 30,        
         PlayerRadius = 8,       
         DelayNext = 1.0,        
         UndergroundOffset = 11.5
     },
     ESP = {
         Enable = true,          
-        ShowSafeRadius = true,  -- Lingkaran merah penanda batas aman
+        ShowSafeRadius = true,  
         NormalColor = Color3.fromRGB(150, 150, 150),   
         CompletedColor = Color3.fromRGB(255, 0, 255),  
         PossessedColor = Color3.fromRGB(0, 255, 255)   
@@ -53,7 +53,7 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
--- ==================== FUNGSI VISUALISASI RADIUS AMAN (DIPERBAIKI) ====================
+-- ==================== FUNGSI VISUALISASI RADIUS AMAN ====================
 local safeRadiusAdornment
 local function updateSafeRadiusVisual()
     if not Config.ESP.ShowSafeRadius then
@@ -62,7 +62,6 @@ local function updateSafeRadiusVisual()
     end
     
     if not safeRadiusAdornment and rootPart then
-        -- Menggunakan CylinderHandleAdornment agar tidak terpengaruh fisika/tanah
         safeRadiusAdornment = Instance.new("CylinderHandleAdornment")
         safeRadiusAdornment.Name = "SafeRadiusVisual"
         safeRadiusAdornment.Radius = Config.Teleport.SafeRadius
@@ -71,7 +70,7 @@ local function updateSafeRadiusVisual()
         safeRadiusAdornment.Transparency = 0.5
         safeRadiusAdornment.CFrame = CFrame.Angles(math.rad(90), 0, 0)
         safeRadiusAdornment.ZIndex = 0
-        safeRadiusAdornment.AlwaysOnTop = true -- Memastikan selalu terlihat menembus tembok/lantai
+        safeRadiusAdornment.AlwaysOnTop = true 
         safeRadiusAdornment.Adornee = rootPart
         safeRadiusAdornment.Parent = rootPart
     end
@@ -214,7 +213,7 @@ local function updateGeneratorESP()
     end
 end
 
--- ==================== FUNGSI GERAKAN & ELEVATOR (BRUTE FORCE METHOD) ====================
+-- ==================== FUNGSI GERAKAN ====================
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
@@ -253,43 +252,59 @@ local function moveToPosition(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
+-- ==================== FUNGSI ULTIMATE ELEVATOR SWEEP (V14) ====================
 local function teleportToRealElevator()
     local map = getMap()
     if not map then return false end
-    print("[INFO] Semua Mesin Selesai! Mencoba Semua Elevator...")
+    print("[INFO] Semua Mesin Selesai! Mencari titik Exit/Elevator...")
     rootPart.Anchored = false 
     
-    local elevatorList = {}
+    local targetParts = {}
     
-    -- Mengumpulkan semua model bernama Elevator
+    -- Mencari SEMUA BasePart yang punya kaitan dengan kata "Elevator" atau "Exit"
     for _, descendant in ipairs(map:GetDescendants()) do
-        if descendant:IsA("Model") and string.find(string.lower(descendant.Name), "elevator") and not string.find(string.lower(descendant.Name), "fake") then
-            table.insert(elevatorList, descendant)
+        if descendant:IsA("BasePart") then
+            local parentName = string.lower(descendant.Parent and descendant.Parent.Name or "")
+            local partName = string.lower(descendant.Name)
+            
+            local isFake = string.find(parentName, "fake") or string.find(partName, "fake")
+            local isElevator = string.find(parentName, "elevator") or string.find(partName, "elevator") or string.find(parentName, "exit") or string.find(partName, "exit")
+            
+            if isElevator and not isFake then
+                -- Jika part ini punya TouchInterest, probabilitasnya 99% ini adalah trigger lantai!
+                if descendant:FindFirstChildWhichIsA("TouchInterest") then
+                    table.insert(targetParts, 1, descendant) -- Taruh di urutan pertama
+                else
+                    table.insert(targetParts, descendant)
+                end
+            end
         end
     end
     
-    if #elevatorList == 0 then
-        print("[WARNING] Tidak ada elevator sama sekali di map ini!")
+    if #targetParts == 0 then
+        print("[WARNING] Tidak ada satupun blok Elevator/Exit ditemukan di map ini!")
         return false
     end
     
-    -- Mencoba masuk ke setiap Elevator satu per satu
-    for index, elev in ipairs(elevatorList) do
-        print("[ELEVATOR] Mencoba masuk ke Elevator #" .. index)
-        local centerPos = getModelCenter(elev)
+    print("[ELEVATOR] Sapu bersih " .. #targetParts .. " titik potensial secara instan...")
+    
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    
+    -- Teleport ke setiap titik satu per satu dengan kecepatan tinggi
+    for _, part in ipairs(targetParts) do
+        if not isFarming then break end
         
-        if centerPos then
-            moveToPosition(CFrame.new(centerPos) * CFrame.new(0, 4, 0), false)
-        elseif elev.PrimaryPart then
-            moveToPosition(elev.PrimaryPart.CFrame * CFrame.new(0, 4, 0), false)
-        end
+        pcall(function()
+            rootPart.CFrame = part.CFrame
+        end)
         
-        -- Diam selama 2 detik untuk memastikan apakah gamenya ter-trigger pindah lantai
-        task.wait(2)
-        
-        if not isFarming then break end -- Jika player mematikan script saat mencoba
+        -- Beri jeda sangat singkat agar server sempat merekam sentuhan kita
+        task.wait(0.1) 
     end
     
+    Workspace.Gravity = originalGravity
     return true
 end
 
@@ -347,8 +362,9 @@ local function startAutoFarming()
                         end
                         
                         if uncompletedCount == 0 then
+                            -- Semua generator selesai, mulai sapu bersih elevator
                             teleportToRealElevator()
-                            task.wait(3) -- Tunggu sebelum memindai generator lagi
+                            task.wait(3) 
                             
                         elseif targetGen then
                             local centerPos = getModelCenter(targetGen)
