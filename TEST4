@@ -1,6 +1,5 @@
-print("testis12345")
--- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V15 (FINAL ELEVATOR & BUG FIXES)
+print("tesasdtis123 - V14 FIXED (ELEVATOR & BUG CAMERA)")
+-- CONFIGURATION: AUTO MACHINE FARMER V14 (FIXED BASED ON USER REQUEST)
 -- ==============================================================================
 local Config = {
     Skillcheck = { Enable = false }, 
@@ -8,7 +7,7 @@ local Config = {
         Enable = true,          
         Mode = "Instant",       
         TweenSpeed = 1.25,      
-        SafeRadius = 30,        -- Jarak aman dari monster
+        SafeRadius = 30,        
         PlayerRadius = 8,       
         DelayNext = 1.0,        
         UndergroundOffset = 11.5
@@ -32,8 +31,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local rootPart = character:WaitForChild("HumanoidRootPart")
+-- Variabel ini sekarang akan diupdate otomatis di dalam loop agar tidak bug di awal game
+local character = player.Character
+local rootPart = character and character:FindFirstChild("HumanoidRootPart")
 
 local isFarming = false
 
@@ -125,50 +125,30 @@ local function isMachineOccupied(generator, radius)
 end
 
 local function forceStop()
-    local decoding = character:FindFirstChild("Decoding") and character.Decoding.Value
-    if decoding ~= nil then
-        pcall(function() decoding.Stats.StopInteracting:FireServer("Stop") end)
+    if character then
+        local decoding = character:FindFirstChild("Decoding") and character.Decoding.Value
+        if decoding ~= nil then
+            pcall(function() decoding.Stats.StopInteracting:FireServer("Stop") end)
+        end
     end
 end
 
--- ==================== PENCARIAN LOKASI (REAL & FAKE ELEVATOR) ====================
 local function getFakeElevatorPosition()
-    -- Fake Elevator ada di CurrentRoom
-    local currentRoom = Workspace:FindFirstChild("CurrentRoom")
-    if currentRoom then
-        for _, obj in pairs(currentRoom:GetDescendants()) do
-            if obj.Name == "FakeElevator" and obj:IsA("Model") then
-                local center = getModelCenter(obj)
-                if center then return center end
-                if obj.PrimaryPart then return obj.PrimaryPart.Position end
+    local map = getMap()
+    if map then
+        local freeArea = map:FindFirstChild("FreeArea")
+        if freeArea then
+            local fakeElevator = freeArea:FindFirstChild("FakeElevator")
+            if fakeElevator and fakeElevator:IsA("Model") then
+                return getModelCenter(fakeElevator)
             end
         end
     end
     return nil
 end
 
-local function teleportToRealElevator()
-    print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
-    rootPart.Anchored = false 
-    
-    -- Real Elevator ada di folder terpisah
-    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
-    if elevatorsFolder then
-        for _, obj in pairs(elevatorsFolder:GetDescendants()) do
-            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
-                print("[SUCCESS] ElevatorPrompt Ditemukan! Menembus ke area tujuan...")
-                -- Teleport langsung ke posisi prompt agar langsung menyentuh trigger
-                moveToPosition(obj.CFrame * CFrame.new(0, 2, 0), false)
-                return true
-            end
-        end
-    end
-    
-    print("[WARNING] Real ElevatorPrompt belum dirender oleh map!")
-    return false
-end
-
 local function teleportplr(cf)
+    if not rootPart then return end
     local originalGravity = Workspace.Gravity
     Workspace.Gravity = 0
     rootPart.AssemblyLinearVelocity = Vector3.zero
@@ -237,21 +217,12 @@ local function updateGeneratorESP()
     end
 end
 
--- ==================== FUNGSI GERAKAN & INTERAKSI BUG FIX ====================
+-- ==================== FUNGSI GERAKAN ====================
 local function forceTriggerGenerator(generator)
-    -- FIX BUG 2: Paksa karakter menatap ke arah mesin agar ProximityPrompt terbaca kamera
-    local center = getModelCenter(generator)
-    if center then
-        rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(center.X, rootPart.Position.Y, center.Z))
-    end
-
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
-            -- Bypass batasan pandangan dan jarak
             descendant.RequiresLineOfSight = false
-            descendant.MaxActivationDistance = math.huge
-            if not descendant.Enabled then descendant.Enabled = true end
-            
+            descendant.MaxActivationDistance = 100 
             pcall(function() descendant:InputHoldBegin() end)
             return true
         end
@@ -260,6 +231,7 @@ local function forceTriggerGenerator(generator)
 end
 
 local function moveToPosition(targetCFrame, usePlatform)
+    if not rootPart then return end
     local originalGravity = Workspace.Gravity
     Workspace.Gravity = 0
     rootPart.AssemblyLinearVelocity = Vector3.zero
@@ -285,10 +257,37 @@ local function moveToPosition(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
+-- ==================== FUNGSI REAL ELEVATOR (NEW) ====================
+local function teleportToRealElevator()
+    print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
+    if rootPart then rootPart.Anchored = false end
+    
+    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
+    if elevatorsFolder then
+        for _, obj in pairs(elevatorsFolder:GetDescendants()) do
+            -- Mencari target pasti yang didapat dari Debugger
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                print("[SUCCESS] Real ElevatorPrompt Ditemukan!")
+                -- Teleport ke atas ElevatorPrompt agar langsung menyentuh trigger lantainya
+                moveToPosition(obj.CFrame * CFrame.new(0, 2, 0), false)
+                return true
+            end
+        end
+    end
+    
+    print("[WARNING] Real ElevatorPrompt tidak ditemukan di map!")
+    return false
+end
+
 -- ==================== FUNGSI UTAMA FARMING ====================
 local function startAutoFarming()
     task.spawn(function()
         while isFarming do
+            -- MEMPERBARUI KARAKTER SECARA OTOMATIS: 
+            -- Jika map baru loading atau mati, script akan terus membaca tubuh barumu
+            character = player.Character
+            if character then rootPart = character:FindFirstChild("HumanoidRootPart") end
+            
             updateGeneratorESP()
             updateSafeRadiusVisual()
             task.wait(0.1)
@@ -311,94 +310,90 @@ local function startAutoFarming()
 
     task.spawn(function()
         while isFarming do
-            if Config.Teleport.Enable then
-                -- FIX BUG 1: Menunggu map ter-load sepenuhnya
+            if Config.Teleport.Enable and character and rootPart then
                 local map = getMap()
-                if not map then
-                    print("[INFO] Menunggu map dan ruangan di-render...")
-                    task.wait(1)
-                    continue -- Skip siklus ini dan coba lagi
-                end
-                
-                local genFolder = map:FindFirstChild("Generators")
-                if not genFolder then
-                    task.wait(1)
-                    continue
-                end
-
-                local targetGen = nil
-                local uncompletedCount = 0
-                
-                for _, gen in pairs(genFolder:GetChildren()) do
-                    if gen:IsA("Model") and gen.PrimaryPart then
-                        local stats = gen:FindFirstChild("Stats")
-                        if stats then
-                            local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
-                            local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
-                            
-                            if not completed then
-                                uncompletedCount = uncompletedCount + 1
-                                if not connie and not targetGen then
-                                    if not isMonsterNear(gen.PrimaryPart.Position, Config.Teleport.SafeRadius) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
-                                        targetGen = gen
+                if map then
+                    local genFolder = map:FindFirstChild("Generators")
+                    if genFolder then
+                        local targetGen = nil
+                        local uncompletedCount = 0
+                        
+                        for _, gen in pairs(genFolder:GetChildren()) do
+                            if gen:IsA("Model") and gen.PrimaryPart then
+                                local stats = gen:FindFirstChild("Stats")
+                                if stats then
+                                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
+                                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
+                                    
+                                    if not completed then
+                                        uncompletedCount = uncompletedCount + 1
+                                        if not connie and not targetGen then
+                                            if not isMonsterNear(gen.PrimaryPart.Position, Config.Teleport.SafeRadius) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
+                                                targetGen = gen
+                                            end
+                                        end
                                     end
                                 end
                             end
                         end
-                    end
-                end
-                
-                if uncompletedCount == 0 then
-                    -- Semua generator selesai -> Langsung lari ke Real Elevator
-                    teleportToRealElevator()
-                    task.wait(3) 
-                    
-                elseif targetGen then
-                    local centerPos = getModelCenter(targetGen)
-                    if centerPos and targetGen.PrimaryPart then
-                        local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
-                        moveToPosition(targetCFrame, true)
-                        task.wait(0.1)
                         
-                        while isFarming and targetGen.Parent do
-                            local stats = targetGen:FindFirstChild("Stats")
-                            if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
-                                break 
-                            end
+                        if uncompletedCount == 0 then
+                            -- Semua generator selesai, langsung ke Real Elevator
+                            teleportToRealElevator()
+                            task.wait(3) 
                             
-                            -- Deteksi monster -> Kabur ke Fake Elevator
-                            if isTargetedByMonster() or isMonsterNear(rootPart.Position, Config.Teleport.SafeRadius) then
-                                print("[SAFETY] Bahaya! Monster terdeteksi! Mengevakuasi ke Fake Elevator...")
-                                forceStop()
-                                rootPart.Anchored = false
+                        elseif targetGen then
+                            local centerPos = getModelCenter(targetGen)
+                            if centerPos and targetGen.PrimaryPart then
+                                -- FIX KAMERA: Memanipulasi rotasi CFrame agar karakter selalu menatap ke arah mesin
+                                local pos = Vector3.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
+                                local lookAtPos = Vector3.new(targetGen.PrimaryPart.Position.X, pos.Y, targetGen.PrimaryPart.Position.Z)
+                                local targetCFrame = CFrame.new(pos, lookAtPos)
                                 
-                                local safePos = getFakeElevatorPosition()
-                                if safePos then
-                                    teleportplr(CFrame.new(safePos))
-                                else
-                                    teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0))
+                                moveToPosition(targetCFrame, true)
+                                task.wait(0.1)
+                                
+                                while isFarming and targetGen.Parent and character and rootPart do
+                                    local stats = targetGen:FindFirstChild("Stats")
+                                    if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
+                                        break 
+                                    end
+                                    
+                                    if isTargetedByMonster() or isMonsterNear(rootPart.Position, Config.Teleport.SafeRadius) then
+                                        print("[SAFETY] Bahaya! Monster terdeteksi! Mengevakuasi...")
+                                        forceStop()
+                                        rootPart.Anchored = false
+                                        
+                                        local safePos = getFakeElevatorPosition()
+                                        if safePos then
+                                            teleportplr(CFrame.new(safePos))
+                                        else
+                                            teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0))
+                                        end
+                                        
+                                        task.wait(5)
+                                        break
+                                    end
+                                    
+                                    if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                        forceStop()
+                                        break
+                                    end
+                                    
+                                    -- Karakter akan terkunci menghadap mesin
+                                    rootPart.CFrame = targetCFrame
+                                    local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
+                                    if not isDecoding then
+                                        forceTriggerGenerator(targetGen)
+                                    end
+                                    
+                                    task.wait(0.1)
                                 end
                                 
-                                task.wait(5)
-                                break
+                                if rootPart then rootPart.Anchored = false end
+                                task.wait(Config.Teleport.DelayNext)
                             end
-                            
-                            if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                forceStop()
-                                break
-                            end
-                            
-                            rootPart.CFrame = targetCFrame
-                            local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
-                            if not isDecoding then
-                                forceTriggerGenerator(targetGen)
-                            end
-                            
-                            task.wait(0.1)
                         end
-                        
-                        rootPart.Anchored = false
-                        task.wait(Config.Teleport.DelayNext)
                     end
                 end
             end
@@ -430,7 +425,7 @@ toggleBtn.Parent = screenGui
 toggleBtn.MouseButton1Click:Connect(function()
     if isFarming then
         isFarming = false
-        rootPart.Anchored = false
+        if rootPart then rootPart.Anchored = false end
         forceStop() 
         if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
         toggleBtn.Text = "START FARMING"
