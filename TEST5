@@ -63,7 +63,7 @@ local Config = {
         UndergroundOffset = 11.5,
         
         LooseRadius = 15,
-        LooseMonsters = { "RodgerMonster" }
+        LooseMonsters = { "RodgerMonster", "RazzleDazzleMonster" }
     },
     GenESP = {
         Enable = true,          
