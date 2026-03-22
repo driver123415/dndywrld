@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 ORIGINAL FIXED (ELEVATOR SWEEP & NO GLITCH)")
+print("tesasdtis123 - V14 OPTIMIZED (HIGH SENSITIVITY & AUTO-STANDBY ELEVATOR)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -52,7 +52,7 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
--- ==================== CEK STATUS INTERAKSI (IDE AKBAR) ====================
+-- ==================== CEK STATUS INTERAKSI ====================
 local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
@@ -93,31 +93,24 @@ local function updateSafeRadiusVisual()
     end
 end
 
--- ==================== SISTEM DETEKSI ANCAMAN ====================
-local function isTargetedByMonster()
+-- ==================== SISTEM DETEKSI ANCAMAN (HIGH SENSITIVITY) ====================
+local function isThreatened(targetPosition, radius)
     local map = getMap()
     if map then
         local monstersFolder = map:FindFirstChild("Monsters")
         if monstersFolder then
             for _, monster in pairs(monstersFolder:GetChildren()) do
+                -- 1. Deteksi Mata (Paling Berbahaya)
                 if monster:FindFirstChild("ChasingValue") and monster.ChasingValue.Value == character then
                     return true 
                 end
-            end
-        end
-    end
-    return false
-end
-
-local function isMonsterNear(targetPosition, radius)
-    local map = getMap()
-    if map then
-        local monstersFolder = map:FindFirstChild("Monsters")
-        if monstersFolder then
-            for _, monster in pairs(monstersFolder:GetChildren()) do
+                
+                -- 2. Deteksi Jarak Fisik Monster (Bahkan jika belum ada mata)
                 if monster:IsA("Model") and monster.PrimaryPart then
                     local distance = (monster.PrimaryPart.Position - targetPosition).Magnitude
-                    if distance <= radius then return true end
+                    if distance <= radius then 
+                        return true 
+                    end
                 end
             end
         end
@@ -275,24 +268,20 @@ local function moveToPosition(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
--- ==================== FUNGSI REAL ELEVATOR (FIX 3 LAPIS) ====================
+-- ==================== FUNGSI REAL ELEVATOR ====================
 local function teleportToRealElevator()
-    print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
+    print("[INFO] Meluncur ke Real Elevator...")
     rootPart.Anchored = false 
     local targetCFrame = nil
     
-    -- LAPIS 1: Cari ElevatorPrompt di folder Elevators (Paling Akurat)
     local elevatorsFolder = Workspace:FindFirstChild("Elevators")
     if elevatorsFolder then
         for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
             if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
                 targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
-                print("[SUCCESS] Lapis 1: Real ElevatorPrompt Ditemukan!")
                 break
             end
         end
-        
-        -- LAPIS 2: Cari Model Elevator (Sebagai Cadangan)
         if not targetCFrame then
             for _, obj in ipairs(elevatorsFolder:GetChildren()) do
                 if obj.Name == "Elevator" and obj:IsA("Model") then
@@ -302,22 +291,18 @@ local function teleportToRealElevator()
                         local centerPos = getModelCenter(obj)
                         if centerPos then targetCFrame = CFrame.new(centerPos) * CFrame.new(0, 3, 0) end
                     end
-                    print("[SUCCESS] Lapis 2: Model Elevator Ditemukan!")
                     break
                 end
             end
         end
     end
     
-    -- LAPIS 3: Pencarian Global (Jaga-jaga jika mapnya beda)
     if not targetCFrame then
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
                 local parentName = string.lower(obj.Parent and obj.Parent.Name or "")
-                -- Abaikan yang punya unsur nama Fake
                 if not string.find(parentName, "fake") then
                     targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
-                    print("[SUCCESS] Lapis 3: ElevatorPrompt ditemukan via Global Sweep!")
                     break
                 end
             end
@@ -325,8 +310,6 @@ local function teleportToRealElevator()
     end
     
     if targetCFrame then
-        -- KUNCI UTAMA: "true" di sini akan mengaktifkan 'rootPart.Anchored = true' 
-        -- Karakter akan melayang aman di titik Elevator tanpa jatuh ke void!
         moveToPosition(targetCFrame, true)
         return true
     else
@@ -337,6 +320,9 @@ end
 
 -- ==================== FUNGSI UTAMA FARMING ====================
 local function startAutoFarming()
+    -- Memori untuk elevator standby
+    local inElevatorStandby = false
+
     task.spawn(function()
         while isFarming do
             updateGeneratorESP()
@@ -361,7 +347,6 @@ local function startAutoFarming()
 
     task.spawn(function()
         while isFarming do
-            -- Refresh karakter jika spawn ulang
             character = player.Character or player.CharacterAdded:Wait()
             rootPart = character:WaitForChild("HumanoidRootPart")
 
@@ -373,6 +358,7 @@ local function startAutoFarming()
                         local targetGen = nil
                         local uncompletedCount = 0
                         
+                        -- PEMINDAIAN MESIN DENGAN SENSITIVITAS TINGGI
                         for _, gen in pairs(genFolder:GetChildren()) do
                             if gen:IsA("Model") and gen.PrimaryPart then
                                 local stats = gen:FindFirstChild("Stats")
@@ -382,8 +368,10 @@ local function startAutoFarming()
                                     
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
+                                        -- Cek berlapis: Mesin tidak boleh dikuasai hantu, player lain, dan harus bersih dari ancaman
                                         if not connie and not targetGen then
-                                            if not isMonsterNear(gen.PrimaryPart.Position, Config.Teleport.SafeRadius) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
+                                            -- Kita tambah buffer + 15 saat mau memilih mesin baru agar lebih selektif
+                                            if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                 targetGen = gen
                                             end
                                         end
@@ -393,10 +381,22 @@ local function startAutoFarming()
                         end
                         
                         if uncompletedCount == 0 then
-                            teleportToRealElevator()
-                            task.wait(3) 
+                            -- SISTEM AUTO-STANDBY ELEVATOR: Hanya teleport 1 kali, lalu lepaskan player
+                            if not inElevatorStandby then
+                                print("[INFO] Semua Mesin Selesai! Menunggu lantai berikutnya...")
+                                teleportToRealElevator()
+                                task.wait(0.5)
+                                -- Lepas gravitasi agar player bisa jalan bebas di dalam lift
+                                if rootPart then rootPart.Anchored = false end
+                                print("[INFO] Mode Standby Aktif. Silakan jalan bebas di dalam lift.")
+                                inElevatorStandby = true
+                            end
+                            task.wait(1) -- Santai menunggu map baru di-load
                             
                         elseif targetGen then
+                            -- Reset memori elevator karena kita punya mesin untuk dikerjakan (map baru mulai)
+                            inElevatorStandby = false
+                            
                             local centerPos = getModelCenter(targetGen)
                             if centerPos and targetGen.PrimaryPart then
                                 local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
@@ -409,20 +409,41 @@ local function startAutoFarming()
                                         break 
                                     end
                                     
-                                    if isTargetedByMonster() or isMonsterNear(rootPart.Position, Config.Teleport.SafeRadius) then
-                                        print("[SAFETY] Bahaya! Monster terdeteksi! Mengevakuasi...")
+                                    -- DETEKSI ANCAMAN WAKTU NYATA SAAT NGERJAIN MESIN
+                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                                        print("[SAFETY] Ancaman terdeteksi sangat dekat! Mengevakuasi...")
                                         forceStop()
                                         rootPart.Anchored = false
                                         
-                                        local safePos = getFakeElevatorPosition()
-                                        if safePos then
-                                            teleportplr(CFrame.new(safePos))
-                                        else
-                                            teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0))
+                                        -- SMART EVASION: Cari mesin lain dulu, kalau tidak ada baru ke Fake Elevator
+                                        local safeAlternative = false
+                                        for _, genAlt in pairs(genFolder:GetChildren()) do
+                                            if genAlt ~= targetGen and genAlt:IsA("Model") and genAlt.PrimaryPart then
+                                                local altStats = genAlt:FindFirstChild("Stats")
+                                                if altStats and not (altStats:FindFirstChild("Completed") and altStats.Completed.Value) and not (altStats:FindFirstChild("Connie") and altStats.Connie.Value) then
+                                                    if not isThreatened(genAlt.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(genAlt, Config.Teleport.PlayerRadius) then
+                                                        safeAlternative = true
+                                                        break
+                                                    end
+                                                end
+                                            end
                                         end
                                         
-                                        task.wait(5)
-                                        break
+                                        if safeAlternative then
+                                            print("[SAFETY] Ada mesin lain yang aman. Segera berpindah...")
+                                            task.wait(0.5)
+                                            break -- Break loop mesin ini agar loop utama memindahkan player ke mesin alternatif
+                                        else
+                                            print("[SAFETY] Semua mesin penuh ancaman. Mengungsi ke Fake Elevator...")
+                                            local safePos = getFakeElevatorPosition()
+                                            if safePos then
+                                                teleportplr(CFrame.new(safePos))
+                                            else
+                                                teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0))
+                                            end
+                                            task.wait(5) -- Sembunyi lama karena situasi berbahaya
+                                            break
+                                        end
                                     end
                                     
                                     if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
