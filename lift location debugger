@@ -1,0 +1,139 @@
+-- ==============================================================================
+-- ELEVATOR DETECTOR & ESP DEBUG TOOL (V2)
+-- ==============================================================================
+local CoreGui = game:GetService("CoreGui")
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local isDebugging = false
+local espFolder = Instance.new("Folder")
+espFolder.Name = "ElevatorDebugFolder"
+
+local success = pcall(function() espFolder.Parent = CoreGui end)
+if not success then espFolder.Parent = player:WaitForChild("PlayerGui") end
+
+-- ==================== FUNGSI BANTUAN ====================
+local function clearESP()
+    for _, child in pairs(espFolder:GetChildren()) do
+        child:Destroy()
+    end
+end
+
+local function createESP(targetPart, espColor, textLabelStr)
+    if not targetPart then return end
+    
+    -- Buat Highlight (Garis luar part)
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = targetPart
+    highlight.FillColor = espColor
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.5
+    highlight.Parent = espFolder
+    
+    -- Buat Teks Mengambang (BillboardGui)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = targetPart
+    billboard.Size = UDim2.new(0, 250, 0, 80)
+    billboard.AlwaysOnTop = true
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Parent = billboard
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Font = Enum.Font.Code
+    textLabel.TextSize = 14
+    textLabel.TextColor3 = espColor
+    textLabel.TextStrokeTransparency = 0
+    textLabel.Text = textLabelStr
+    
+    billboard.Parent = espFolder
+end
+
+-- ==================== FUNGSI SCAN ELEVATOR ====================
+local function scanAllElevators()
+    clearESP()
+    
+    -- 1. SCAN FAKE ELEVATOR (Berada di Workspace.CurrentRoom)
+    local currentRoom = Workspace:FindFirstChild("CurrentRoom")
+    if currentRoom then
+        for _, obj in pairs(currentRoom:GetDescendants()) do
+            if obj.Name == "FakeElevator" and obj:IsA("Model") then
+                local targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                createESP(targetPart, Color3.fromRGB(255, 50, 50), "[ FAKE ELEVATOR ]\nLokasi: CurrentRoom")
+            end
+        end
+    end
+    
+    -- 2. SCAN REAL ELEVATOR (Berada di Workspace.Elevators)
+    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
+    if elevatorsFolder then
+        for _, obj in pairs(elevatorsFolder:GetDescendants()) do
+            -- Target utama: ElevatorPrompt
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                createESP(obj, Color3.fromRGB(50, 255, 50), "[ TARGET UTAMA: ElevatorPrompt ]\nLokasi: Elevators Folder")
+                print("[DEBUG] Target Real ElevatorPrompt ditemukan!")
+                
+            -- Target cadangan: Model utamanya
+            elseif obj.Name == "Elevator" and obj:IsA("Model") and obj.Parent == elevatorsFolder then
+                local targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                createESP(targetPart, Color3.fromRGB(255, 255, 0), "[ MODEL: Elevator ]\nInduk Elevator Asli")
+            end
+        end
+    end
+end
+
+-- ==================== LOOP DEBUG ====================
+task.spawn(function()
+    while true do
+        if isDebugging then
+            scanAllElevators()
+        else
+            clearESP()
+        end
+        task.wait(2)
+    end
+end)
+
+-- ==================== UI SETUP (DRAGGABLE) ====================
+local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ElevatorDebugUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = guiContainer
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 200, 0, 45)
+toggleBtn.Position = UDim2.new(0.5, -100, 0.1, 0)
+toggleBtn.Text = "SCAN ELEVATORS (OFF)"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 18
+toggleBtn.Active = true
+toggleBtn.Draggable = true 
+toggleBtn.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = toggleBtn
+
+toggleBtn.MouseButton1Click:Connect(function()
+    isDebugging = not isDebugging
+    if isDebugging then
+        toggleBtn.Text = "SCAN ELEVATORS (ON)"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+        print("[DEBUG] Memulai pemindaian elevator...")
+        scanAllElevators()
+    else
+        toggleBtn.Text = "SCAN ELEVATORS (OFF)"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        print("[DEBUG] Pemindaian dihentikan.")
+        clearESP()
+    end
+end)
+
+print("=========================================")
+print(" TOOL DEBUG ELEVATOR V2 AKTIF ")
+print("=========================================")
