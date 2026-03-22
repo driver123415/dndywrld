@@ -1,11 +1,10 @@
 -- ==============================================================================
--- V-INTEGRATED: DEATH DETECTION + AUTO ITEM + AUTO GENERATOR
+-- V-INTEGRATED REVISION 2: DEATH DETECTION + AUTO ITEM + AUTO GEN + AUTO READY
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
 local LOBBY_PLACE_ID = 16116270224 
 
--- 1. SYARAT WAJIB: Script hanya jalan di Place ID yang ditentukan
 if game.PlaceId ~= INGAME_PLACE_ID then
     print("[SYSTEM] Not in-game (Place ID mismatch). Script disabled.")
     return
@@ -25,14 +24,19 @@ local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- STATE CONTROL (Jembatan antar script)
-local isMasterFarming = false     -- Toggle Utama dari UI
-local isItemFarmingActive = false -- Penanda apakah script sedang fokus ambil item
+local isMasterFarming = false     
+local isItemFarmingActive = false 
 local hasTeleportedToLobby = false
 
 -- ==================== MERGED CONFIGURATION ====================
 local Config = {
-    -- [A] ITEM AUTO-FARM CONFIG
+    AutoStartFarming = true, -- REVISI 3: True = Otomatis jalan saat di-execute
+    
+    AutoReady = {            -- REVISI 1: Auto Ready Up
+        Enable = true,
+        Delay = 5            -- Delay dalam detik
+    },
+
     Pickup = {
         Enable = true,              
         MovementMode = "Instant",   
@@ -48,7 +52,6 @@ local Config = {
         Slots = { Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false }
     },
 
-    -- [B] GENERATOR AUTO-FARM CONFIG
     Skillcheck = { Enable = false }, 
     Teleport = {
         Enable = true,          
@@ -69,23 +72,35 @@ local Config = {
 }
 
 -- ==============================================================
--- MODUL 1: SCRIPT DETEKSI KEMATIAN PLAYER (Berjalan di Background)
+-- MODUL 0: AUTO READY-UP (REVISI 1)
+-- ==============================================================
+if Config.AutoReady.Enable then
+    task.spawn(function()
+        print("[SYSTEM] Menunggu " .. Config.AutoReady.Delay .. " detik untuk eksekusi Auto Ready-Up...")
+        task.wait(Config.AutoReady.Delay)
+        pcall(function()
+            local args = { "ReadyUp" }
+            ReplicatedStorage:WaitForChild("Events"):WaitForChild("ReadyUpEvent"):FireServer(unpack(args))
+            print("[SUCCESS] Auto Ready-Up telah dikirim ke Server!")
+        end)
+    end)
+end
+
+-- ==============================================================
+-- MODUL 1: SCRIPT DETEKSI KEMATIAN PLAYER
 -- ==============================================================
 local function teleportToLobby()
     if hasTeleportedToLobby then return end
     hasTeleportedToLobby = true 
     print("[DEATH] Kematian terdeteksi! Teleporting back to Lobby...")
-    isMasterFarming = false -- Matikan farm saat mati
+    isMasterFarming = false 
     TeleportService:Teleport(LOBBY_PLACE_ID, player)
 end
 
 local function setupDeathDetection(char)
     local humanoid = char:WaitForChild("Humanoid", 10)
     if humanoid then
-        humanoid.Died:Connect(function()
-            print("[DEBUG] Humanoid.Died terpanggil.")
-            teleportToLobby()
-        end)
+        humanoid.Died:Connect(function() teleportToLobby() end)
     end
 end
 
@@ -96,10 +111,7 @@ task.spawn(function()
     local inGamePlayers = workspace:WaitForChild("InGamePlayers", 10)
     if inGamePlayers then
         inGamePlayers.ChildRemoved:Connect(function(child)
-            if child.Name == player.Name then
-                print("[DEBUG] Karakter dihapus dari InGamePlayers.")
-                teleportToLobby()
-            end
+            if child.Name == player.Name then teleportToLobby() end
         end)
     end
 end)
@@ -129,9 +141,7 @@ local function getFakeElevatorPosition()
         local freeArea = map:FindFirstChild("FreeArea")
         if freeArea then
             local fakeElevator = freeArea:FindFirstChild("FakeElevator")
-            if fakeElevator and fakeElevator:IsA("Model") then
-                return getModelCenter(fakeElevator)
-            end
+            if fakeElevator and fakeElevator:IsA("Model") then return getModelCenter(fakeElevator) end
         end
     end
     return nil
@@ -293,7 +303,6 @@ local function executePickup()
 
         if #priorityItems == 0 and #normalItems == 0 then
             hasCleanedAll = true
-            print("[INFO] Pengecekan Loop " .. currentLoop .. ": Seluruh item telah dibersihkan!")
             break
         end
 
@@ -337,8 +346,6 @@ local function executePickup()
     end
 
     isItemAuraActive = false
-    
-    -- LOGIC DIUBAH DISINI: Daripada diam di Fake Elevator, kita lapor selesai agar Generator lanjut
     print("[DONE] Item berhasil diamankan! Melanjutkan ke target Generator...")
     isItemFarmingActive = false 
 end
@@ -583,7 +590,6 @@ end
 local function startAutoFarming()
     local inElevatorStandby = false
 
-    -- Loop Visual ESP
     task.spawn(function()
         while isMasterFarming do
             updateGeneratorESP()
@@ -593,7 +599,6 @@ local function startAutoFarming()
         if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
     end)
 
-    -- Loop Bypass Skillcheck
     task.spawn(function()
         while isMasterFarming do
             pcall(function()
@@ -607,12 +612,10 @@ local function startAutoFarming()
         end
     end)
 
-    -- Loop Utama Pergerakan Generator
     task.spawn(function()
         while isMasterFarming do
-            -- JIKA ITEM SEDANG DIAMBIL, GENERATOR PAUSE DULU
             if isItemFarmingActive then
-                task.wait(0.5)
+                task.wait(0.2)
                 continue
             end
 
@@ -669,6 +672,14 @@ local function startAutoFarming()
                                 local failTimer = 0 
                                 
                                 while isMasterFarming and targetGen.Parent and not isItemFarmingActive do
+                                    -- REVISI 2: Pengecekan ekstra untuk break saat farming item aktif
+                                    if isItemFarmingActive then
+                                        forceStop()
+                                        rootPart.Anchored = false
+                                        instantNext = true
+                                        break
+                                    end
+
                                     local stats = targetGen:FindFirstChild("Stats")
                                     if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
                                         instantNext = true
@@ -759,11 +770,10 @@ local function startAutoFarming()
 end
 
 -- ==============================================================
--- MODUL 4: MASTER WATCHER (Pemantau Item / Pergantian Lantai)
+-- MODUL 4: MASTER WATCHER (REVISI 2: TIMER DIPERCEPAT 0.2s)
 -- ==============================================================
 task.spawn(function()
-    while task.wait(1) do
-        -- Jika UI Start belum ditekan, abaikan
+    while task.wait(0.2) do -- Jauh lebih cepat agar tidak kalah start dengan Generator
         if not isMasterFarming then continue end
 
         local map = getMap()
@@ -778,19 +788,22 @@ task.spawn(function()
                     end
                 end
 
-                -- Jika terdeteksi item valid dan script belum masuk mode ambil item
                 if hasValidItems and not isItemFarmingActive then
-                    isItemFarmingActive = true -- Ini otomatis membuat Auto-Generator pause!
+                    isItemFarmingActive = true 
                     
                     print("\n==============================================")
                     print("[SYSTEM] Mendeteksi Item / Lantai Baru!")
-                    print("[SYSTEM] Auto-Generator Pause. Mengambil item...")
+                    print("[SYSTEM] Force Stop Generator. Mengambil item...")
                     print("==============================================")
+                    
+                    -- REVISI 2: Paksa putus interaksi Generator JIKA pemain sedang nge-mesin
+                    forceStop()
+                    if rootPart then rootPart.Anchored = false end
                     
                     character = player.Character or player.CharacterAdded:Wait()
                     rootPart = character:WaitForChild("HumanoidRootPart")
                     
-                    executePickup() -- Setelah eksekusi ini selesai, isItemFarmingActive akan diubah jadi false, dan Generator jalan lagi
+                    executePickup() 
                 end
             end
         end
@@ -798,7 +811,7 @@ task.spawn(function()
 end)
 
 -- ==============================================================
--- MODUL 5: UI TOGGLE DRAGGABLE
+-- MODUL 5: UI TOGGLE DRAGGABLE & AUTO-START
 -- ==============================================================
 local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 
@@ -834,3 +847,12 @@ toggleBtn.MouseButton1Click:Connect(function()
         startAutoFarming()
     end
 end)
+
+-- REVISI 3: TRIGGER AUTO-START JIKA DI-SET TRUE
+if Config.AutoStartFarming then
+    print("[SYSTEM] Auto-Start Enabled. Langsung memulai Farming...")
+    isMasterFarming = true
+    toggleBtn.Text = "STOP FARMING"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    startAutoFarming()
+end
