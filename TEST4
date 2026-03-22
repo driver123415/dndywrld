@@ -1,6 +1,6 @@
-print("tesasdtis123 - V14 ULTIMATE (CAMERA FIX & ELEVATOR FALLBACK)")
+print("tesasdtis123 - V14 ORIGINAL FIXED (UI CHECK & CAMERA TILT)")
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER
+-- CONFIGURATION: AUTO MACHINE FARMER V14 (STABLE BASE)
 -- ==============================================================================
 local Config = {
     Skillcheck = { Enable = false }, 
@@ -15,7 +15,7 @@ local Config = {
     },
     ESP = {
         Enable = true,          
-        ShowSafeRadius = false,  
+        ShowSafeRadius = true,  
         NormalColor = Color3.fromRGB(150, 150, 150),   
         CompletedColor = Color3.fromRGB(255, 0, 255),  
         PossessedColor = Color3.fromRGB(0, 255, 255)   
@@ -52,7 +52,7 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
--- ==================== CEK STATUS INTERAKSI VIA UI (IDE USER) ====================
+-- ==================== CEK STATUS INTERAKSI VIA UI (IDE AKBAR) ====================
 local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
@@ -61,7 +61,6 @@ local function isInteractingUI()
             local menu = screenGui:FindFirstChild("Menu")
             if menu then
                 local stopGen = menu:FindFirstChild("StopGenerator")
-                -- Jika StopGenerator Visible tercentang, artinya player sedang ngerjain mesin
                 if stopGen and stopGen:IsA("GuiObject") then
                     return stopGen.Visible
                 end
@@ -231,12 +230,20 @@ local function updateGeneratorESP()
     end
 end
 
--- ==================== FUNGSI GERAKAN ====================
+-- ==================== FUNGSI GERAKAN & INTERAKSI ====================
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
             descendant.RequiresLineOfSight = false
             descendant.MaxActivationDistance = math.huge 
+            
+            -- FIX CAMERA BUG (IDE AKBAR): Arahkan KAMERA (bukan fisik karakter) menghadap ke atas
+            local camera = Workspace.CurrentCamera
+            if camera and rootPart then
+                -- Memaksa layar kamera mendongak ke atas
+                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, camera.CFrame.Position + Vector3.new(0, 50, 0))
+            end
+            
             pcall(function() descendant:InputHoldBegin() end)
             return true
         end
@@ -270,15 +277,15 @@ local function moveToPosition(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
--- ==================== FUNGSI REAL ELEVATOR (NEW FIX) ====================
+-- ==================== FUNGSI PENCARIAN REAL ELEVATOR (NEW FIX) ====================
 local function teleportToRealElevator()
     print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
     rootPart.Anchored = false 
     
     local elevatorsFolder = Workspace:FindFirstChild("Elevators")
     if elevatorsFolder then
-        -- 1. Coba cari ElevatorPrompt dulu (Paling akurat)
         for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
+            -- Menggunakan data dari Debugger kamu (ElevatorPrompt)
             if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
                 print("[SUCCESS] Real ElevatorPrompt Ditemukan!")
                 moveToPosition(obj.CFrame * CFrame.new(0, 2, 0), false)
@@ -286,7 +293,7 @@ local function teleportToRealElevator()
             end
         end
         
-        -- 2. Jika tidak ada, fallback cari Model induknya "Elevator"
+        -- Fallback jika ElevatorPrompt tidak langsung ketemu, cari fisiknya
         for _, obj in ipairs(elevatorsFolder:GetChildren()) do
             if obj.Name == "Elevator" and obj:IsA("Model") then
                 print("[SUCCESS] Model Elevator Ditemukan (Pengganti Prompt)!")
@@ -332,11 +339,11 @@ local function startAutoFarming()
 
     task.spawn(function()
         while isFarming do
-            -- Re-fetch character jika mati/ganti lantai
+            -- REFRESH KARAKTER DENGAN CARA AMAN V14
             character = player.Character or player.CharacterAdded:Wait()
-            rootPart = character:FindFirstChild("HumanoidRootPart")
+            rootPart = character:WaitForChild("HumanoidRootPart")
 
-            if Config.Teleport.Enable and rootPart then
+            if Config.Teleport.Enable then
                 local map = getMap()
                 if map then
                     local genFolder = map:FindFirstChild("Generators")
@@ -364,6 +371,7 @@ local function startAutoFarming()
                         end
                         
                         if uncompletedCount == 0 then
+                            -- Panggil fungsi ke Elevator Asli
                             teleportToRealElevator()
                             task.wait(3) 
                             
@@ -374,7 +382,7 @@ local function startAutoFarming()
                                 moveToPosition(targetCFrame, true)
                                 task.wait(0.1)
                                 
-                                while isFarming and targetGen.Parent and rootPart do
+                                while isFarming and targetGen.Parent do
                                     local stats = targetGen:FindFirstChild("Stats")
                                     if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
                                         break 
@@ -403,23 +411,18 @@ local function startAutoFarming()
                                     
                                     rootPart.CFrame = targetCFrame
                                     
-                                    -- FIX BUG CAMERA & SKILLCHECK (IDE DARI KAMU)
+                                    -- =========================================
+                                    -- CEK STATUS INTERAKSI MENGGUNAKAN UI VISIBLE
+                                    -- =========================================
                                     if not isInteractingUI() then
-                                        -- Arahkan badan ke mesin
-                                        rootPart.CFrame = CFrame.lookAt(rootPart.Position, Vector3.new(centerPos.X, rootPart.Position.Y, centerPos.Z))
-                                        -- Paksa arah pandangan kamera ke mesin
-                                        local camera = Workspace.CurrentCamera
-                                        if camera then
-                                            camera.CFrame = CFrame.lookAt(camera.CFrame.Position, centerPos)
-                                        end
-                                        -- Trigger prompt
+                                        -- Jika belum masuk minigame, paksa interaksi & kamera dongak ke atas!
                                         forceTriggerGenerator(targetGen)
                                     end
                                     
                                     task.wait(0.1)
                                 end
                                 
-                                if rootPart then rootPart.Anchored = false end
+                                rootPart.Anchored = false
                                 task.wait(Config.Teleport.DelayNext)
                             end
                         end
@@ -454,7 +457,7 @@ toggleBtn.Parent = screenGui
 toggleBtn.MouseButton1Click:Connect(function()
     if isFarming then
         isFarming = false
-        if rootPart then rootPart.Anchored = false end
+        rootPart.Anchored = false
         forceStop() 
         if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
         toggleBtn.Text = "START FARMING"
