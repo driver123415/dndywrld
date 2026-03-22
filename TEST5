@@ -1,5 +1,5 @@
 -- ==============================================================================
--- V-INTEGRATED REVISION 3: DEATH + ITEM + GEN + READY + LOOSE MONSTER
+-- V-INTEGRATED REVISION 5: FULL FIX + PRIORITY BYPASS (ANTI-LIMBO)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -62,7 +62,6 @@ local Config = {
         DelayNext = 1.0,        
         UndergroundOffset = 11.5,
         
-        -- [FITUR LOOSE DETEKSI MONSTER DIAM]
         LooseRadius = 15,
         LooseMonsters = { "RodgerMonster" }
     },
@@ -172,6 +171,9 @@ end
 local isItemAuraActive = false
 local isAutoUseActive = false
 
+-- Tabel Weak Key untuk melacak item yang gagal diambil (Normal Item Saja)
+local unpickableItems = setmetatable({}, {__mode = "k"}) 
+
 local function isIgnored(itemName)
     local nameLower = string.lower(itemName)
     for _, blackName in ipairs(Config.Pickup.IgnoreList) do
@@ -198,7 +200,8 @@ local function applyItemESP()
                 highlight.Name = "ItemESP"
                 highlight.Parent = item
                 highlight.FillTransparency = 0.5
-                if isIgnored(item.Name) then highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                
+                if isIgnored(item.Name) or unpickableItems[item] then highlight.FillColor = Color3.fromRGB(255, 0, 0)
                 elseif isPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 255, 0)
                 else highlight.FillColor = Color3.fromRGB(0, 255, 0) end
                 
@@ -242,7 +245,7 @@ local function startItemAura()
                 local itemsFolder = map:FindFirstChild("Items")
                 if itemsFolder then
                     for _, item in pairs(itemsFolder:GetChildren()) do
-                        if not isIgnored(item.Name) then
+                        if not isIgnored(item.Name) and not unpickableItems[item] then
                             local promptPart = item:FindFirstChild("Prompt")
                             if promptPart then
                                 local proximityPrompt = promptPart:FindFirstChild("ProximityPrompt")
@@ -299,7 +302,7 @@ local function executePickup()
         
         local priorityItems, normalItems = {}, {}
         for _, item in ipairs(itemsFolder:GetChildren()) do
-            if item:IsA("Model") and not isIgnored(item.Name) then
+            if item:IsA("Model") and not isIgnored(item.Name) and not unpickableItems[item] then
                 if isPriority(item.Name) then table.insert(priorityItems, item)
                 else table.insert(normalItems, item) end
             end
@@ -317,7 +320,7 @@ local function executePickup()
         end)
 
         for _, item in ipairs(itemsToProcess) do
-            if item and item.Parent and not isIgnored(item.Name) then
+            if item and item.Parent and not isIgnored(item.Name) and not unpickableItems[item] then
                 local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
                 local platform = Instance.new("Part")
                 platform.Size = Vector3.new(15, 1, 15) 
@@ -342,6 +345,19 @@ local function executePickup()
                     task.wait(0.1)
                     timeout = timeout - 1
                 end
+                
+                -- [PERBAIKAN REVISI 5]: Bypass Blacklist untuk Item Priority
+                if item.Parent then
+                    if isPriority(item.Name) then
+                        print("[SYSTEM] Item Priority " .. item.Name .. " masih mencoba diambil. Bypass Blacklist aktif.")
+                    else
+                        print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas/Darah Penuh). Dimasukkan ke Blacklist Sementara.")
+                        unpickableItems[item] = true
+                        local highlight = item:FindFirstChild("ItemESP")
+                        if highlight then highlight.FillColor = Color3.fromRGB(255, 0, 0) end
+                    end
+                end
+
                 if platform then platform:Destroy() end
             end
         end
@@ -350,7 +366,7 @@ local function executePickup()
     end
 
     isItemAuraActive = false
-    print("[DONE] Item berhasil diamankan! Melanjutkan ke target Generator...")
+    print("[DONE] Pengambilan item selesai. Melanjutkan ke target Generator...")
     isItemFarmingActive = false 
 end
 
@@ -415,21 +431,16 @@ local function updateSafeRadiusVisual()
     end
 end
 
--- ==============================================================
--- [UPDATE REVISI 3] SISTEM DETEKSI ANCAMAN (LOOSE MONSTER)
--- ==============================================================
 local function isThreatened(targetPosition, radius)
     local map = getMap()
     if map then
         local monstersFolder = map:FindFirstChild("Monsters")
         if monstersFolder then
             for _, monster in pairs(monstersFolder:GetChildren()) do
-                -- 1. Deteksi Mata
                 if monster:FindFirstChild("ChasingValue") and monster.ChasingValue.Value == character then
                     return true 
                 end
                 
-                -- 2. Deteksi Jarak Fisik dengan Pengecualian Monster Diam
                 if monster:IsA("Model") and monster.PrimaryPart then
                     local distance = (monster.PrimaryPart.Position - targetPosition).Magnitude
                     
@@ -815,7 +826,7 @@ task.spawn(function()
             if itemsFolder then
                 local hasValidItems = false
                 for _, item in ipairs(itemsFolder:GetChildren()) do
-                    if item:IsA("Model") and not isIgnored(item.Name) then
+                    if item:IsA("Model") and not isIgnored(item.Name) and not unpickableItems[item] then
                         hasValidItems = true
                         break
                     end
