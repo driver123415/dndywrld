@@ -8,7 +8,7 @@ local Config = {
     
     -- Kata kunci untuk nama Frame/Menu yang dianggap sebagai "Pop-up" pengganggu
     PopupKeywords = {
-        "popup", "notice", "reward", "levelup", "mastery", "announcement", "error", "prompt"
+        "popup", "notice", "reward", "levelup", "announcement", "error", "prompt" --"mastery"
     },
     
     -- Kata kunci untuk tombol yang harus ditekan (Close / Claim / OK)
