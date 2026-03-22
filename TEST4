@@ -1,6 +1,6 @@
-print("tesasdtis123 - V14 ORIGINAL FIXED (UI CHECK & CAMERA TILT)")
+print("tesasdtis123 - V14 ORIGINAL (NO CAMERA TRICK & FIX ELEVATOR)")
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V14 (STABLE BASE)
+-- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
 local Config = {
     Skillcheck = { Enable = false }, 
@@ -52,7 +52,7 @@ local function getModelCenter(model)
     return totalPosition / #parts
 end
 
--- ==================== CEK STATUS INTERAKSI VIA UI (IDE AKBAR) ====================
+-- ==================== CEK STATUS INTERAKSI (IDE AKBAR) ====================
 local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
@@ -230,21 +230,53 @@ local function updateGeneratorESP()
     end
 end
 
--- ==================== FUNGSI GERAKAN & INTERAKSI ====================
+-- ==================== FUNGSI REAL ELEVATOR ====================
+local function teleportToRealElevator()
+    print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
+    rootPart.Anchored = false 
+    
+    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
+    if elevatorsFolder then
+        for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                print("[SUCCESS] Real ElevatorPrompt Ditemukan!")
+                moveToPosition(obj.CFrame * CFrame.new(0, 2, 0), false)
+                return true
+            end
+        end
+        
+        for _, obj in ipairs(elevatorsFolder:GetChildren()) do
+            if obj.Name == "Elevator" and obj:IsA("Model") then
+                print("[SUCCESS] Model Elevator Ditemukan (Pengganti Prompt)!")
+                local centerPos = getModelCenter(obj)
+                if centerPos then
+                    moveToPosition(CFrame.new(centerPos) * CFrame.new(0, 4, 0), false)
+                    return true
+                elseif obj.PrimaryPart then
+                    moveToPosition(obj.PrimaryPart.CFrame * CFrame.new(0, 4, 0), false)
+                    return true
+                end
+            end
+        end
+    end
+    print("[WARNING] Real Elevator gagal ditemukan di map!")
+    return false
+end
+
+-- ==================== FUNGSI GERAKAN & FIRE PROMPT ====================
 local function forceTriggerGenerator(generator)
     for _, descendant in ipairs(generator:GetDescendants()) do
         if descendant:IsA("ProximityPrompt") then
             descendant.RequiresLineOfSight = false
             descendant.MaxActivationDistance = math.huge 
             
-            -- FIX CAMERA BUG (IDE AKBAR): Arahkan KAMERA (bukan fisik karakter) menghadap ke atas
-            local camera = Workspace.CurrentCamera
-            if camera and rootPart then
-                -- Memaksa layar kamera mendongak ke atas
-                camera.CFrame = CFrame.lookAt(camera.CFrame.Position, camera.CFrame.Position + Vector3.new(0, 50, 0))
+            -- Pendekatan Baru: Bypass kamera menggunakan fungsi executor
+            if fireproximityprompt then
+                fireproximityprompt(descendant, 1)
+            else
+                pcall(function() descendant:InputHoldBegin() end)
             end
             
-            pcall(function() descendant:InputHoldBegin() end)
             return true
         end
     end
@@ -277,42 +309,6 @@ local function moveToPosition(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
--- ==================== FUNGSI PENCARIAN REAL ELEVATOR (NEW FIX) ====================
-local function teleportToRealElevator()
-    print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
-    rootPart.Anchored = false 
-    
-    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
-    if elevatorsFolder then
-        for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
-            -- Menggunakan data dari Debugger kamu (ElevatorPrompt)
-            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
-                print("[SUCCESS] Real ElevatorPrompt Ditemukan!")
-                moveToPosition(obj.CFrame * CFrame.new(0, 2, 0), false)
-                return true
-            end
-        end
-        
-        -- Fallback jika ElevatorPrompt tidak langsung ketemu, cari fisiknya
-        for _, obj in ipairs(elevatorsFolder:GetChildren()) do
-            if obj.Name == "Elevator" and obj:IsA("Model") then
-                print("[SUCCESS] Model Elevator Ditemukan (Pengganti Prompt)!")
-                local centerPos = getModelCenter(obj)
-                if centerPos then
-                    moveToPosition(CFrame.new(centerPos) * CFrame.new(0, 4, 0), false)
-                    return true
-                elseif obj.PrimaryPart then
-                    moveToPosition(obj.PrimaryPart.CFrame * CFrame.new(0, 4, 0), false)
-                    return true
-                end
-            end
-        end
-    end
-    
-    print("[WARNING] Real Elevator gagal ditemukan di map!")
-    return false
-end
-
 -- ==================== FUNGSI UTAMA FARMING ====================
 local function startAutoFarming()
     task.spawn(function()
@@ -339,7 +335,7 @@ local function startAutoFarming()
 
     task.spawn(function()
         while isFarming do
-            -- REFRESH KARAKTER DENGAN CARA AMAN V14
+            -- Refresh karakter jika spawn ulang
             character = player.Character or player.CharacterAdded:Wait()
             rootPart = character:WaitForChild("HumanoidRootPart")
 
@@ -371,7 +367,6 @@ local function startAutoFarming()
                         end
                         
                         if uncompletedCount == 0 then
-                            -- Panggil fungsi ke Elevator Asli
                             teleportToRealElevator()
                             task.wait(3) 
                             
@@ -412,10 +407,9 @@ local function startAutoFarming()
                                     rootPart.CFrame = targetCFrame
                                     
                                     -- =========================================
-                                    -- CEK STATUS INTERAKSI MENGGUNAKAN UI VISIBLE
+                                    -- CEK UI VISIBLE + FIRE PROMPT
                                     -- =========================================
                                     if not isInteractingUI() then
-                                        -- Jika belum masuk minigame, paksa interaksi & kamera dongak ke atas!
                                         forceTriggerGenerator(targetGen)
                                     end
                                     
