@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 PERFECTED (NO FLOAT BUG, SYNC FIX, SMART EVASION)")
+print("tesasdtis123 - V14 SUPREME (MICRO-RESET ANTI BUG, SMART EVASION, SYNC FIX)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -365,7 +365,6 @@ local function startAutoFarming()
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
                                         if not connie and not targetGen then
-                                            -- SENSITIVITAS TINGGI (BUFFER ZONE +15)
                                             if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                 targetGen = gen
                                             end
@@ -380,8 +379,8 @@ local function startAutoFarming()
                                 print("[INFO] Semua Mesin Selesai! Menunggu lantai berikutnya...")
                                 teleportToRealElevator()
                                 task.wait(0.5)
-                                -- ELEVATOR FREE ROAM: Karakter bebas gerak di lift
                                 if rootPart then rootPart.Anchored = false end
+                                print("[INFO] Mode Standby Aktif. Silakan jalan bebas di dalam lift.")
                                 inElevatorStandby = true
                             end
                             
@@ -396,6 +395,7 @@ local function startAutoFarming()
                                 
                                 local hasStartedInteracting = false
                                 local instantNext = false
+                                local failTimer = 0 -- VARIABEL PENGHITUNG KEGAGALAN
                                 
                                 while isFarming and targetGen.Parent do
                                     local stats = targetGen:FindFirstChild("Stats")
@@ -407,7 +407,7 @@ local function startAutoFarming()
                                     if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
                                         print("[SAFETY] Ancaman terdeteksi sangat dekat! Mengevakuasi...")
                                         forceStop()
-                                        task.wait(0.1) -- JEDA SINKRONISASI: Biarkan server tahu interaksi dibatalkan
+                                        task.wait(0.1)
                                         rootPart.Anchored = false
                                         
                                         local safeAlternative = false
@@ -443,7 +443,7 @@ local function startAutoFarming()
                                     
                                     if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                         forceStop()
-                                        task.wait(0.1) -- JEDA SINKRONISASI
+                                        task.wait(0.1)
                                         instantNext = true
                                         break
                                     end
@@ -453,14 +453,32 @@ local function startAutoFarming()
                                     local currentlyInteracting = isInteractingUI()
                                     if currentlyInteracting then
                                         hasStartedInteracting = true
+                                        failTimer = 0 -- Reset timer jika berhasil interaksi
                                     elseif hasStartedInteracting and not currentlyInteracting then
                                         print("[INFO] Extraction putus (UI Hilang). Instan berpindah!")
                                         forceStop()
-                                        task.wait(0.1) -- JEDA SINKRONISASI
+                                        task.wait(0.1)
                                         instantNext = true
                                         break
                                     else
                                         forceTriggerGenerator(targetGen)
+                                        failTimer = failTimer + 1
+                                        
+                                        -- LOGIKA MICRO-RESET
+                                        if failTimer == 10 then
+                                            -- Angkat karakter sedikit (Micro-Reset) setelah 1 detik gagal
+                                            print("[BUG FIX] UI macet! Melakukan Micro-Reset posisi...")
+                                            rootPart.CFrame = targetCFrame * CFrame.new(0, 1.5, 0)
+                                            task.wait(0.1)
+                                            rootPart.CFrame = targetCFrame
+                                        elseif failTimer >= 25 then
+                                            -- Jika sudah 2.5 detik tetap gagal, menyerah dan cari mesin lain
+                                            print("[WARNING] Mesin nge-bug tidak bisa di-trigger! Pindah mencari yang lain...")
+                                            forceStop()
+                                            task.wait(0.1)
+                                            instantNext = true
+                                            break
+                                        end
                                     end
                                     
                                     task.wait(0.1)
@@ -468,7 +486,6 @@ local function startAutoFarming()
                                 
                                 rootPart.Anchored = false
                                 
-                                -- BYPASS DELAY BENGONG 1 DETIK
                                 if instantNext then
                                     task.wait(0.1)
                                 else
@@ -477,21 +494,18 @@ local function startAutoFarming()
                             end
                             
                         else
-                            -- WAITING ROOM SAFEPLACE: 
-                            -- Sisa mesin ada, tapi dijaga hantu atau dipakai teman.
                             print("[INFO] Mesin tersisa sedang tidak aman/dipakai. Menunggu di Safe Place...")
                             rootPart.Anchored = false
                             local safePos = getFakeElevatorPosition()
                             if safePos then 
                                 teleportplr(CFrame.new(safePos)) 
-                                -- DI SINI SUDAH TIDAK DI-ANCHORED (BEBAS BERDIRI)
                             end
                             task.wait(1) 
                         end
                     end
                 end
             end
-            task.wait(0.1) -- Loop utama dipercepat agar lebih responsif
+            task.wait(0.1)
         end
     end)
 end
