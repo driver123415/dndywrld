@@ -1,5 +1,5 @@
 local targetPlaceId = 16116270224
-local timeoutSeconds = 30 -- Waktu tunggu (detik) sebelum mencoba eksekusi ulang
+local timeoutSeconds = 15 -- Waktu tunggu (detik) sebelum mencoba eksekusi ulang
 
 if game.PlaceId == targetPlaceId then
     print("Berada di Lobby. Memulai proses auto-join...")
