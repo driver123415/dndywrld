@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 FINAL (GLOBAL ELEVATOR SWEEP & GREEN PLATFORM)")
+print("tesasdtis123 - V14 ORIGINAL FIXED (ELEVATOR SWEEP & NO GLITCH)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -255,10 +255,6 @@ local function moveToPosition(targetCFrame, usePlatform)
     rootPart.AssemblyLinearVelocity = Vector3.zero
     rootPart.Anchored = false
     
-    -- Tangkap part lama jika ada
-    local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
-    if oldPlatform then oldPlatform:Destroy() end
-    
     if Config.Teleport.Mode == "Instant" then
         rootPart.CFrame = targetCFrame
         task.wait(0.1) 
@@ -273,41 +269,30 @@ local function moveToPosition(targetCFrame, usePlatform)
     end
     
     if usePlatform then
-        -- Membuat Pijakan Hijau Kuat agar tidak tembus/jatuh ke void
-        local platform = Instance.new("Part")
-        platform.Name = "FarmPlatform"
-        platform.Size = Vector3.new(10, 1, 10)
-        platform.Anchored = true
-        platform.CanCollide = true
-        platform.Transparency = 0.5
-        platform.Color = Color3.fromRGB(0, 255, 0)
-        platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
-        platform.Parent = Workspace
-        
         rootPart.CFrame = targetCFrame
         rootPart.Anchored = true 
     end
     Workspace.Gravity = originalGravity
 end
 
--- ==================== PENCARIAN REAL ELEVATOR (3 LAPIS SWEEP) ====================
+-- ==================== FUNGSI REAL ELEVATOR (FIX 3 LAPIS) ====================
 local function teleportToRealElevator()
     print("[INFO] Semua Mesin Selesai! Meluncur ke Real Elevator...")
     rootPart.Anchored = false 
     local targetCFrame = nil
     
-    -- LAPIS 1: Cari ElevatorPrompt di folder Elevators
+    -- LAPIS 1: Cari ElevatorPrompt di folder Elevators (Paling Akurat)
     local elevatorsFolder = Workspace:FindFirstChild("Elevators")
     if elevatorsFolder then
         for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
             if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
                 targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
-                print("[SUCCESS] Real ElevatorPrompt Ditemukan di folder utama!")
+                print("[SUCCESS] Lapis 1: Real ElevatorPrompt Ditemukan!")
                 break
             end
         end
         
-        -- LAPIS 2: Jika Prompt ga ada, cari Model Elevator-nya
+        -- LAPIS 2: Cari Model Elevator (Sebagai Cadangan)
         if not targetCFrame then
             for _, obj in ipairs(elevatorsFolder:GetChildren()) do
                 if obj.Name == "Elevator" and obj:IsA("Model") then
@@ -317,32 +302,35 @@ local function teleportToRealElevator()
                         local centerPos = getModelCenter(obj)
                         if centerPos then targetCFrame = CFrame.new(centerPos) * CFrame.new(0, 3, 0) end
                     end
-                    print("[SUCCESS] Model Elevator Ditemukan sebagai cadangan!")
+                    print("[SUCCESS] Lapis 2: Model Elevator Ditemukan!")
                     break
                 end
             end
         end
     end
     
-    -- LAPIS 3: SAPU BERSIH SELURUH MAP! (Jika Folder Elevators tidak ada)
+    -- LAPIS 3: Pencarian Global (Jaga-jaga jika mapnya beda)
     if not targetCFrame then
         for _, obj in ipairs(Workspace:GetDescendants()) do
-            -- Abaikan FakeElevator
-            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") and not string.find(string.lower(obj.Parent and obj.Parent.Name or ""), "fake") then
-                targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
-                print("[SUCCESS] ElevatorPrompt ditemukan dari pencarian Global Sweep!")
-                break
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                local parentName = string.lower(obj.Parent and obj.Parent.Name or "")
+                -- Abaikan yang punya unsur nama Fake
+                if not string.find(parentName, "fake") then
+                    targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
+                    print("[SUCCESS] Lapis 3: ElevatorPrompt ditemukan via Global Sweep!")
+                    break
+                end
             end
         end
     end
     
-    -- EKSEKUSI TELEPORT
     if targetCFrame then
-        -- MENGGUNAKAN PLATFORM HIJAU (TRUE) AGAR TIDAK JATUH KE VOID!
+        -- KUNCI UTAMA: "true" di sini akan mengaktifkan 'rootPart.Anchored = true' 
+        -- Karakter akan melayang aman di titik Elevator tanpa jatuh ke void!
         moveToPosition(targetCFrame, true)
         return true
     else
-        print("[WARNING] Real Elevator benar-benar gagal ditemukan di map!")
+        print("[WARNING] Real Elevator gagal ditemukan di map!")
         return false
     end
 end
@@ -356,8 +344,6 @@ local function startAutoFarming()
             task.wait(0.1)
         end
         if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
-        local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
-        if oldPlatform then oldPlatform:Destroy() end
     end)
 
     task.spawn(function()
@@ -375,6 +361,7 @@ local function startAutoFarming()
 
     task.spawn(function()
         while isFarming do
+            -- Refresh karakter jika spawn ulang
             character = player.Character or player.CharacterAdded:Wait()
             rootPart = character:WaitForChild("HumanoidRootPart")
 
@@ -406,7 +393,6 @@ local function startAutoFarming()
                         end
                         
                         if uncompletedCount == 0 then
-                            -- Panggil fungsi ke Elevator Asli
                             teleportToRealElevator()
                             task.wait(3) 
                             
@@ -445,10 +431,6 @@ local function startAutoFarming()
                                     end
                                     
                                     rootPart.CFrame = targetCFrame
-                                    
-                                    -- =========================================
-                                    -- CEK UI VISIBLE + FIRE PROMPT
-                                    -- =========================================
                                     if not isInteractingUI() then
                                         forceTriggerGenerator(targetGen)
                                     end
@@ -457,8 +439,6 @@ local function startAutoFarming()
                                 end
                                 
                                 rootPart.Anchored = false
-                                local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
-                                if oldPlatform then oldPlatform:Destroy() end
                                 task.wait(Config.Teleport.DelayNext)
                             end
                         end
@@ -496,8 +476,6 @@ toggleBtn.MouseButton1Click:Connect(function()
         rootPart.Anchored = false
         forceStop() 
         if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
-        local oldPlatform = Workspace:FindFirstChild("FarmPlatform")
-        if oldPlatform then oldPlatform:Destroy() end
         toggleBtn.Text = "START FARMING"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
     else
