@@ -1,0 +1,85 @@
+-- ==============================================================================
+-- AUTO CLOSE POP-UPS (DANDY'S WORLD)
+-- Menutup notifikasi Level Up, Reward, Error, atau Pengumuman secara otomatis
+-- ==============================================================================
+
+local Config = {
+    EnableAutoClose = true,
+    
+    -- Kata kunci untuk nama Frame/Menu yang dianggap sebagai "Pop-up" pengganggu
+    PopupKeywords = {
+        "popup", "notice", "reward", "levelup", "mastery", "announcement", "error", "prompt"
+    },
+    
+    -- Kata kunci untuk tombol yang harus ditekan (Close / Claim / OK)
+    ButtonKeywords = {
+        "close", "okay", "ok", "claim", "confirm", "continue", "x"
+    }
+}
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+print("==================================================")
+print(" AUTO CLOSE POP-UPS BERHASIL DIJALANKAN")
+print("==================================================")
+
+local function startAutoClosePopups()
+    task.spawn(function()
+        while Config.EnableAutoClose do
+            pcall(function()
+                local playerGui = player:WaitForChild("PlayerGui")
+                
+                -- Menyapu seluruh isi UI di layar
+                for _, uiElement in ipairs(playerGui:GetDescendants()) do
+                    -- Cari Frame yang sedang muncul (Visible = true)
+                    if uiElement:IsA("Frame") and uiElement.Visible then
+                        local frameName = string.lower(uiElement.Name)
+                        local isPopup = false
+                        
+                        -- Cek apakah nama frame ini masuk daftar popup pengganggu
+                        for _, keyword in ipairs(Config.PopupKeywords) do
+                            if string.find(frameName, keyword) then
+                                isPopup = true
+                                break
+                            end
+                        end
+                        
+                        -- Jika terdeteksi sebagai popup pengganggu, cari tombol tutupnya!
+                        if isPopup then
+                            for _, btn in ipairs(uiElement:GetDescendants()) do
+                                if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
+                                    local btnName = string.lower(btn.Name)
+                                    local btnText = btn:IsA("TextButton") and string.lower(btn.Text) or ""
+                                    
+                                    for _, btnKeyword in ipairs(Config.ButtonKeywords) do
+                                        -- Jika nama tombol atau teksnya adalah "Close", "OK", dll
+                                        if string.find(btnName, btnKeyword) or string.find(btnText, btnKeyword) then
+                                            print("[AUTO CLOSE] Menutup Pop-up: " .. uiElement.Name)
+                                            
+                                            -- Tembak tombolnya secara gaib (Simulasi Klik)
+                                            if getconnections then
+                                                for _, connection in pairs(getconnections(btn.MouseButton1Click)) do
+                                                    connection:Fire()
+                                                end
+                                            else
+                                                -- Fallback jika executor tidak support getconnections (Sembunyikan paksa)
+                                                uiElement.Visible = false 
+                                            end
+                                            
+                                            task.wait(0.5) -- Jeda agar tidak spam klik berlebihan
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(2) -- Patroli UI setiap 2 detik agar game tidak nge-lag
+        end
+    end)
+end
+
+startAutoClosePopups()
