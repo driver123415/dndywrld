@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 OPTIMIZED (NO DELAY BENGONG, INSTANT TELEPORT)")
+print("tesasdtis123 - V14 FINAL (OUTER LOOP DELAY FIXED & COMPLETION LOG)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -10,7 +10,7 @@ local Config = {
         TweenSpeed = 1.25,      
         SafeRadius = 30,        
         PlayerRadius = 8,       
-        DelayNext = 1.0,        -- Hanya berlaku untuk delay normal
+        DelayNext = 1.0,        
         UndergroundOffset = 11.5
     },
     ESP = {
@@ -365,7 +365,6 @@ local function startAutoFarming()
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
                                         if not connie and not targetGen then
-                                            -- Buffer zone +15
                                             if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                 targetGen = gen
                                             end
@@ -383,19 +382,8 @@ local function startAutoFarming()
                                 if rootPart then rootPart.Anchored = false end
                                 print("[INFO] Mode Standby Aktif. Silakan jalan bebas di dalam lift.")
                                 
-                                isFarming = false
-                                local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
-                                local screenGui = guiContainer:FindFirstChild("FarmToggleUI")
-                                if screenGui then
-                                    local btn = screenGui:FindFirstChild("TextButton")
-                                    if btn then
-                                        btn.Text = "START FARMING"
-                                        btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-                                    end
-                                end
-                                break
+                                inElevatorStandby = true
                             end
-                            task.wait(1) 
                             
                         elseif targetGen then
                             inElevatorStandby = false
@@ -407,11 +395,12 @@ local function startAutoFarming()
                                 task.wait(0.1)
                                 
                                 local hasStartedInteracting = false
-                                local instantNext = false -- FLAG PENTING ANTI-BENGONG!
+                                local instantNext = false
                                 
                                 while isFarming and targetGen.Parent do
                                     local stats = targetGen:FindFirstChild("Stats")
                                     if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
+                                        print("[INFO] Mesin Selesai (100%)! Instan berpindah...")
                                         instantNext = true
                                         break 
                                     end
@@ -436,7 +425,7 @@ local function startAutoFarming()
                                         
                                         if safeAlternative then
                                             print("[SAFETY] Pindah ke mesin alternatif yang aman...")
-                                            instantNext = true -- Langsung pindah seketika
+                                            instantNext = true
                                             break 
                                         else
                                             print("[SAFETY] Semua mesin penuh ancaman. Mengungsi ke Fake Elevator...")
@@ -463,7 +452,7 @@ local function startAutoFarming()
                                     if currentlyInteracting then
                                         hasStartedInteracting = true
                                     elseif hasStartedInteracting and not currentlyInteracting then
-                                        print("[INFO] Extraction selesai (UI StopGenerator hilang). Instan teleport!")
+                                        print("[INFO] Extraction putus/dibatalkan (UI Hilang). Instan berpindah!")
                                         instantNext = true
                                         break
                                     else
@@ -475,18 +464,20 @@ local function startAutoFarming()
                                 
                                 rootPart.Anchored = false
                                 
-                                -- PENGHILANG BUG "BENGONG" (MENUNGGU 1 DETIK)
                                 if instantNext then
-                                    task.wait(0.1) -- Seketika pindah
+                                    task.wait(0.1) 
                                 else
-                                    task.wait(Config.Teleport.DelayNext) -- Normal delay
+                                    task.wait(Config.Teleport.DelayNext)
                                 end
                             end
                         end
                     end
                 end
             end
-            task.wait(1)
+            
+            -- FIX UTAMA: Outer Loop delay diubah dari 1.0 detik menjadi sangat cepat (0.1 detik)
+            -- Ini akan menghilangkan efek "bengong berdiri" di sebelah mesin
+            task.wait(0.1)
         end
     end)
 end
