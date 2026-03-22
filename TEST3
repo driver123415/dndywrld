@@ -1,385 +1,136 @@
 -- ==============================================================================
--- CONFIGURATION: AUTO MACHINE FARMER V9 (ELEVASI DISESUAIKAN masuk tengah generator)
+-- ELEVATOR DETECTOR & ESP DEBUG TOOL
 -- ==============================================================================
-local Config = {
-    
-    Skillcheck = { Enable = true },
-
-    Teleport = {
-        Enable = true,          
-        Mode = "Instant",       -- PILIHAN: "Tween" atau "Instant"
-        TweenSpeed = 1.25,      
-        SafeRadius = 30,        
-        PlayerRadius = 8,       
-        DelayNext = 1.0,        
-        
-        -- KEDALAMAN: Dinaikkan menjadi -5.5 (Ubah angka ini jika masih kurang pas)
-        -- Semakin mendekati angka 0, posisi kamu akan semakin ke atas
-        UndergroundOffset = 11.5
-    },
-
-    ESP = {
-        Enable = true,          
-        NormalColor = Color3.fromRGB(150, 150, 150),   
-        CompletedColor = Color3.fromRGB(255, 0, 255),  
-        PossessedColor = Color3.fromRGB(0, 255, 255)   
-    }
-}
--- ==============================================================================
--- END OF CONFIGURATION
--- ==============================================================================
-
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local rootPart = character:WaitForChild("HumanoidRootPart")
-
-local isFarming = false
-local activePlatform = nil
+local isDebugging = false
+local espFolder = Instance.new("Folder")
+espFolder.Name = "ElevatorDebugFolder"
+-- Kita simpan di CoreGui agar tidak menumpuk di Workspace
+local success = pcall(function() espFolder.Parent = CoreGui end)
+if not success then espFolder.Parent = player:WaitForChild("PlayerGui") end
 
 -- ==================== FUNGSI BANTUAN ====================
 local function getMap()
-    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model") or Workspace
 end
 
-local function getModelCenter(model)
-    if not model or not model:IsA("Model") then return nil end
-    local parts = {}
-    for _, part in pairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            table.insert(parts, part)
-        end
+local function clearESP()
+    for _, child in pairs(espFolder:GetChildren()) do
+        child:Destroy()
     end
-    if #parts == 0 then return nil end
-    local totalPosition = Vector3.zero
-    for _, part in pairs(parts) do
-        totalPosition = totalPosition + part.Position
-    end
-    return totalPosition / #parts
 end
 
-local function isMonsterNear(generator, radius)
+-- ==================== FUNGSI SCAN ELEVATOR ====================
+local function scanAllElevators()
+    clearESP()
     local map = getMap()
-    if map then
-        local monstersFolder = map:FindFirstChild("Monsters")
-        if monstersFolder then
-            for _, monster in pairs(monstersFolder:GetChildren()) do
-                if monster:IsA("Model") and monster.PrimaryPart then
-                    local distance = (monster.PrimaryPart.Position - generator.PrimaryPart.Position).Magnitude
-                    if distance <= radius then return true end
-                end
-            end
-        end
-    end
-    return false
-end
-
-local function isMachineOccupied(generator, radius)
-    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
-    if inGamePlayers then
-        for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
-            if otherPlayer.Name ~= player.Name then
-                local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
-                if otherRoot and generator.PrimaryPart then
-                    local distance = (otherRoot.Position - generator.PrimaryPart.Position).Magnitude
-                    if distance <= radius then return true end
-                end
-            end
-        end
-    end
-    return false
-end
-
--- ==================== FUNGSI AUTO SKILLCHECK (V2 BYPASS) ====================
-local function setupAutoSkillcheck()
-    if not Config.Skillcheck.Enable then return end
-    task.spawn(function()
-        print("[INFO] Memulai Auto Skillcheck Bypass (V2)...")
-        while Config.Skillcheck.Enable do
-            pcall(function()
-                local events = ReplicatedStorage:FindFirstChild("Events")
-                if events then
-                    local su = events:FindFirstChild("SkillcheckUpdate")
-                    if su then
-                        su.OnClientInvoke = function() return true end
-                    end
-                end
-            end)
-            task.wait(1)
-        end
-    end)
-end
-
--- ==================== FUNGSI GENERATOR ESP ====================
-local function updateGeneratorESP()
-    if not Config.ESP.Enable then return end
-    local map = getMap()
-    if not map then return end
     
-    local generatorsFolder = map:FindFirstChild("Generators")
-    if generatorsFolder then
-        for _, gen in pairs(generatorsFolder:GetChildren()) do
-            if gen:IsA("Model") then
-                local highlight = gen:FindFirstChild("GenESP")
-                if not highlight then
-                    highlight = Instance.new("Highlight")
-                    highlight.Name = "GenESP"
-                    highlight.Parent = gen
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.FillTransparency = 0.5
-                end
+    for _, obj in pairs(map:GetDescendants()) do
+        local objName = string.lower(obj.Name)
+        local parentName = obj.Parent and obj.Parent.Name or "Unknown"
+        
+        -- Cari semua benda yang namanya ada unsur Elevator, Exit, atau Lift
+        if string.find(objName, "elevator") or string.find(objName, "exit") or string.find(objName, "lift") then
+            
+            -- Kita hanya buat ESP untuk wujud fisiknya (BasePart) atau Model utamanya
+            local targetPart = nil
+            if obj:IsA("BasePart") then
+                targetPart = obj
+            elseif obj:IsA("Model") and obj.PrimaryPart then
+                targetPart = obj.PrimaryPart
+            end
+            
+            if targetPart then
+                -- Menentukan warna: Merah untuk Fake, Hijau/Kuning untuk yang lain
+                local isFake = string.find(objName, "fake") or string.lower(parentName) == "fake"
+                local espColor = isFake and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(50, 255, 50)
                 
-                local billboard = gen:FindFirstChild("GenText")
-                local label
-                if not billboard then
-                    billboard = Instance.new("BillboardGui")
-                    billboard.Name = "GenText"
-                    billboard.Adornee = gen
-                    billboard.Size = UDim2.new(0, 100, 0, 50)
-                    billboard.AlwaysOnTop = true
-                    billboard.Parent = gen
-                    
-                    label = Instance.new("TextLabel")
-                    label.Name = "Text"
-                    label.Size = UDim2.new(1, 0, 1, 0)
-                    label.BackgroundTransparency = 1
-                    label.Font = Enum.Font.Nunito
-                    label.TextStrokeTransparency = 0.5
-                    label.TextSize = 16
-                    label.Parent = billboard
-                else
-                    label = billboard.Text
-                end
-
-                local stats = gen:FindFirstChild("Stats")
-                if stats then
-                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
-                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
-                    local current = stats:FindFirstChild("CurrentAmount") and math.floor(stats.CurrentAmount.Value + 0.5) or 0
-                    local required = stats:FindFirstChild("RequiredAmount") and stats.RequiredAmount.Value or 0
-                    
-                    local genName = gen.Name
-                    local textColor = Config.ESP.NormalColor
-                    
-                    if connie then
-                        textColor = Config.ESP.PossessedColor
-                        genName = genName .. "\n[POSSESSED]"
-                        highlight.FillColor = Config.ESP.PossessedColor
-                    elseif completed then
-                        textColor = Config.ESP.CompletedColor
-                        highlight.FillColor = Config.ESP.CompletedColor
-                    else
-                        textColor = Config.ESP.NormalColor
-                        highlight.FillColor = Config.ESP.NormalColor
-                    end
-                    
-                    label.TextColor3 = textColor
-                    label.Text = genName .. "\n(" .. current .. " / " .. required .. ")"
-                end
+                -- Buat Highlight (Garis luar part)
+                local highlight = Instance.new("Highlight")
+                highlight.Adornee = targetPart
+                highlight.FillColor = espColor
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.FillTransparency = 0.5
+                highlight.Parent = espFolder
+                
+                -- Buat Teks Mengambang (BillboardGui)
+                local billboard = Instance.new("BillboardGui")
+                billboard.Adornee = targetPart
+                billboard.Size = UDim2.new(0, 200, 0, 70)
+                billboard.AlwaysOnTop = true
+                
+                local textLabel = Instance.new("TextLabel")
+                textLabel.Parent = billboard
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.Font = Enum.Font.Code
+                textLabel.TextSize = 14
+                textLabel.TextColor3 = espColor
+                textLabel.TextStrokeTransparency = 0
+                -- Tampilkan info detail: Nama Part, Tipe, dan Parent-nya
+                textLabel.Text = "[ " .. obj.Name .. " ]\nType: " .. obj.ClassName .. "\nParent: " .. parentName
+                
+                billboard.Parent = espFolder
             end
         end
     end
 end
 
--- ==================== FUNGSI INTERAKSI PAKSA ====================
-local function forceTriggerGenerator(generator)
-    for _, descendant in ipairs(generator:GetDescendants()) do
-        if descendant:IsA("ProximityPrompt") then
-            local oldLineOfSight = descendant.RequiresLineOfSight
-            local oldMaxDist = descendant.MaxActivationDistance
-            
-            descendant.RequiresLineOfSight = false
-            descendant.MaxActivationDistance = 100 
-            
-            pcall(function()
-                descendant:InputHoldBegin()
-            end)
-            
-            return true
+-- ==================== LOOP DEBUG ====================
+task.spawn(function()
+    while true do
+        if isDebugging then
+            scanAllElevators()
+        else
+            clearESP()
         end
+        task.wait(2) -- Scan ulang tiap 2 detik agar tidak berat
     end
-    return false
-end
+end)
 
--- ==================== FUNGSI MOVEMENT & PLATFORM ====================
-local function moveToPosition(targetCFrame, usePlatform)
-    local originalGravity = Workspace.Gravity
-    Workspace.Gravity = 0
-    rootPart.AssemblyLinearVelocity = Vector3.zero
-    rootPart.Anchored = false
-    
-    if activePlatform then
-        activePlatform:Destroy()
-        activePlatform = nil
-    end
-    
-    if usePlatform then
-        activePlatform = Instance.new("Part")
-        activePlatform.Size = Vector3.new(15, 1, 15)
-        activePlatform.Anchored = true
-        activePlatform.CanCollide = true
-        activePlatform.Transparency = 0.5
-        activePlatform.Color = Color3.fromRGB(0, 255, 0)
-        activePlatform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
-        activePlatform.Parent = Workspace
-    end
-    
-    if Config.Teleport.Mode == "Instant" then
-        rootPart.CFrame = targetCFrame
-        task.wait(0.1) 
+-- ==================== UI SETUP (DRAGGABLE) ====================
+local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ElevatorDebugUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = guiContainer
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 200, 0, 45)
+toggleBtn.Position = UDim2.new(0.5, -100, 0.1, 0)
+toggleBtn.Text = "SCAN ELEVATORS (OFF)"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 18
+toggleBtn.Active = true
+toggleBtn.Draggable = true -- Bisa digeser sesuka hati
+toggleBtn.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = toggleBtn
+
+toggleBtn.MouseButton1Click:Connect(function()
+    isDebugging = not isDebugging
+    if isDebugging then
+        toggleBtn.Text = "SCAN ELEVATORS (ON)"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+        print("[DEBUG] Memulai pemindaian elevator...")
+        scanAllElevators()
     else
-        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
-        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
-        local duration = distance / (speed * Config.Teleport.TweenSpeed)
-        if duration <= 0 then duration = 0.1 end
-        
-        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
-        tween:Play()
-        tween.Completed:Wait()
+        toggleBtn.Text = "SCAN ELEVATORS (OFF)"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        print("[DEBUG] Pemindaian dihentikan.")
+        clearESP()
     end
-    
-    if usePlatform then
-        rootPart.CFrame = targetCFrame
-        rootPart.Anchored = true 
-    end
-    
-    Workspace.Gravity = originalGravity
-end
+end)
 
--- ==================== FUNGSI TELEPORT KE LIFT ====================
-local function teleportToRealElevator()
-    local map = getMap()
-    if map then
-        print("[INFO] Semua Generator Selesai! Mencari Real Elevator...")
-        rootPart.Anchored = false 
-        
-        local freeArea = map:FindFirstChild("FreeArea")
-        if freeArea then
-            for _, child in ipairs(freeArea:GetChildren()) do
-                if child:IsA("Model") and child.Name == "Elevator" and child.PrimaryPart then
-                    print("[SUCCESS] Real Elevator ditemukan! Meluncur...")
-                    local targetCFrame = child.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
-                    moveToPosition(targetCFrame, false)
-                    return true
-                end
-            end
-        end
-        
-        for _, child in ipairs(map:GetChildren()) do
-            if child:IsA("Model") and child.Name == "Elevator" and child.PrimaryPart then
-                local targetCFrame = child.PrimaryPart.CFrame * CFrame.new(0, 4, 0)
-                moveToPosition(targetCFrame, false)
-                return true
-            end
-        end
-        print("[WARNING] Elevator tidak ditemukan.")
-    end
-    return false
-end
-
--- ==================== FUNGSI UTAMA FARMING ====================
-local function startAutoFarming()
-    isFarming = true
-    
-    task.spawn(function()
-        while isFarming do
-            if Config.Teleport.Enable then
-                local map = getMap()
-                if map then
-                    local genFolder = map:FindFirstChild("Generators")
-                    if genFolder then
-                        local targetGen = nil
-                        local uncompletedCount = 0
-                        
-                        for _, gen in pairs(genFolder:GetChildren()) do
-                            if gen:IsA("Model") and gen.PrimaryPart then
-                                local stats = gen:FindFirstChild("Stats")
-                                if stats then
-                                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
-                                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
-                                    
-                                    if not completed then
-                                        uncompletedCount = uncompletedCount + 1
-                                        if not connie and not targetGen then
-                                            if not isMonsterNear(gen, Config.Teleport.SafeRadius) then
-                                                if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
-                                                    targetGen = gen
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        
-                        if uncompletedCount == 0 then
-                            teleportToRealElevator()
-                            task.wait(5)
-                            
-                        elseif targetGen then
-                            print("[FARMER] Menuju Generator: " .. targetGen.Name)
-                            
-                            local centerPos = getModelCenter(targetGen)
-                            if centerPos and targetGen.PrimaryPart then
-                                local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
-                                
-                                moveToPosition(targetCFrame, true)
-                                task.wait(0.1)
-                                
-                                while isFarming and targetGen.Parent do
-                                    local stats = targetGen:FindFirstChild("Stats")
-                                    if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
-                                        print("[FARMER] Generator Selesai!")
-                                        break 
-                                    end
-                                    
-                                    if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                        print("[WARNING] Ada player lain mendekat! Pindah cari mesin lain...")
-                                        break
-                                    end
-                                    
-                                    rootPart.CFrame = targetCFrame
-                                    
-                                    local isDecoding = character:FindFirstChild("Decoding") and character.Decoding.Value ~= nil
-                                    if not isDecoding then
-                                        forceTriggerGenerator(targetGen)
-                                    end
-                                    
-                                    task.wait(0.1)
-                                end
-                                
-                                rootPart.Anchored = false
-                                if activePlatform then
-                                    activePlatform:Destroy()
-                                    activePlatform = nil
-                                end
-                                
-                                task.wait(Config.Teleport.DelayNext)
-                            end
-                        end
-                    end
-                end
-            end
-            task.wait(1)
-        end
-    end)
-    
-    task.spawn(function()
-        while isFarming do
-            updateGeneratorESP()
-            task.wait(0.5)
-        end
-    end)
-end
-
--- ==================== INISIALISASI ====================
-print("==================================================")
-print(" AUTO MACHINE FARMER V9 BERHASIL DIJALANKAN ELEVASI DISESUAIKAN Ahayyyyyyy")
-print("==================================================")
-setupAutoSkillcheck()
-startAutoFarming()
+print("=========================================")
+print(" TOOL DEBUG ELEVATOR AKTIF ")
+print("=========================================")
