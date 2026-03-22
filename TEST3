@@ -1,4 +1,4 @@
-print("tesasdtis123 - V14 SUPREME MAX (LOOSE DETECTION, MICRO-RESET, SMART EVASION)")
+print("tesasdtis12345 - V14 SUPREME MAX (SMART EVASION FIXED, LOOSE MONSTER, MICRO-RESET)")
 -- ==============================================================================
 -- CONFIGURATION: AUTO MACHINE FARMER V14
 -- ==============================================================================
@@ -13,11 +13,10 @@ local Config = {
         DelayNext = 1.0,        
         UndergroundOffset = 11.5,
         
-        -- [FITUR BARU IDE AKBAR: DETEKSI LONGGAR MONSTER DIAM]
-        LooseRadius = 15, -- Jarak sangat dekat khusus untuk monster di daftar bawah
+        -- [FITUR LOOSE DETEKSI MONSTER DIAM]
+        LooseRadius = 15,
         LooseMonsters = {
-            "RodgerMonster",
-            -- "NamaMonsterDiamLainnya" (Bisa ditambah pakai koma jika ada lagi)
+            "RodgerMonster"
         }
     },
     ESP = {
@@ -107,16 +106,15 @@ local function isThreatened(targetPosition, radius)
         local monstersFolder = map:FindFirstChild("Monsters")
         if monstersFolder then
             for _, monster in pairs(monstersFolder:GetChildren()) do
-                -- 1. Deteksi Mata/Agresif (MUTLAK BERLAKU UNTUK SEMUA MONSTER)
+                -- 1. Deteksi Mata
                 if monster:FindFirstChild("ChasingValue") and monster.ChasingValue.Value == character then
                     return true 
                 end
                 
-                -- 2. Deteksi Jarak Fisik
+                -- 2. Deteksi Jarak Fisik dengan Pengecualian Monster Diam
                 if monster:IsA("Model") and monster.PrimaryPart then
                     local distance = (monster.PrimaryPart.Position - targetPosition).Magnitude
                     
-                    -- Mengecek apakah monster ini masuk daftar "Longgar"
                     local isLooseMonster = false
                     for _, looseName in ipairs(Config.Teleport.LooseMonsters) do
                         if monster.Name == looseName then
@@ -126,15 +124,9 @@ local function isThreatened(targetPosition, radius)
                     end
                     
                     if isLooseMonster then
-                        -- Jika monster diam (Rodger), pakai radius super kecil (15)
-                        if distance <= Config.Teleport.LooseRadius then 
-                            return true 
-                        end
+                        if distance <= Config.Teleport.LooseRadius then return true end
                     else
-                        -- Jika monster normal, pakai radius yang diminta (30 atau 45)
-                        if distance <= radius then 
-                            return true 
-                        end
+                        if distance <= radius then return true end
                     end
                 end
             end
@@ -392,7 +384,6 @@ local function startAutoFarming()
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
                                         if not connie and not targetGen then
-                                            -- SENSITIVITAS TINGGI (BUFFER ZONE +15)
                                             if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                 targetGen = gen
                                             end
@@ -423,7 +414,7 @@ local function startAutoFarming()
                                 
                                 local hasStartedInteracting = false
                                 local instantNext = false
-                                local failTimer = 0 -- PENGHITUNG ANTI BUG
+                                local failTimer = 0 
                                 
                                 while isFarming and targetGen.Parent do
                                     local stats = targetGen:FindFirstChild("Stats")
@@ -444,18 +435,22 @@ local function startAutoFarming()
                                                 local altStats = genAlt:FindFirstChild("Stats")
                                                 if altStats and not (altStats:FindFirstChild("Completed") and altStats.Completed.Value) and not (altStats:FindFirstChild("Connie") and altStats.Connie.Value) then
                                                     if not isThreatened(genAlt.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(genAlt, Config.Teleport.PlayerRadius) then
+                                                        -- [PERBAIKAN SMART EVASION]: Langsung ganti target mesin saat ini juga
+                                                        print("[SAFETY] Pindah LANGSUNG ke mesin alternatif yang aman...")
                                                         safeAlternative = true
+                                                        targetGen = genAlt
+                                                        local altCenterPos = getModelCenter(targetGen)
+                                                        targetCFrame = CFrame.new(altCenterPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, altCenterPos.Z)
+                                                        moveToPosition(targetCFrame, true)
+                                                        task.wait(0.1)
                                                         break
                                                     end
                                                 end
                                             end
                                         end
                                         
-                                        if safeAlternative then
-                                            print("[SAFETY] Pindah ke mesin alternatif yang aman...")
-                                            instantNext = true
-                                            break 
-                                        else
+                                        -- Jika tidak ada mesin aman sama sekali, baru lari ke Safeplace
+                                        if not safeAlternative then
                                             print("[SAFETY] Semua mesin penuh ancaman. Mengungsi ke Fake Elevator...")
                                             local safePos = getFakeElevatorPosition()
                                             if safePos then
@@ -481,18 +476,17 @@ local function startAutoFarming()
                                     local currentlyInteracting = isInteractingUI()
                                     if currentlyInteracting then
                                         hasStartedInteracting = true
-                                        failTimer = 0 -- Reset timer jika berhasil interaksi
+                                        failTimer = 0 
                                     elseif hasStartedInteracting and not currentlyInteracting then
                                         print("[INFO] Extraction putus/selesai (UI Hilang). Instan berpindah!")
                                         forceStop()
-                                        task.wait(0.1) 
+                                        task.wait(0.1)
                                         instantNext = true
                                         break
                                     else
                                         forceTriggerGenerator(targetGen)
                                         failTimer = failTimer + 1
                                         
-                                        -- LOGIKA MICRO-RESET
                                         if failTimer == 10 then
                                             print("[BUG FIX] UI macet! Melakukan Micro-Reset posisi...")
                                             rootPart.CFrame = targetCFrame * CFrame.new(0, 1.5, 0)
