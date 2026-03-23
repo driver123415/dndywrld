@@ -43,7 +43,7 @@ local Config = {
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
-        IgnoreList = {"Pop"--kaleng, "PopBottle", "FakeCapsule" }
+        IgnoreList = { "Pop", "PopBottle", "FakeCapsule" }
     },
     ItemESP = { Enable = true },
     AutoUse = {
