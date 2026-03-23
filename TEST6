@@ -1,5 +1,5 @@
 -- ==============================================================================
--- V-INTEGRATED REVISION 6: ATTRIBUTE BLACKLIST + PRIORITY FAIL-SAFE
+-- V-INTEGRATED REVISION 7: ATTRIBUTE BLACKLIST + IMMORTAL PRIORITY
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -63,7 +63,7 @@ local Config = {
         UndergroundOffset = 11.5,
         
         LooseRadius = 15,
-        LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster" } -- Telah diperbarui
+        LooseMonsters = { "RodgerMonster", "RazzleDazzleMonster" } 
     },
     GenESP = {
         Enable = true,          
@@ -198,7 +198,6 @@ local function applyItemESP()
                 highlight.Parent = item
                 highlight.FillTransparency = 0.5
                 
-                -- Cek Attribute BlacklistLimbo
                 if isIgnored(item.Name) or item:GetAttribute("BlacklistLimbo") then highlight.FillColor = Color3.fromRGB(255, 0, 0)
                 elseif isPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 255, 0)
                 else highlight.FillColor = Color3.fromRGB(0, 255, 0) end
@@ -243,7 +242,6 @@ local function startItemAura()
                 local itemsFolder = map:FindFirstChild("Items")
                 if itemsFolder then
                     for _, item in pairs(itemsFolder:GetChildren()) do
-                        -- Cegah aura berinteraksi dengan item yang sudah dilabeli BlacklistLimbo
                         if not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
                             local promptPart = item:FindFirstChild("Prompt")
                             if promptPart then
@@ -301,7 +299,6 @@ local function executePickup()
         
         local priorityItems, normalItems = {}, {}
         for _, item in ipairs(itemsFolder:GetChildren()) do
-            -- Filter menggunakan Attribute
             if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
                 if isPriority(item.Name) then table.insert(priorityItems, item)
                 else table.insert(normalItems, item) end
@@ -346,19 +343,10 @@ local function executePickup()
                     timeout = timeout - 1
                 end
                 
-                -- [REVISI 6]: Attribute Blacklist & Fail-safe Priority
+                -- [REVISI 7]: Hapus fail-safe priority. Priority item bebas mencoba sampai dapat.
                 if item.Parent then
                     if isPriority(item.Name) then
-                        local fails = (item:GetAttribute("PriorityFailCount") or 0) + 1
-                        item:SetAttribute("PriorityFailCount", fails)
-                        if fails >= 3 then
-                            print("[SYSTEM] Item Priority " .. item.Name .. " nge-bug (Gagal 3x)! Memaksa Blacklist.")
-                            item:SetAttribute("BlacklistLimbo", true)
-                            local highlight = item:FindFirstChild("ItemESP")
-                            if highlight then highlight.FillColor = Color3.fromRGB(255, 0, 0) end
-                        else
-                            print("[SYSTEM] Item Priority " .. item.Name .. " mencoba diambil ulang (Percobaan " .. fails .. "/3).")
-                        end
+                        print("[SYSTEM] Item Priority " .. item.Name .. " masih mencoba diambil. Bypass Blacklist aktif selamanya.")
                     else
                         print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas Penuh). Dimasukkan ke Blacklist Permanen Lantai Ini.")
                         item:SetAttribute("BlacklistLimbo", true)
@@ -835,7 +823,6 @@ task.spawn(function()
             if itemsFolder then
                 local hasValidItems = false
                 for _, item in ipairs(itemsFolder:GetChildren()) do
-                    -- [REVISI 6] Baca label Blacklist dari Attribute
                     if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
                         hasValidItems = true
                         break
