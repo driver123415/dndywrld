@@ -43,7 +43,7 @@ local Config = {
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
-        IgnoreList = {"FakeCapsule"}
+        IgnoreList = {"Pop"--kaleng, "PopBottle", "FakeCapsule" }
     },
     ItemESP = { Enable = true },
     AutoUse = {
@@ -63,7 +63,7 @@ local Config = {
         UndergroundOffset = 11.5,
         
         LooseRadius = 15,
-        LooseMonsters = { "RodgerMonster", "RazzleDazzleMonster" } 
+        LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster" } 
     },
     GenESP = {
         Enable = true,          
