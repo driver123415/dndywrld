@@ -1,43 +1,27 @@
 -- ==============================================================================
--- AUTO VOTE BEST CARD (DANDY'S WORLD) + GUI
--- OPTIMIZED FOR TELEPORT / FAST FARMING
+-- AUTO VOTE BEST CARD (DANDY'S WORLD) + GUI (ANTI-HALLUCINATION & REAL EVENT)
 -- ==============================================================================
 
 local Config = {
-    EnableAutoVote = false, -- Default OFF dari awal
+    EnableAutoVote = false, 
     
-    -- DAFTAR PRIORITAS KARTU (META AUTO-FARM)
     PriorityCards = {
-        -- === PRIORITAS 1: KECEPATAN EKSTRAKSI (Paling Penting!) ===
-        "Tech Savvy",                         -- Mesin beres 5 detik lebih cepat (Sangat OP untuk auto-farm)
-        
-        -- === PRIORITAS 2: KEBUTUHAN STAMINA TREADMILL ===
-        -- Karena kamu teleport, stamina cuma dipakai buat treadmill.
-        "TIME'S UP",                          -- Ambil ini kalau ada, +50 stamina bikin treadmill langsung rata
-        "Well-Paced", "Endurance",            -- Tambahan +10 max stamina buat cadangan treadmill
-        
-        -- === PRIORITAS 3: EKONOMI & LOOTING (Namanya juga farming) ===
-        "Spare Change", "Penny Pincher",      -- Dapet 45 Tapes gratis tiap lantai
-        "Avaricious", "Covetous",             -- Ningkatin drop rate item bagus/rare
-        "Lost and Found", "Blind Grab",       -- Random item gratis
-        "Frugal",                             -- Diskon kalau mampir ke Dandy's Shop
-        
-        -- === PRIORITAS 4: UTILITY & COOLDOWN ===
-        "Rehearsal", "Practice",              -- Cooldown skill Active berkurang 5 detik (Berguna kalau hero kamu punya skill farming)
-        
-        -- === PRIORITAS 5: PENCEGAH LANTAI MENGGANGGU ===
-        -- Teleport memang aman, tapi efek lantai kadang bikin layar gelap/berisik.
-        "Electrician",                        -- Mencegah lantai Blackout
-        "Piping Tape",                        -- Mencegah lantai Ichor Leak
-        "Air Freshener",                      -- Mencegah lantai Spring Fever
-        "Frost Shield",                       -- Mencegah lantai Iced Over
-        "Sparkplug",                          -- Terang saat blackout
-        
-        -- === PRIORITAS TERAKHIR: SURVIVAL DASAR ===
-        -- Karena kamu pakai teleport, kemungkinan kena hit sangat kecil.
-        "First Aid", "Medical Attention",     -- Heal darurat kalau kebetulan kesenggol
-        "Suppression",                        -- (Kurang berguna) Ngurangin speed monster
-        "Decency", "Etiquette"                -- (Kurang berguna) Waktu panic elevator nambah
+        "Tech Savvy",                         
+        "TIME'S UP",                          
+        "Well-Paced", "Endurance",            
+        "Spare Change", "Penny Pincher",      
+        "Avaricious", "Covetous",             
+        "Lost and Found", "Blind Grab",       
+        "Frugal",                             
+        "Rehearsal", "Practice",              
+        "Electrician",                        
+        "Piping Tape",                        
+        "Air Freshener",                      
+        "Frost Shield",                       
+        "Sparkplug",                          
+        "First Aid", "Medical Attention",     
+        "Suppression",                        
+        "Decency", "Etiquette"                
     },
     
     VoteRandomIfNotFound = true 
@@ -101,21 +85,13 @@ btnCorner.Parent = toggleBtn
 -- ==================== DRAGGABLE LOGIC ====================
 local dragging, dragInput, dragStart, startPos
 
-local function updateInput(input)
-    local delta = input.Position - dragStart
-    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
         dragStart = input.Position
         startPos = mainFrame.Position
-
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
         end)
     end
 end)
@@ -128,45 +104,68 @@ end)
 
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
-        updateInput(input)
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
 -- ==================== TOGGLE LOGIC ====================
 toggleBtn.MouseButton1Click:Connect(function()
     Config.EnableAutoVote = not Config.EnableAutoVote
-    if Config.EnableAutoVote then
-        toggleBtn.Text = "ON"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 200, 80)
-        print("[GUI] Auto Vote: ON")
-    else
-        toggleBtn.Text = "OFF"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
-        print("[GUI] Auto Vote: OFF")
-    end
+    toggleBtn.Text = Config.EnableAutoVote and "ON" or "OFF"
+    toggleBtn.BackgroundColor3 = Config.EnableAutoVote and Color3.fromRGB(40, 200, 80) or Color3.fromRGB(220, 60, 60)
 end)
 
 -- ==================== FUNGSI AUTO VOTE ====================
 local function getCardPriorityWeight(cardName)
     local nameLower = string.lower(cardName)
     for i, priorityName in ipairs(Config.PriorityCards) do
-        if string.find(nameLower, string.lower(priorityName)) then
-            return i 
-        end
+        if string.find(nameLower, string.lower(priorityName)) then return i end
     end
     return 999 
 end
 
-local function sendVoteToServer(cardName)
+local function executeVote(cardName, uiElement)
+    print("[AUTO VOTE] >>> MEMILIH PRIORITAS: " .. cardName .. " <<<")
     pcall(function()
         local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
         
-        local argString = Instance.new("StringValue")
-        argString.Name = cardName
-        argString.Value = cardName
+        -- MENCURI StringValue ASLI DARI UI GAME
+        local realStringValue = nil
         
-        voteEvent:FireServer(argString)
-        print("[AUTO VOTE BERHASIL] Tembakan RemoteEvent untuk: " .. cardName)
+        -- Cek di dalam elemen kartu
+        for _, child in pairs(uiElement:GetDescendants()) do
+            if child:IsA("StringValue") then
+                realStringValue = child
+                break
+            end
+        end
+        
+        -- Kalau tidak ketemu, cek di parentnya
+        if not realStringValue and uiElement.Parent then
+            for _, sibling in pairs(uiElement.Parent:GetDescendants()) do
+                if sibling:IsA("StringValue") then
+                    realStringValue = sibling
+                    break
+                end
+            end
+        end
+        
+        if realStringValue then
+            voteEvent:FireServer(realStringValue)
+            print("[AUTO VOTE BERHASIL] RemoteEvent dikirim dengan objek StringValue asli: " .. tostring(realStringValue.Value))
+        else
+            -- Fallback jika game update dan menghapus StringValue
+            print("[WARNING] StringValue asli tidak ditemukan! Mencoba bypass klik langsung...")
+            local btn = uiElement
+            if not btn:IsA("GuiButton") then btn = btn.Parent end
+            if btn and btn:IsA("GuiButton") and getconnections then
+                for _, conn in pairs(getconnections(btn.MouseButton1Click)) do
+                    conn:Fire()
+                end
+                print("[AUTO VOTE] Bypass klik GUI dieksekusi.")
+            end
+        end
     end)
 end
 
@@ -178,50 +177,60 @@ local function startAutoVote()
                     local playerGui = player:WaitForChild("PlayerGui", 5)
                     if playerGui then
                         
-                        local voteFrame = nil
+                        local validVoteFrame = nil
+                        
+                        -- Cek semua ScreenGui
                         for _, gui in pairs(playerGui:GetChildren()) do
-                            if gui:IsA("ScreenGui") and gui:FindFirstChild("VoteFrame") then
-                                voteFrame = gui.VoteFrame
-                                break
+                            -- ANTI-BOCOR: Pastikan ScreenGui-nya ENABLED dan VoteFrame-nya VISIBLE
+                            if gui:IsA("ScreenGui") and gui.Enabled and gui:FindFirstChild("VoteFrame") then
+                                if gui.VoteFrame.Visible then
+                                    validVoteFrame = gui.VoteFrame
+                                    break
+                                end
                             end
                         end
                         
-                        if voteFrame and voteFrame.Visible and not isVoting then
+                        if validVoteFrame and not isVoting then
                             isVoting = true
-                            print("[AUTO VOTE] VoteFrame terdeteksi!")
+                            print("[AUTO VOTE] VoteFrame Valid Terdeteksi!")
                             
-                            task.wait(1.5) 
+                            task.wait(2) -- Jeda dinaikkan sedikit agar semua animasi kartu selesai
                             
                             local bestCardName = nil
+                            local bestCardUI = nil
                             local bestWeight = 999
                             local firstAvailableCardName = nil
+                            local firstAvailableCardUI = nil
                             
-                            for _, item in ipairs(voteFrame:GetDescendants()) do
-                                if item:IsA("TextLabel") and item.Text ~= "" then
+                            for _, item in ipairs(validVoteFrame:GetDescendants()) do
+                                -- ANTI-HALUSINASI: Pastikan teks dan parent-nya tidak Invisible (Mencegah baca kartu lama)
+                                if item:IsA("TextLabel") and item.Visible and item.Parent and item.Parent.Visible and item.Text ~= "" then
                                     local text = item.Text
+                                    
                                     if string.len(text) < 20 and text ~= "Vote" and text ~= "Auto Vote Card" and text ~= "ON" and text ~= "OFF" then
                                         
                                         if not firstAvailableCardName then
                                             firstAvailableCardName = text
+                                            firstAvailableCardUI = item
                                         end
                                         
                                         local weight = getCardPriorityWeight(text)
                                         if weight < bestWeight then
                                             bestWeight = weight
                                             bestCardName = text
+                                            bestCardUI = item
                                         end
                                     end
                                 end
                             end
                             
                             if bestCardName then
-                                print("[AUTO VOTE] >>> MEMILIH PRIORITAS: " .. bestCardName .. " <<<")
-                                sendVoteToServer(bestCardName)
+                                executeVote(bestCardName, bestCardUI)
                             elseif Config.VoteRandomIfNotFound and firstAvailableCardName then
-                                print("[AUTO VOTE] >>> PRIORITAS TIDAK ADA. Memilih acak: " .. firstAvailableCardName .. " <<<")
-                                sendVoteToServer(firstAvailableCardName)
+                                print("[AUTO VOTE] Prioritas tidak ada. Memilih: " .. firstAvailableCardName)
+                                executeVote(firstAvailableCardName, firstAvailableCardUI)
                             else
-                                print("[AUTO VOTE] Gagal mendeteksi nama kartu (mungkin masih loading).")
+                                print("[AUTO VOTE ERROR] Layar terbuka tapi tidak ada kartu valid ditemukan.")
                             end
                             
                             task.wait(10) 
@@ -237,6 +246,6 @@ end
 
 -- ==================== EKSEKUSI ====================
 print("==================================================")
-print(" AUTO VOTE SERVER-SIDED + GUI BERHASIL DIJALANKAN")
+print(" AUTO VOTE FIXED: ANTI-HALLUCINATION LOADED")
 print("==================================================")
 startAutoVote()
