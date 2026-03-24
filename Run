@@ -2,7 +2,6 @@ local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- Menggunakan WaitForChild agar script tidak error jika UI belum sepenuhnya loading
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local ScreenGui = PlayerGui:WaitForChild("ScreenGui")
 local Menu = ScreenGui:WaitForChild("Menu")
@@ -10,34 +9,35 @@ local SpaceBarPromptText = Menu:WaitForChild("SpaceBarPromptText")
 
 local isRunning = false
 
--- Fungsi untuk mengaktifkan/mematikan simulasi tombol lari (Shift)
 local function toggleRun(state)
-	-- Mencegah spam input jika status lari belum berubah
 	if state == isRunning then return end 
 	isRunning = state
 
 	if state then
-		-- Simulasi menahan (hold) tombol Left Shift
 		VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.LeftShift, false, game)
 		print("[Auto-Treadmill] Aktif - Sedang lari otomatis")
 	else
-		-- Simulasi melepas (release) tombol Left Shift
 		VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.LeftShift, false, game)
 		print("[Auto-Treadmill] Nonaktif - Lari berhenti")
 	end
 end
 
--- Memantau perubahan hanya pada properti 'Text' agar tidak lag
-SpaceBarPromptText:GetPropertyChangedSignal("Text"):Connect(function()
+-- Kita jadikan pengecekan teks sebagai fungsi tersendiri
+local function checkPromptText()
 	local currentText = SpaceBarPromptText.Text
 	
-	-- Cek apakah teks sesuai dengan treadmill generator
 	if currentText == "Sprint to run faster!" then
 		toggleRun(true)
 	else
-		-- Jika teks berubah menjadi skillcheck atau hilang (kosong), matikan lari
 		toggleRun(false)
 	end
-end)
+end
 
-print("[Auto-Treadmill] Script berhasil dijalankan dan sedang memantau teks.")
+-- 1. Pantau perubahan teks (untuk generator selanjutnya)
+SpaceBarPromptText:GetPropertyChangedSignal("Text"):Connect(checkPromptText)
+
+-- 2. PENGECEKAN AWAL (Ini jawaban untuk pertanyaanmu)
+-- Langsung cek teks saat script pertama kali dijalankan!
+checkPromptText()
+
+print("[Auto-Treadmill] Script berjalan. Mengecek status saat ini dan memantau perubahan.")
