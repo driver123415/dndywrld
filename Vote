@@ -1,0 +1,132 @@
+-- ==============================================================================
+-- AUTO VOTE BEST CARD (DANDY'S WORLD)
+-- Otomatis memilih kartu berdasarkan daftar prioritas saat Elevator selesai
+-- ==============================================================================
+
+local Config = {
+    EnableAutoVote = true,
+    
+    -- DAFTAR PRIORITAS KARTU (Urutkan dari yang PALING DIBUTUHKAN di atas)
+    -- Script akan mencari nama kartu dari atas ke bawah.
+    -- Tulis sebagian atau seluruh nama kartunya (Case-Insensitive).
+    PriorityCards = {
+        "Skillcheck",       -- Prioritas 1: Bonus Skillcheck / Ichor Extraction
+        "Stamina",          -- Prioritas 2: Segala jenis kartu Stamina
+        "Stealth",          -- Prioritas 3: Kartu Stealth / Anti ketahuan
+        "Speed",            -- Prioritas 4: Segala jenis kartu Speed (Movement Speed)
+        "Health",           -- Prioritas 5: Max Health
+        "Heal"              -- Prioritas 6: Healing
+    },
+    
+    -- Jika kartu prioritas tidak ada yang muncul, apakah mau pilih kartu acak/pertama?
+    VoteRandomIfNotFound = true 
+}
+
+-- ==============================================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+local isVoting = false
+
+print("==================================================")
+print(" AUTO VOTE BEST CARD BERHASIL DIJALANKAN")
+print("==================================================")
+
+-- Fungsi untuk mengecek apakah nama kartu ada di daftar prioritas kita
+local function getCardPriorityWeight(cardName)
+    local nameLower = string.lower(cardName)
+    for i, priorityName in ipairs(Config.PriorityCards) do
+        if string.find(nameLower, string.lower(priorityName)) then
+            return i -- Semakin kecil angkanya (1), semakin tinggi prioritasnya
+        end
+    end
+    return 999 -- Tidak masuk prioritas
+end
+
+-- Fungsi Utama Auto Vote
+local function startAutoVote()
+    task.spawn(function()
+        while Config.EnableAutoVote do
+            pcall(function()
+                -- Biasanya Dandy's World memunculkan menu vote di dalam PlayerGui
+                local playerGui = player:WaitForChild("PlayerGui", 5)
+                if playerGui then
+                    -- Mencari ScreenGui atau Frame yang berhubungan dengan Card Vote
+                    local mainUI = playerGui:FindFirstChild("MainUI") or playerGui:FindFirstChild("Main")
+                    
+                    if mainUI then
+                        local cardMenu = mainUI:FindFirstChild("CardVote") or mainUI:FindFirstChild("CardSelection")
+                        
+                        -- Jika menu kartu sedang terbuka/terlihat
+                        if cardMenu and cardMenu.Visible and not isVoting then
+                            isVoting = true
+                            print("[AUTO VOTE] Layar pemilihan kartu terdeteksi!")
+                            
+                            task.wait(0.5) -- Jeda sebentar agar semua data kartu ter-load dari server
+                            
+                            local bestCard = nil
+                            local bestWeight = 999
+                            local firstAvailableCard = nil
+                            
+                            -- Cari semua tombol/frame kartu di dalam menu tersebut
+                            for _, item in ipairs(cardMenu:GetDescendants()) do
+                                -- Mencari tombol yang memiliki TextLabel (Nama Kartu)
+                                if item:IsA("TextLabel") and (item.Name == "CardName" or item.Name == "Title") then
+                                    local cardName = item.Text
+                                    local cardButton = item.Parent -- Biasanya TextLabel ada di dalam TextButton/ImageButton
+                                    
+                                    if cardButton and (cardButton:IsA("TextButton") or cardButton:IsA("ImageButton")) then
+                                        if not firstAvailableCard then
+                                            firstAvailableCard = cardButton
+                                        end
+                                        
+                                        local weight = getCardPriorityWeight(cardName)
+                                        print("[AUTO VOTE] Ditemukan Kartu: " .. cardName .. " (Prioritas: " .. (weight == 999 and "Bukan Prioritas" or weight) .. ")")
+                                        
+                                        -- Bandingkan mana yang prioritasnya paling tinggi (angkanya paling kecil)
+                                        if weight < bestWeight then
+                                            bestWeight = weight
+                                            bestCard = cardButton
+                                        end
+                                    end
+                                end
+                            end
+                            
+                            -- Keputusan Voting
+                            if bestCard then
+                                print("[AUTO VOTE] >>> MEMILIH KARTU PRIORITAS: " .. bestCard:FindFirstChildWhichIsA("TextLabel").Text .. " <<<")
+                                -- Simulasikan klik pada UI secara paksa
+                                if getconnections then
+                                    for _, connection in pairs(getconnections(bestCard.MouseButton1Click)) do
+                                        connection:Fire()
+                                    end
+                                else
+                                    print("[WARNING] Executor tidak support getconnections, Auto Vote mungkin tidak berfungsi.")
+                                end
+                            elseif Config.VoteRandomIfNotFound and firstAvailableCard then
+                                print("[AUTO VOTE] >>> PRIORITAS TIDAK ADA. Memilih kartu pertama secara acak! <<<")
+                                if getconnections then
+                                    for _, connection in pairs(getconnections(firstAvailableCard.MouseButton1Click)) do
+                                        connection:Fire()
+                                    end
+                                end
+                            else
+                                print("[AUTO VOTE] Tidak ada kartu yang bisa divote.")
+                            end
+                            
+                            -- Beri jeda agak lama agar tidak spam klik berulang-ulang di 1 lantai
+                            task.wait(10) 
+                            isVoting = false
+                        end
+                    end
+                end
+            end)
+            
+            task.wait(1) -- Cek layar setiap 1 detik
+        end
+    end)
+end
+
+-- ==================== EKSEKUSI ====================
+startAutoVote()
