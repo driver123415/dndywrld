@@ -12,8 +12,8 @@
 --wait(1)
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Debug2"))()--join solo
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote"))()--join solo
---loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/remote2"))()--join solo
+loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/remote3"))()--join solo
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Spy/main/source.lua", true))()
+--loadstring(game:HttpGet("https://raw.githubusercontent.com/Turtle-Brand/Turtle-Spy/main/source.lua", true))()
 
 
