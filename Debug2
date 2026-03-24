@@ -1,111 +1,88 @@
--- ==============================================================================
--- DEBUGGER & DUMPER: DANDY'S WORLD VOTE FRAME
--- ==============================================================================
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui") or Players.LocalPlayer:WaitForChild("PlayerGui")
-local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ==================== GUI SETUP ====================
-if CoreGui:FindFirstChild("DandyDebuggerUI") then
-    CoreGui.DandyDebuggerUI:Destroy()
+-- ==========================================
+-- ⚙️ KONFIGURASI NAMA UI
+-- Ganti ini dengan nama persis Frame Vote kamu di DEX Explorer
+-- ==========================================
+local NAMA_SCREEN_GUI = "ScreenGui"
+local NAMA_VOTE_FRAME = "VoteFrame" -- Contoh: "VotePanel", "VoteUI", dll.
+-- ==========================================
+
+-- Fungsi Detektif UI (Mengecek sampai ke akar)
+local function deepDebugUI(guiElement)
+	print("🔍 Menganalisis elemen: " .. guiElement.Name)
+	print("   - Properti Visible bawaan : " .. tostring(guiElement.Visible))
+	print("   - Ukuran (AbsoluteSize)   : X=" .. tostring(guiElement.AbsoluteSize.X) .. ", Y=" .. tostring(guiElement.AbsoluteSize.Y))
+	print("   - Posisi (AbsolutePosition): X=" .. tostring(guiElement.AbsolutePosition.X) .. ", Y=" .. tostring(guiElement.AbsolutePosition.Y))
+
+	-- 1. Cek ukuran fisik
+	if guiElement.AbsoluteSize.X == 0 or guiElement.AbsoluteSize.Y == 0 then
+		print("   ⚠️ JAWABAN: UI disembunyikan dengan cara dibuat ukurannya 0 (AbsoluteSize 0,0)")
+		return false
+	end
+
+	-- 2. Cek posisi fisik (apakah dilempar keluar layar?)
+	if guiElement.AbsolutePosition.X < -2000 or guiElement.AbsolutePosition.Y < -2000 then
+		print("   ⚠️ JAWABAN: UI disembunyikan dengan cara digeser jauh ke luar layar (Off-screen)")
+		return false
+	end
+
+	-- 3. Cek silsilah keluarga (apakah Parent-nya yang dimatikan?)
+	local currentParent = guiElement.Parent
+	while currentParent and not currentParent:IsA("ScreenGui") and not currentParent:IsA("PlayerGui") do
+		if currentParent:IsA("GuiObject") and currentParent.Visible == false then
+			print("   ⚠️ JAWABAN: UI disembunyikan karena Parent-nya (" .. currentParent.Name .. ") berstatus Visible = false")
+			return false
+		end
+		currentParent = currentParent.Parent
+	end
+
+	-- 4. Cek dirinya sendiri
+	if not guiElement.Visible then
+		print("   ⚠️ JAWABAN: UI dimatikan secara normal (Visible = false)")
+		return false
+	end
+
+	print("   ✅ KESIMPULAN: UI benar-benar MUNCUL dan AKTIF secara fisik di layar!")
+	return true
 end
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DandyDebuggerUI"
-screenGui.Parent = CoreGui
+-- Fungsi eksekusi utama
+local function runDebugger()
+	print("\n🛠️ MEMULAI SCANNING VOTE FRAME 🛠️")
+	print("=========================================")
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 80)
-mainFrame.Position = UDim2.new(0.5, -100, 0.1, 0) -- Muncul di atas biar gak nutupin kartu
-mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-mainFrame.Parent = screenGui
+	-- Mencari ScreenGui utama
+	local TargetScreenGui = PlayerGui:FindFirstChild(NAMA_SCREEN_GUI)
 
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(0.9, 0, 0.7, 0)
-btn.Position = UDim2.new(0.05, 0, 0.15, 0)
-btn.BackgroundColor3 = Color3.fromRGB(200, 150, 40)
-btn.Text = "DUMP UI DATA (F9)"
-btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-btn.Font = Enum.Font.GothamBold
-btn.TextSize = 14
-btn.Parent = mainFrame
+	if TargetScreenGui then
+		print(">> SCREEN GUI KETEMU: " .. TargetScreenGui.Name .. " (Enabled: " .. tostring(TargetScreenGui.Enabled) .. ")")
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = mainFrame
-corner:Clone().Parent = btn
+		-- Mencari VoteFrame sampai ke dalam folder/frame terdalam (Recursive Search)
+		local TargetVoteFrame = TargetScreenGui:FindFirstChild(NAMA_VOTE_FRAME, true)
 
--- Fitur Drag sederhana
-local UIS = game:GetService("UserInputService")
-local dragToggle = nil
-local dragStart = nil
-local startPos = nil
+		if TargetVoteFrame then
+			print(">> VOTE FRAME KETEMU!\n")
+			
+			-- Jalankan Detektif UI
+			local isReallyVisible = deepDebugUI(TargetVoteFrame)
 
-mainFrame.InputBegan:Connect(function(input)
-    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-        dragToggle = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if dragToggle then
-            local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragToggle = false
-    end
-end)
+			if isReallyVisible then
+				print("\n🚀 HASIL AKHIR: BISA DILAKUKAN AUTO-VOTE SEKARANG!")
+			else
+				print("\n🛑 HASIL AKHIR: STATUS ASLI FALSE. JANGAN AUTO-VOTE DULU!")
+			end
+		else
+			print(">> ❌ VOTE FRAME TIDAK DITEMUKAN! Pastikan NAMA_VOTE_FRAME di config sudah benar huruf besar/kecilnya.")
+		end
+	else
+		print(">> ❌ SCREEN GUI TIDAK DITEMUKAN! Pastikan NAMA_SCREEN_GUI benar.")
+	end
+	
+	print("=========================================\n")
+end
 
--- ==================== FUNGSI DUMPER ====================
-btn.MouseButton1Click:Connect(function()
-    print("\n\n==================================================")
-    print(" 🛠️ MEMULAI SCANNING VOTE FRAME 🛠️")
-    print("==================================================")
-    
-    local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then return print("PlayerGui tidak ditemukan!") end
-    
-    local found = false
-    
-    for _, gui in pairs(playerGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui:FindFirstChild("VoteFrame", true) then
-            local voteFrame = gui:FindFirstChild("VoteFrame", true)
-            
-            print(">> SCREEN GUI KETEMU: " .. gui.Name .. " (Enabled: " .. tostring(gui.Enabled) .. ")")
-            print(">> VOTE FRAME KETEMU: (Visible: " .. tostring(voteFrame.Visible) .. ")")
-            
-            found = true
-            
-            -- Scan anak-anaknya (kartunya)
-            for _, child in ipairs(voteFrame:GetChildren()) do
-                if child:IsA("GuiObject") then
-                    print("\n📦 ELEMEN KARTU DETEKSI: " .. child.Name .. " (" .. child.ClassName .. ") | Visible: " .. tostring(child.Visible))
-                    
-                    -- Cari Teks dan Value di dalamnya
-                    for _, desc in ipairs(child:GetDescendants()) do
-                        if desc:IsA("TextLabel") then
-                            print("   📝 Teks: [" .. desc.Name .. "] -> \"" .. desc.Text .. "\"")
-                        elseif desc:IsA("StringValue") or desc:IsA("ObjectValue") then
-                            print("   🔑 VALUE BASE DETEKSI: [" .. desc.Name .. "] -> " .. tostring(desc.Value))
-                        elseif desc:IsA("TextButton") or desc:IsA("ImageButton") then
-                            print("   🔘 Tombol: [" .. desc.Name .. "]")
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    if not found then
-        print("❌ VoteFrame TIDAK DITEMUKAN atau sedang tidak diload oleh game!")
-    end
-    print("==================================================\n\n")
-end)
-
-print(">> Debugger berhasil diload! Silakan tunggu sampai menu Vote Kartu muncul, lalu klik tombol DUMP.")
+-- Langsung jalankan debug
+runDebugger()
