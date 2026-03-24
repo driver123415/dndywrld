@@ -1,0 +1,63 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- ==========================================
+-- ⚙️ KONFIGURASI SCRIPT
+-- ==========================================
+local CONFIG = {
+	DelayReady = 5, -- Waktu tunggu (dalam detik) sebelum otomatis menekan Ready
+}
+-- ==========================================
+
+-- Menunggu UI loading dengan aman (Aman untuk Auto-Execute)
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local ScreenGui = PlayerGui:WaitForChild("ScreenGui")
+local SelectionFrame = ScreenGui:WaitForChild("SelectionFrame")
+local Margin = SelectionFrame:WaitForChild("Margin")
+local BottomFrame = Margin:WaitForChild("BottomFrame")
+local ReadyStatus = BottomFrame:WaitForChild("ReadyStatus")
+local ReadyUpButton = ReadyStatus:WaitForChild("ReadyUp")
+local Title = ReadyUpButton:WaitForChild("Title")
+
+-- Variabel penanda agar tidak terjadi double-klik saat sedang menunggu delay
+local isWaiting = false 
+
+local function fireReadyEvent()
+	-- Tunggu sesuai konfigurasi sebelum menekan
+	print("[Auto-Ready] Menunggu " .. CONFIG.DelayReady .. " detik...")
+	task.wait(CONFIG.DelayReady)
+	
+	-- Cek ulang! Siapa tahu dalam 5 detik itu game sudah mulai atau keburu ready manual
+	if string.find(Title.Text, "Ready Up!") then
+		local args = { "ReadyUp" }
+		ReplicatedStorage:WaitForChild("Events"):WaitForChild("ReadyUpEvent"):FireServer(unpack(args))
+		print("[Auto-Ready] RemoteEvent dikirim!")
+	end
+	
+	isWaiting = false
+end
+
+local function checkReady()
+	local currentText = Title.Text
+	
+	if string.find(currentText, "Ready Up!") then
+		-- Hanya jalankan jika tidak sedang dalam masa tunggu (delay)
+		if not isWaiting then
+			isWaiting = true
+			fireReadyEvent()
+		end
+	elseif string.find(currentText, "Ready! ✓") then
+		print("[Auto-Ready] Berhasil Ready! Memantau jika lobi ter-reset...")
+		-- Kita TIDAK mematikan script (Disconnect) di sini. 
+		-- Script akan terus diam memantau kalau-kalau statusnya kembali jadi "Ready Up!"
+	end
+end
+
+-- 1. Cek pertama kali saat script dijalankan
+checkReady()
+
+-- 2. Pasang pemantau permanen yang super ringan
+Title:GetPropertyChangedSignal("Text"):Connect(checkReady)
+
+print("[Auto-Ready] Script berjalan permanen dengan delay " .. CONFIG.DelayReady .. " detik.")
