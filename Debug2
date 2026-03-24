@@ -1,88 +1,151 @@
+-- ==============================================================================
+-- DANDY'S WORLD - VOTE FRAME CHILD COPIER (INTERNAL ID EXTRACTOR)
+-- ==============================================================================
+
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local CoreGui = game:GetService("CoreGui") or Players.LocalPlayer:WaitForChild("PlayerGui")
+local player = Players.LocalPlayer
 
--- ==========================================
--- ⚙️ KONFIGURASI NAMA UI
--- Ganti ini dengan nama persis Frame Vote kamu di DEX Explorer
--- ==========================================
-local NAMA_SCREEN_GUI = "ScreenGui"
-local NAMA_VOTE_FRAME = "VoteFrame" -- Contoh: "VotePanel", "VoteUI", dll.
--- ==========================================
-
--- Fungsi Detektif UI (Mengecek sampai ke akar)
-local function deepDebugUI(guiElement)
-	print("🔍 Menganalisis elemen: " .. guiElement.Name)
-	print("   - Properti Visible bawaan : " .. tostring(guiElement.Visible))
-	print("   - Ukuran (AbsoluteSize)   : X=" .. tostring(guiElement.AbsoluteSize.X) .. ", Y=" .. tostring(guiElement.AbsoluteSize.Y))
-	print("   - Posisi (AbsolutePosition): X=" .. tostring(guiElement.AbsolutePosition.X) .. ", Y=" .. tostring(guiElement.AbsolutePosition.Y))
-
-	-- 1. Cek ukuran fisik
-	if guiElement.AbsoluteSize.X == 0 or guiElement.AbsoluteSize.Y == 0 then
-		print("   ⚠️ JAWABAN: UI disembunyikan dengan cara dibuat ukurannya 0 (AbsoluteSize 0,0)")
-		return false
-	end
-
-	-- 2. Cek posisi fisik (apakah dilempar keluar layar?)
-	if guiElement.AbsolutePosition.X < -2000 or guiElement.AbsolutePosition.Y < -2000 then
-		print("   ⚠️ JAWABAN: UI disembunyikan dengan cara digeser jauh ke luar layar (Off-screen)")
-		return false
-	end
-
-	-- 3. Cek silsilah keluarga (apakah Parent-nya yang dimatikan?)
-	local currentParent = guiElement.Parent
-	while currentParent and not currentParent:IsA("ScreenGui") and not currentParent:IsA("PlayerGui") do
-		if currentParent:IsA("GuiObject") and currentParent.Visible == false then
-			print("   ⚠️ JAWABAN: UI disembunyikan karena Parent-nya (" .. currentParent.Name .. ") berstatus Visible = false")
-			return false
-		end
-		currentParent = currentParent.Parent
-	end
-
-	-- 4. Cek dirinya sendiri
-	if not guiElement.Visible then
-		print("   ⚠️ JAWABAN: UI dimatikan secara normal (Visible = false)")
-		return false
-	end
-
-	print("   ✅ KESIMPULAN: UI benar-benar MUNCUL dan AKTIF secara fisik di layar!")
-	return true
+-- ==================== GUI SETUP ====================
+if CoreGui:FindFirstChild("VoteIDCopier_Dandy") then
+    CoreGui.VoteIDCopier_Dandy:Destroy()
 end
 
--- Fungsi eksekusi utama
-local function runDebugger()
-	print("\n🛠️ MEMULAI SCANNING VOTE FRAME 🛠️")
-	print("=========================================")
+local screenGui = Instance.new("ScreenGui", CoreGui)
+screenGui.Name = "VoteIDCopier_Dandy"
 
-	-- Mencari ScreenGui utama
-	local TargetScreenGui = PlayerGui:FindFirstChild(NAMA_SCREEN_GUI)
+-- Main Frame (Di sebelah kanan, bisa di drag)
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 260, 0, 300)
+mainFrame.Position = UDim2.new(1, -280, 0.5, -150) -- Muncul di kanan layar
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 
-	if TargetScreenGui then
-		print(">> SCREEN GUI KETEMU: " .. TargetScreenGui.Name .. " (Enabled: " .. tostring(TargetScreenGui.Enabled) .. ")")
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "🛠️ Card ID Copier"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
 
-		-- Mencari VoteFrame sampai ke dalam folder/frame terdalam (Recursive Search)
-		local TargetVoteFrame = TargetScreenGui:FindFirstChild(NAMA_VOTE_FRAME, true)
+local scanBtn = Instance.new("TextButton", mainFrame)
+scanBtn.Size = UDim2.new(0.9, 0, 0, 35)
+scanBtn.Position = UDim2.new(0.05, 0, 0, 35)
+scanBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 200)
+scanBtn.Text = "🔍 SCAN KARTU SAAT INI"
+scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+scanBtn.Font = Enum.Font.GothamBold
+scanBtn.TextSize = 14
+Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 6)
 
-		if TargetVoteFrame then
-			print(">> VOTE FRAME KETEMU!\n")
-			
-			-- Jalankan Detektif UI
-			local isReallyVisible = deepDebugUI(TargetVoteFrame)
+-- Tempat list kartu
+local scrollFrame = Instance.new("ScrollingFrame", mainFrame)
+scrollFrame.Size = UDim2.new(0.9, 0, 1, -85)
+scrollFrame.Position = UDim2.new(0.05, 0, 0, 75)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.ScrollBarThickness = 4
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-			if isReallyVisible then
-				print("\n🚀 HASIL AKHIR: BISA DILAKUKAN AUTO-VOTE SEKARANG!")
-			else
-				print("\n🛑 HASIL AKHIR: STATUS ASLI FALSE. JANGAN AUTO-VOTE DULU!")
-			end
-		else
-			print(">> ❌ VOTE FRAME TIDAK DITEMUKAN! Pastikan NAMA_VOTE_FRAME di config sudah benar huruf besar/kecilnya.")
-		end
-	else
-		print(">> ❌ SCREEN GUI TIDAK DITEMUKAN! Pastikan NAMA_SCREEN_GUI benar.")
-	end
-	
-	print("=========================================\n")
+local uiListLayout = Instance.new("UIListLayout", scrollFrame)
+uiListLayout.Padding = UDim.new(0, 5)
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Drag Logic
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragStart, startPos
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true dragStart = input.Position startPos = mainFrame.Position end
+end)
+mainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
+UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
+
+-- ==================== FUNGSI SCAN & COPY ====================
+local function clearList()
+    for _, child in ipairs(scrollFrame:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
 end
 
--- Langsung jalankan debug
-runDebugger()
+local function addCardToList(displayName, internalID)
+    local itemFrame = Instance.new("Frame", scrollFrame)
+    itemFrame.Size = UDim2.new(1, 0, 0, 45)
+    itemFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 6)
+    
+    local nameLabel = Instance.new("TextLabel", itemFrame)
+    nameLabel.Size = UDim2.new(0.7, -5, 1, 0)
+    nameLabel.Position = UDim2.new(0, 5, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    -- Menampilkan nama di layar vs nama aslinya
+    nameLabel.Text = "Layar: " .. displayName .. "\nID: " .. internalID
+    nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    nameLabel.Font = Enum.Font.Gotham
+    nameLabel.TextSize = 12
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local copyBtn = Instance.new("TextButton", itemFrame)
+    copyBtn.Size = UDim2.new(0.3, -5, 0.8, 0)
+    copyBtn.Position = UDim2.new(0.7, 0, 0.1, 0)
+    copyBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 80)
+    copyBtn.Text = "Copy ID"
+    copyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    copyBtn.Font = Enum.Font.GothamBold
+    copyBtn.TextSize = 12
+    Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 4)
+    
+    copyBtn.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard(internalID)
+            copyBtn.Text = "Copied!"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 40)
+            task.wait(1.5)
+            copyBtn.Text = "Copy ID"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 80)
+        else
+            copyBtn.Text = "No Clipbrd"
+            copyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end
+    end)
+    
+    -- Update scroll area
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, uiListLayout.AbsoluteContentSize.Y + 10)
+end
+
+scanBtn.MouseButton1Click:Connect(function()
+    clearList()
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then return end
+    
+    local foundCards = 0
+    for _, gui in pairs(playerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui:FindFirstChild("VoteFrame", true) then
+            local voteFrame = gui:FindFirstChild("VoteFrame", true)
+            
+            -- Ambil semua anak-anaknya
+            for _, child in ipairs(voteFrame:GetChildren()) do
+                -- Pastikan itu frame kartu, bukan template atau layout
+                if child:IsA("GuiObject") and not string.find(child.Name, "Template") and child.Name ~= "UIListLayout" and child.Name ~= "SelectionFrame" then
+                    
+                    local itemNameLabel = child:FindFirstChild("ItemName", true)
+                    local displayName = "Unknown"
+                    if itemNameLabel and itemNameLabel:IsA("TextLabel") then
+                        displayName = itemNameLabel.Text
+                    end
+                    
+                    local internalID = child.Name
+                    addCardToList(displayName, internalID)
+                    foundCards = foundCards + 1
+                end
+            end
+        end
+    end
+    
+    if foundCards == 0 then
+        scanBtn.Text = "❌ TIDAK ADA KARTU"
+        task.wait(1.5)
+        scanBtn.Text = "🔍 SCAN KARTU SAAT INI"
+    end
+end)
+
+print("✅ CARD ID COPIER BERHASIL DIEKSEKUSI ✅")
