@@ -19,7 +19,9 @@ local scripts = {
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey",
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST6",--coba    
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST5",--coba    
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ANTI_POP_UP"--Anti Pop up    
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ANTI_POP_UP",--Anti Pop up   
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--Skill
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill"--Skill
 }
 
 executeScripts(scripts)
