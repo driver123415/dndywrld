@@ -22,6 +22,7 @@ local scripts = {
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ANTI_POP_UP",--Anti Pop up   
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill",--Skill use
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Debug2",--debug vote
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi"--ready
 }
 
