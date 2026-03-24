@@ -1,5 +1,5 @@
 -- ==============================================================================
--- V-INTEGRATED REVISION 7: ATTRIBUTE BLACKLIST + IMMORTAL PRIORITY
+-- V-INTEGRATED REVISION 9: GLOBAL THREAT DETECTION (ITEM EVASION FIX)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -32,18 +32,13 @@ local hasTeleportedToLobby = false
 local Config = {
     AutoStartFarming = true, 
     
-    AutoReady = {            
-        Enable = true,
-        Delay = 5            
-    },
-
     Pickup = {
         Enable = true,              
         MovementMode = "Instant",   
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
-        IgnoreList = { "Pop", "PopBottle", "FakeCapsule" }
+        IgnoreList = {"FakeCapsule"}
     },
     ItemESP = { Enable = true },
     AutoUse = {
@@ -73,21 +68,6 @@ local Config = {
         PossessedColor = Color3.fromRGB(0, 255, 255)   
     }
 }
-
--- ==============================================================
--- MODUL 0: AUTO READY-UP
--- ==============================================================
-if Config.AutoReady.Enable then
-    task.spawn(function()
-        print("[SYSTEM] Menunggu " .. Config.AutoReady.Delay .. " detik untuk eksekusi Auto Ready-Up...")
-        task.wait(Config.AutoReady.Delay)
-        pcall(function()
-            local args = { "ReadyUp" }
-            ReplicatedStorage:WaitForChild("Events"):WaitForChild("ReadyUpEvent"):FireServer(unpack(args))
-            print("[SUCCESS] Auto Ready-Up telah dikirim ke Server!")
-        end)
-    end)
-end
 
 -- ==============================================================
 -- MODUL 1: SCRIPT DETEKSI KEMATIAN PLAYER
@@ -165,11 +145,47 @@ local function forceStop()
     end
 end
 
+-- [REVISI 9]: isThreatened DIPINDAH KE SHARED AGAR BISA DIPAKAI SEMUA SCRIPT
+local function isThreatened(targetPosition, radius)
+    local map = getMap()
+    if map then
+        local monstersFolder = map:FindFirstChild("Monsters")
+        if monstersFolder then
+            for _, monster in pairs(monstersFolder:GetChildren()) do
+                if monster:FindFirstChild("ChasingValue") and monster.ChasingValue.Value == character then
+                    return true 
+                end
+                
+                if monster:IsA("Model") and monster.PrimaryPart then
+                    local distance = (monster.PrimaryPart.Position - targetPosition).Magnitude
+                    
+                    local isLooseMonster = false
+                    for _, looseName in ipairs(Config.Teleport.LooseMonsters) do
+                        if monster.Name == looseName then
+                            isLooseMonster = true
+                            break
+                        end
+                    end
+                    
+                    if isLooseMonster then
+                        if distance <= Config.Teleport.LooseRadius then return true end
+                    else
+                        if distance <= radius then return true end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- ==============================================================
 -- MODUL 2: ITEM AUTO-FARM SCRIPT
 -- ==============================================================
 local isItemAuraActive = false
 local isAutoUseActive = false
+
+local unpickableItems = setmetatable({}, {__mode = "k"}) 
 
 local function isIgnored(itemName)
     local nameLower = string.lower(itemName)
@@ -318,6 +334,17 @@ local function executePickup()
 
         for _, item in ipairs(itemsToProcess) do
             if item and item.Parent and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
+                
+                -- [REVISI 9]: CEK ANCAMAN SEBELUM BERGERAK KE ITEM
+                if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                    print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item, lari ke Safe Place...")
+                    local safePos = getFakeElevatorPosition()
+                    if safePos then teleportplr(CFrame.new(safePos))
+                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                    task.wait(4)
+                    break -- Keluar dari loop for, re-evaluasi
+                end
+
                 local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
                 local platform = Instance.new("Part")
                 platform.Size = Vector3.new(15, 1, 15) 
@@ -338,12 +365,28 @@ local function executePickup()
                 end
                 
                 local timeout = 15 
+                local interrupted = false
                 while item.Parent and timeout > 0 do
+                    -- [REVISI 9]: CEK ANCAMAN SAAT MENUNGGU ITEM TERAMBIL
+                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                        interrupted = true
+                        break
+                    end
                     task.wait(0.1)
                     timeout = timeout - 1
                 end
                 
-                -- [REVISI 7]: Hapus fail-safe priority. Priority item bebas mencoba sampai dapat.
+                if platform then platform:Destroy() end
+
+                if interrupted then
+                    print("[SAFETY - ITEM] Diserang saat memungut item! Kabur!")
+                    local safePos = getFakeElevatorPosition()
+                    if safePos then teleportplr(CFrame.new(safePos))
+                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                    task.wait(4)
+                    break
+                end
+                
                 if item.Parent then
                     if isPriority(item.Name) then
                         print("[SYSTEM] Item Priority " .. item.Name .. " masih mencoba diambil. Bypass Blacklist aktif selamanya.")
@@ -354,8 +397,6 @@ local function executePickup()
                         if highlight then highlight.FillColor = Color3.fromRGB(255, 0, 0) end
                     end
                 end
-
-                if platform then platform:Destroy() end
             end
         end
         currentLoop = currentLoop + 1
@@ -426,39 +467,6 @@ local function updateSafeRadiusVisual()
         safeRadiusAdornment.Adornee = rootPart
         safeRadiusAdornment.Parent = rootPart
     end
-end
-
-local function isThreatened(targetPosition, radius)
-    local map = getMap()
-    if map then
-        local monstersFolder = map:FindFirstChild("Monsters")
-        if monstersFolder then
-            for _, monster in pairs(monstersFolder:GetChildren()) do
-                if monster:FindFirstChild("ChasingValue") and monster.ChasingValue.Value == character then
-                    return true 
-                end
-                
-                if monster:IsA("Model") and monster.PrimaryPart then
-                    local distance = (monster.PrimaryPart.Position - targetPosition).Magnitude
-                    
-                    local isLooseMonster = false
-                    for _, looseName in ipairs(Config.Teleport.LooseMonsters) do
-                        if monster.Name == looseName then
-                            isLooseMonster = true
-                            break
-                        end
-                    end
-                    
-                    if isLooseMonster then
-                        if distance <= Config.Teleport.LooseRadius then return true end
-                    else
-                        if distance <= radius then return true end
-                    end
-                end
-            end
-        end
-    end
-    return false
 end
 
 local function isMachineOccupied(generator, radius)
@@ -573,53 +581,37 @@ local function moveToPositionGen(targetCFrame, usePlatform)
     Workspace.Gravity = originalGravity
 end
 
-local function teleportToRealElevator()
-    print("[INFO] Meluncur ke Real Elevator...")
-    rootPart.Anchored = false 
-    local targetCFrame = nil
+local function getRealElevatorCFrame()
     local elevatorsFolder = Workspace:FindFirstChild("Elevators")
-    
     if elevatorsFolder then
+        for _, obj in ipairs(elevatorsFolder:GetChildren()) do
+            if obj.Name == "Elevator" and obj:IsA("Model") then
+                if obj.PrimaryPart then 
+                    return obj.PrimaryPart.CFrame * CFrame.new(0, 3, 0)
+                else
+                    local centerPos = getModelCenter(obj)
+                    if centerPos then return CFrame.new(centerPos) * CFrame.new(0, 3, 0) end
+                end
+            end
+        end
         for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
             if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
-                targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
-                break
-            end
-        end
-        if not targetCFrame then
-            for _, obj in ipairs(elevatorsFolder:GetChildren()) do
-                if obj.Name == "Elevator" and obj:IsA("Model") then
-                    if obj.PrimaryPart then targetCFrame = obj.PrimaryPart.CFrame * CFrame.new(0, 3, 0)
-                    else
-                        local centerPos = getModelCenter(obj)
-                        if centerPos then targetCFrame = CFrame.new(centerPos) * CFrame.new(0, 3, 0) end
-                    end
-                    break
-                end
+                return obj.CFrame * CFrame.new(0, 1.5, 2)
             end
         end
     end
     
-    if not targetCFrame then
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
-                local parentName = string.lower(obj.Parent and obj.Parent.Name or "")
-                if not string.find(parentName, "fake") then
-                    targetCFrame = obj.CFrame * CFrame.new(0, 1.5, 0)
-                    break
-                end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+            local parentName = string.lower(obj.Parent and obj.Parent.Name or "")
+            if not string.find(parentName, "fake") then
+                return obj.CFrame * CFrame.new(0, 1.5, 2)
             end
         end
     end
-    
-    if targetCFrame then
-        moveToPositionGen(targetCFrame, true)
-        return true
-    else
-        print("[WARNING] Real Elevator gagal ditemukan di map!")
-        return false
-    end
+    return nil
 end
+
 
 local function startAutoFarming()
     local inElevatorStandby = false
@@ -685,13 +677,23 @@ local function startAutoFarming()
                         
                         if uncompletedCount == 0 then
                             if not inElevatorStandby then
-                                print("[INFO] Semua Mesin Selesai! Menunggu lantai berikutnya...")
-                                teleportToRealElevator()
-                                task.wait(0.5)
-                                if rootPart then rootPart.Anchored = false end
-                                print("[INFO] Mode Standby Aktif. Silakan jalan bebas di dalam lift.")
+                                print("[INFO] Semua Mesin Selesai! Menuju Real Elevator...")
                                 inElevatorStandby = true
                             end
+                            
+                            local elevatorTarget = getRealElevatorCFrame()
+                            if elevatorTarget then
+                                local dist = (rootPart.Position - elevatorTarget.Position).Magnitude
+                                if dist > 7 then
+                                    print("[INFO] Mengecek Posisi: Player di luar pintu! Mengkoreksi masuk ke dalam lift...")
+                                    moveToPositionGen(elevatorTarget, true)
+                                else
+                                    if rootPart.Anchored then rootPart.Anchored = false end
+                                end
+                            else
+                                print("[WARNING] CFrame Real Elevator gagal ditemukan di map ini!")
+                            end
+                            task.wait(0.5) 
                             
                         elseif targetGen then
                             inElevatorStandby = false
@@ -830,11 +832,19 @@ task.spawn(function()
                 end
 
                 if hasValidItems and not isItemFarmingActive then
+                    if isInteractingUI() then
+                        print("[SYSTEM] Item baru terdeteksi, TAPI mesin sedang diekstrak! Menunggu UI selesai...")
+                    end
+                    
+                    while isInteractingUI() and isMasterFarming do
+                        task.wait(0.2)
+                    end
+                    
                     isItemFarmingActive = true 
                     
                     print("\n==============================================")
                     print("[SYSTEM] Mendeteksi Item / Lantai Baru!")
-                    print("[SYSTEM] Force Stop Generator. Mengambil item...")
+                    print("[SYSTEM] Mesin aman/selesai. Mengambil item...")
                     print("==============================================")
                     
                     forceStop()
