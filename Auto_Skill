@@ -1,0 +1,148 @@
+-- ==============================================================================
+-- SMART AUTO ABILITY (DANDY'S WORLD)
+-- Logika Cerdas: Menggunakan skill HANYA saat kondisi terpenuhi
+-- ==============================================================================
+
+local Config = {
+    EnableSmartAbility = true,
+    
+    -- KUNCI TOMBOL ABILITY (Sesuaikan jika ada karakter dengan 2 skill)
+    PrimaryKey = Enum.KeyCode.Q,
+    SecondaryKey = Enum.KeyCode.E, -- Aktifkan jika karakter punya skill kedua
+    
+    -- ==================== SYARAT & KONDISI (SMART LOGIC) ====================
+    Conditions = {
+        -- [1] DEFENSIVE: Hanya gunakan skill jika sedang DIKEJAR MONSTER
+        -- (Cocok untuk karakter dengan skill Speed Boost, Shield, Dash, Stun)
+        UseOnlyWhenChased = true,
+        
+        -- [2] SUPPORT: Hanya gunakan skill jika ada PLAYER LAIN di dekatmu
+        -- (Cocok untuk karakter Healer / Buff)
+        RequirePlayerNearby = false,
+        NearbyRadius = 25,
+        
+        -- [3] ANTI-INTERRUPT: Jangan gunakan skill jika sedang mengerjakan Mesin
+        -- (Agar proses Decoding tidak batal gara-gara animasi skill)
+        DontUseWhileDecoding = false
+    },
+    
+    AttemptInterval = 1 -- Cek kondisi setiap 1 detik
+}
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+
+print("==================================================")
+print(" SMART AUTO ABILITY BERHASIL DIJALANKAN")
+print("==================================================")
+
+-- ==================== FUNGSI PEMERIKSAAN KONDISI ====================
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
+
+-- Cek apakah karakter kita sedang dikejar monster
+local function isChasedByMonster(character)
+    local map = getMap()
+    if map then
+        local monstersFolder = map:FindFirstChild("Monsters")
+        if monstersFolder then
+            for _, monster in pairs(monstersFolder:GetChildren()) do
+                local chasingVal = monster:FindFirstChild("ChasingValue")
+                if chasingVal and chasingVal.Value == character then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Cek apakah ada player lain di dekat kita (Untuk skill Support)
+local function isPlayerNearby(characterPosition, radius)
+    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+    if inGamePlayers then
+        for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
+            if otherPlayer.Name ~= player.Name then
+                local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
+                if otherRoot then
+                    local distance = (otherRoot.Position - characterPosition).Magnitude
+                    if distance <= radius then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Cek apakah kita sedang mengerjakan mesin
+local function isDecodingMachine(character)
+    local decoding = character:FindFirstChild("Decoding")
+    return decoding and decoding.Value ~= nil
+end
+
+-- ==================== FUNGSI UTAMA ====================
+local function startSmartAbility()
+    task.spawn(function()
+        while Config.EnableSmartAbility do
+            pcall(function()
+                local character = player.Character
+                
+                if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                    local rootPart = character:FindFirstChild("HumanoidRootPart")
+                    local shouldCastSkill = true
+                    
+                    -- 1. Evaluasi Syarat: Sedang Decoding
+                    if Config.Conditions.DontUseWhileDecoding and isDecodingMachine(character) then
+                        shouldCastSkill = false
+                    end
+                    
+                    -- 2. Evaluasi Syarat: Sedang Dikejar Monster
+                    if shouldCastSkill and Config.Conditions.UseOnlyWhenChased then
+                        if not isChasedByMonster(character) then
+                            shouldCastSkill = false
+                        end
+                    end
+                    
+                    -- 3. Evaluasi Syarat: Support/Player Terdekat
+                    if shouldCastSkill and Config.Conditions.RequirePlayerNearby and rootPart then
+                        if not isPlayerNearby(rootPart.Position, Config.Conditions.NearbyRadius) then
+                            shouldCastSkill = false
+                        end
+                    end
+                    
+                    -- ==================== EKSEKUSI SKILL ====================
+                    if shouldCastSkill then
+                        -- Tembak Skill 1 (Primary)
+                        VirtualInputManager:SendKeyEvent(true, Config.PrimaryKey, false, game)
+                        task.wait(0.05)
+                        VirtualInputManager:SendKeyEvent(false, Config.PrimaryKey, false, game)
+                        
+                        -- Tembak Skill 2 (Secondary) jika ada
+                        if Config.SecondaryKey then
+                            task.wait(0.1) -- Jeda antar skill agar tidak bentrok
+                            VirtualInputManager:SendKeyEvent(true, Config.SecondaryKey, false, game)
+                            task.wait(0.05)
+                            VirtualInputManager:SendKeyEvent(false, Config.SecondaryKey, false, game)
+                        end
+                        
+                        print("[SMART ABILITY] Kondisi terpenuhi! Skill dieksekusi.")
+                        
+                        -- Jeda panjang setelah memakai skill (Asumsi Cooldown rata-rata)
+                        -- Mencegah spam tombol saat skill masih proses/animasi
+                        task.wait(3) 
+                    end
+                end
+            end)
+            
+            task.wait(Config.AttemptInterval)
+        end
+    end)
+end
+
+startSmartAbility()
