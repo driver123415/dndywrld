@@ -1,0 +1,83 @@
+-- ==============================================================================
+-- AUTO RUN / AUTO SPRINT (DANDY'S WORLD)
+-- Otomatis menyalakan mode lari ketika karakter memasuki lantai/map In-Game
+-- ==============================================================================
+
+local Config = {
+    -- Matikan/Nyalakan fitur Auto Run
+    EnableAutoRun = true,
+    
+    -- Tombol lari bawaan Dandy's World (Biasanya LeftShift)
+    RunKey = Enum.KeyCode.LeftShift,
+    
+    -- Jeda waktu (detik) sebelum menekan Shift setelah map termuat
+    -- Berguna agar tidak bentrok dengan lag saat awal loading
+    DelayAfterSpawn = 1.5 
+}
+
+-- ==============================================================================
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+
+print("==================================================")
+print(" AUTO RUN BERHASIL DIJALANKAN (TOMBOL: " .. tostring(Config.RunKey) .. ")")
+print("==================================================")
+
+-- Fungsi untuk mengecek apakah kita sudah berada di dalam map permainan (bukan Lobby)
+local function isInGame()
+    local currentRoom = Workspace:FindFirstChild("CurrentRoom")
+    if currentRoom then
+        -- Jika di dalam CurrentRoom ada Model (Map), berarti kita sedang bermain
+        return currentRoom:FindFirstChildWhichIsA("Model") ~= nil
+    end
+    return false
+end
+
+-- Fungsi Utama Auto Run
+local function startAutoRun()
+    task.spawn(function()
+        -- Variabel penanda agar script tidak menekan Shift berkali-kali di lantai yang sama
+        local hasToggledRun = false
+        
+        while Config.EnableAutoRun do
+            pcall(function()
+                local character = player.Character
+                
+                if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                    
+                    if isInGame() then
+                        -- Jika masuk ke in-game dan belum menyalakan lari
+                        if not hasToggledRun then
+                            print("[AUTO RUN] Memasuki Map! Bersiap mengaktifkan lari...")
+                            task.wait(Config.DelayAfterSpawn)
+                            
+                            -- Simulasi menekan tombol Shift (Menyalakan Toggle Sprint)
+                            VirtualInputManager:SendKeyEvent(true, Config.RunKey, false, game)
+                            task.wait(0.1)
+                            VirtualInputManager:SendKeyEvent(false, Config.RunKey, false, game)
+                            
+                            print("[AUTO RUN] Mode Lari AKTIF!")
+                            hasToggledRun = true -- Kunci agar tidak dipencet lagi selama di lantai ini
+                        end
+                    else
+                        -- Jika kita kembali ke Lobby atau masuk Elevator (map hilang),
+                        -- reset penanda agar di lantai berikutnya Auto Run menyala lagi.
+                        if hasToggledRun then
+                            hasToggledRun = false
+                            print("[AUTO RUN] Keluar dari map, me-reset status lari.")
+                        end
+                    end
+                    
+                end
+            end)
+            
+            task.wait(1) -- Cek status lokasi setiap 1 detik
+        end
+    end)
+end
+
+-- ==================== INISIALISASI ====================
+startAutoRun()
