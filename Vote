@@ -1,21 +1,34 @@
 -- ==============================================================================
--- AUTO VOTE BEST CARD - VIRTUAL INPUT MANAGER (PHYSICAL CLICK SIMULATION)
+-- AUTO VOTE BEST CARD (META FARMING) - 100% INTERNAL ID (BASED ON DEX DISCOVERY)
 -- ==============================================================================
 
 local Config = {
     EnableAutoVote = true, 
+    
+    -- DAFTAR PRIORITAS MENGGUNAKAN NAMA INTERNAL SERVER (DARI REPLICATED STORAGE)
     PriorityCards = {
-        "Tech Savvy", "TIME'S UP", "Well-Paced", "Endurance",            
-        "Spare Change", "Penny Pincher", "Avaricious", "Covetous",             
-        "Lost and Found", "Blind Grab", "Frugal", "Rehearsal", "Practice",              
-        "Electrician", "Piping Tape", "Air Freshener", "Frost Shield",                       
-        "Sparkplug", "First Aid", "Medical Attention", "Suppression", "Decency", "Etiquette"                
+        "Machine",               -- Tech Savvy (Mesin lebih cepat)
+        "Stamina2", "Stamina",   -- Endurance / Well-Paced (Max Stamina)
+        "SurvivalPoint2", "SurvivalPoint", -- Penny Pincher / Spare Change (Uang)
+        "ItemRarity2", "ItemRarity",       -- Avaricious / Covetous (Item langka)
+        "RandomItem2", "RandomItem",       -- Blind Grab / Lost and Found (Item gratis)
+        "DandyDiscount",         -- Frugal (Diskon Shop)
+        "AbilityCooldown2", "AbilityCooldown", -- Practice / Rehearsal (Cooldown Skill)
+        "BlackOut",              -- Electrician (Anti Blackout)
+        "PipingTape",            -- Piping Tape (Anti Ichor)
+        "PollenShield",          -- Air Freshener (Anti Spring Fever)
+        "FrostShield",           -- Frost Shield (Anti Es)
+        "GlowLight",             -- Sparkplug (Terang saat Blackout)
+        "Heal2", "Heal",         -- Medical Attention / First Aid
+        "MonsterPanicReduction", -- Suppression (Speed monster turun)
+        "Elevator2", "Elevator"  -- Etiquette / Decency (Waktu elevator)
     },
+    
     VoteRandomIfNotFound = true 
 }
 
 local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui") or Players.LocalPlayer:WaitForChild("PlayerGui")
 local player = Players.LocalPlayer
 local isVoting = false
@@ -33,10 +46,10 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 local title = Instance.new("TextLabel", mainFrame)
 title.Size = UDim2.new(1, 0, 0.4, 0)
 title.BackgroundTransparency = 1
-title.Text = "Auto Vote Card"
+title.Text = "Auto Vote (Internal ID)"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 16
+title.TextSize = 14
 
 local toggleBtn = Instance.new("TextButton", mainFrame)
 toggleBtn.Size = UDim2.new(0.8, 0, 0.4, 0)
@@ -70,28 +83,20 @@ local function isOnScreen(gui)
     local viewport = workspace.CurrentCamera.ViewportSize
     if size.X <= 0 or size.Y <= 0 then return false end
     if pos.X >= viewport.X or pos.Y >= viewport.Y then return false end
+    if pos.X + size.X <= 0 or pos.Y + size.Y <= 0 then return false end
     return true
 end
 
--- FUNGSI KLIK FISIK DI KOORDINAT LAYAR
-local function physicalClick(guiObject, cardName)
+local function executeVote(internalID)
     print("--------------------------------------------------")
-    print("🤖 Mengeksekusi Klik Fisik pada: " .. cardName)
-    
-    -- Mencari titik tengah dari kartu tersebut
-    local center = guiObject.AbsolutePosition + (guiObject.AbsoluteSize / 2)
-    
-    -- Menambahkan kompensasi offset Roblox Topbar (biasanya 36 pixel) agar akurat di semua device
-    local clickX = center.X
-    local clickY = center.Y + 36 
-    
+    print("🚀 Mengirim Vote Internal ID: " .. internalID)
     pcall(function()
-        -- Mensimulasikan jari menekan layar
-        VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
-        task.wait(0.1)
-        -- Mensimulasikan jari diangkat dari layar
-        VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
-        print("✅ [BERHASIL] Layar ditekan pada kordinat X: " .. math.floor(clickX) .. ", Y: " .. math.floor(clickY))
+        local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
+        local argString = Instance.new("StringValue")
+        argString.Name = internalID
+        argString.Value = internalID
+        voteEvent:FireServer(argString)
+        print("✅ [SUKSES] Server menerima Vote: " .. internalID)
     end)
     print("--------------------------------------------------")
 end
@@ -116,46 +121,36 @@ task.spawn(function()
                     
                     if validVoteFrame and not isVoting then
                         isVoting = true
-                        print(">> VOTE FRAME MUNCUL DI LAYAR! <<")
-                        task.wait(2) -- Jeda biar kartu posisinya pas di tengah layar sebelum diklik
+                        print(">> VOTE FRAME DI LAYAR! <<")
+                        task.wait(2) 
                         
-                        local bestCardName = nil
-                        local bestCardUI = nil
                         local bestWeight = 999
-                        local firstAvailableCardName = nil
-                        local firstAvailableCardUI = nil
+                        local bestInternalID = nil
+                        local firstInternalID = nil
                         
+                        -- Cek langsung nama foldernya (contoh: "Machine", "PipingTape")
                         for _, child in ipairs(validVoteFrame:GetChildren()) do
                             if child:IsA("GuiObject") and isOnScreen(child) and not string.find(child.Name, "Template") and child.Name ~= "UIListLayout" then
-                                local itemNameLabel = child:FindFirstChild("ItemName", true)
+                                local internalID = child.Name
                                 
-                                if itemNameLabel and itemNameLabel:IsA("TextLabel") then
-                                    local cardName = itemNameLabel.Text
-                                    local weight = 999
-                                    
-                                    for i, p in ipairs(Config.PriorityCards) do
-                                        if string.find(string.lower(cardName), string.lower(p)) then weight = i break end
-                                    end
-                                    
-                                    if not firstAvailableCardName then
-                                        firstAvailableCardName = cardName
-                                        firstAvailableCardUI = child
-                                    end
-                                    
-                                    if weight < bestWeight then
-                                        bestWeight = weight
-                                        bestCardName = cardName
-                                        bestCardUI = child
+                                if not firstInternalID then firstInternalID = internalID end
+                                
+                                -- Cocokkan dengan daftar prioritas
+                                for i, pID in ipairs(Config.PriorityCards) do
+                                    if internalID == pID and i < bestWeight then
+                                        bestWeight = i
+                                        bestInternalID = internalID
+                                        break
                                     end
                                 end
                             end
                         end
                         
-                        if bestCardUI then
-                            physicalClick(bestCardUI, bestCardName)
-                        elseif Config.VoteRandomIfNotFound and firstAvailableCardUI then
-                            print("⚠️ Prioritas tidak ada, memilih: " .. firstAvailableCardName)
-                            physicalClick(firstAvailableCardUI, firstAvailableCardName)
+                        if bestInternalID then
+                            executeVote(bestInternalID)
+                        elseif Config.VoteRandomIfNotFound and firstInternalID then
+                            print("⚠️ Prioritas tidak ada, memilih acak: " .. firstInternalID)
+                            executeVote(firstInternalID)
                         end
                         
                         task.wait(10) 
@@ -168,4 +163,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ SCRIPT AUTO VOTE (VIRTUAL INPUT CLICK) BERHASIL DIMUAT ✅")
+print("✅ SCRIPT AUTO VOTE (MASTER INTERNAL ID) BERHASIL DIMUAT ✅")
