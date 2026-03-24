@@ -1,79 +1,43 @@
 -- ==============================================================================
--- AUTO VOTE BEST CARD (META FARMING) - 100% FIXED BY INTERNAL ID DISCOVERY
+-- AUTO VOTE BEST CARD (DANDY'S WORLD) - ULTIMATE BRUTE FORCE VERSION
 -- ==============================================================================
 
 local Config = {
     EnableAutoVote = true, 
-    
     PriorityCards = {
-        "Tech Savvy",                         
-        "TIME'S UP",                          
-        "Well-Paced", "Endurance",            
-        "Spare Change", "Penny Pincher",      
-        "Avaricious", "Covetous",             
-        "Lost and Found", "Blind Grab",       
-        "Frugal",                             
-        "Rehearsal", "Practice",              
-        "Electrician",                        
-        "Piping Tape",                        
-        "Air Freshener",                      
-        "Frost Shield",                       
-        "Sparkplug",                          
-        "First Aid", "Medical Attention",     
-        "Suppression",                        
-        "Decency", "Etiquette"                
+        "Tech Savvy", "TIME'S UP", "Well-Paced", "Endurance",            
+        "Spare Change", "Penny Pincher", "Avaricious", "Covetous",             
+        "Lost and Found", "Blind Grab", "Frugal", "Rehearsal", "Practice",              
+        "Electrician", "Piping Tape", "Air Freshener", "Frost Shield",                       
+        "Sparkplug", "First Aid", "Medical Attention", "Suppression", "Decency", "Etiquette"                
     },
-    
     VoteRandomIfNotFound = true 
 }
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui") or Players.LocalPlayer:WaitForChild("PlayerGui")
 local player = Players.LocalPlayer
 local isVoting = false
 
 -- ==================== GUI SETUP ====================
-if CoreGui:FindFirstChild("AutoVoteGUI_Dandy") then
-    CoreGui.AutoVoteGUI_Dandy:Destroy()
-end
-
-local screenGui = Instance.new("ScreenGui")
+if CoreGui:FindFirstChild("AutoVoteGUI_Dandy") then CoreGui.AutoVoteGUI_Dandy:Destroy() end
+local screenGui = Instance.new("ScreenGui", CoreGui)
 screenGui.Name = "AutoVoteGUI_Dandy"
-screenGui.Parent = CoreGui
-
-local mainFrame = Instance.new("Frame")
+local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Size = UDim2.new(0, 200, 0, 100)
 mainFrame.Position = UDim2.new(0.5, -100, 0.8, -50)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
-
-local title = Instance.new("TextLabel", mainFrame)
-title.Size = UDim2.new(1, 0, 0.4, 0)
-title.BackgroundTransparency = 1
-title.Text = "Auto Vote Card"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-
 local toggleBtn = Instance.new("TextButton", mainFrame)
 toggleBtn.Size = UDim2.new(0.8, 0, 0.4, 0)
 toggleBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
-toggleBtn.BackgroundColor3 = Config.EnableAutoVote and Color3.fromRGB(40, 200, 80) or Color3.fromRGB(220, 60, 60)
-toggleBtn.Text = Config.EnableAutoVote and "ON" or "OFF"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+toggleBtn.Text = "OFF"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 18
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
-
--- Drag Logic
-local dragging, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true dragStart = input.Position startPos = mainFrame.Position end
-end)
-mainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
-UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
 toggleBtn.MouseButton1Click:Connect(function()
     Config.EnableAutoVote = not Config.EnableAutoVote
@@ -81,118 +45,75 @@ toggleBtn.MouseButton1Click:Connect(function()
     toggleBtn.BackgroundColor3 = Config.EnableAutoVote and Color3.fromRGB(40, 200, 80) or Color3.fromRGB(220, 60, 60)
 end)
 
--- ==================== AUTO VOTE LOGIC ====================
-local function getCardPriorityWeight(cardName)
-    local nameLower = string.lower(cardName)
-    for i, priorityName in ipairs(Config.PriorityCards) do
-        if string.find(nameLower, string.lower(priorityName)) then return i end
-    end
-    return 999 
+-- ==================== FUNGSI INTI ====================
+local function isOnScreen(gui)
+    return gui.Visible and gui.AbsolutePosition.X < workspace.CurrentCamera.ViewportSize.X and gui.AbsolutePosition.Y < workspace.CurrentCamera.ViewportSize.Y and gui.AbsoluteSize.X > 0
 end
 
-local function isOnScreen(guiObject)
-    if not guiObject.Visible then return false end
-    local pos = guiObject.AbsolutePosition
-    local size = guiObject.AbsoluteSize
-    local viewport = workspace.CurrentCamera.ViewportSize
-    if size.X <= 0 or size.Y <= 0 then return false end
-    if pos.X >= viewport.X or pos.Y >= viewport.Y then return false end
-    if pos.X + size.X <= 0 or pos.Y + size.Y <= 0 then return false end
-    return true
-end
-
--- MENGGUNAKAN REMOTE EVENT DENGAN INTERNAL ID
-local function executeVote(internalID, displayName)
-    print("--------------------------------------------------")
-    print("🛠️ MENGIRIM VOTE KE SERVER...")
-    print("   -> Teks di Layar: " .. displayName)
-    print("   -> ID Server    : " .. internalID)
-    
+local function fireVote(valueObject)
     pcall(function()
-        local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
-        
-        -- Bungkus ID dengan StringValue sesuai permintaan server
-        local argString = Instance.new("StringValue")
-        argString.Name = internalID
-        argString.Value = internalID
-        
-        voteEvent:FireServer(argString)
-        print("🎉 [BERHASIL] RemoteEvent ditembak dengan ID: " .. internalID)
+        local event = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
+        event:FireServer(valueObject)
+        print("🎉 [VOTE SUCCESS] Berhasil mengirim objek kartu ke server!")
     end)
-    print("--------------------------------------------------")
 end
 
 task.spawn(function()
     while true do
         if Config.EnableAutoVote then
             pcall(function()
-                local playerGui = player:WaitForChild("PlayerGui", 5)
-                if playerGui then
-                    local validVoteFrame = nil
-                    
-                    for _, gui in pairs(playerGui:GetChildren()) do
-                        if gui:IsA("ScreenGui") and gui.Enabled and gui:FindFirstChild("VoteFrame", true) then
-                            local vf = gui:FindFirstChild("VoteFrame", true)
-                            if isOnScreen(vf) then
-                                validVoteFrame = vf
-                                break
-                            end
-                        end
+                local playerGui = player:WaitForChild("PlayerGui")
+                local voteFrame = nil
+                for _, g in pairs(playerGui:GetChildren()) do
+                    if g:IsA("ScreenGui") and g.Enabled and g:FindFirstChild("VoteFrame", true) then
+                        local vf = g:FindFirstChild("VoteFrame", true)
+                        if isOnScreen(vf) then voteFrame = vf break end
                     end
+                end
+
+                if voteFrame and not isVoting then
+                    isVoting = true
+                    task.wait(2) 
                     
-                    if validVoteFrame and not isVoting then
-                        isVoting = true
-                        print(">> VOTE FRAME MUNCUL DI LAYAR! <<")
-                        task.wait(2) 
-                        
-                        local bestCardName = nil
-                        local bestInternalID = nil
-                        local bestWeight = 999
-                        
-                        local firstAvailableCardName = nil
-                        local firstAvailableInternalID = nil
-                        
-                        for _, child in ipairs(validVoteFrame:GetChildren()) do
-                            -- Filter: Pastikan elemen ini adalah kartu valid
-                            if child:IsA("GuiObject") and isOnScreen(child) and not string.find(child.Name, "Template") and child.Name ~= "UIListLayout" and child.Name ~= "SelectionFrame" then
-                                local itemNameLabel = child:FindFirstChild("ItemName", true)
-                                
-                                if itemNameLabel and itemNameLabel:IsA("TextLabel") then
-                                    local displayCardName = itemNameLabel.Text
-                                    local internalCardID = child.Name -- INI KUNCI DARI GAMBARMU! ("Machine", "SurvivalPoint2", dll)
-                                    
-                                    local weight = getCardPriorityWeight(displayCardName)
-                                    
-                                    if not firstAvailableCardName then
-                                        firstAvailableCardName = displayCardName
-                                        firstAvailableInternalID = internalCardID
-                                    end
-                                    
-                                    if weight < bestWeight then
-                                        bestWeight = weight
-                                        bestCardName = displayCardName
-                                        bestInternalID = internalCardID
-                                    end
+                    local bestWeight = 999
+                    local targetObj = nil
+                    local firstName = nil
+                    local firstObj = nil
+
+                    for _, card in ipairs(voteFrame:GetChildren()) do
+                        if card:IsA("GuiObject") and isOnScreen(card) and not card.Name:find("Template") then
+                            local nameLabel = card:FindFirstChild("ItemName", true)
+                            local val = card:FindFirstChildWhichIsA("StringValue", true) or card:FindFirstChildWhichIsA("ObjectValue", true)
+
+                            if nameLabel and val then
+                                local name = nameLabel.Text
+                                local weight = 999
+                                for i, p in ipairs(Config.PriorityCards) do
+                                    if name:lower():find(p:lower()) then weight = i break end
                                 end
+
+                                if not firstObj then firstName = name firstObj = val end
+                                if weight < bestWeight then
+                                    bestWeight = weight
+                                    targetObj = val
+                                end
+                                print("🔍 Terdeteksi Kartu: " .. name .. " (Weight: " .. weight .. ")")
                             end
                         end
-                        
-                        if bestInternalID then
-                            executeVote(bestInternalID, bestCardName)
-                        elseif Config.VoteRandomIfNotFound and firstAvailableInternalID then
-                            executeVote(firstAvailableInternalID, firstAvailableCardName)
-                        else
-                            print("❌ Gagal membaca kartu.")
-                        end
-                        
-                        task.wait(10) 
-                        isVoting = false
                     end
+
+                    if targetObj then
+                        fireVote(targetObj)
+                    elseif Config.VoteRandomIfNotFound and firstObj then
+                        print("⚠️ Prioritas tidak ada, memilih: " .. firstName)
+                        fireVote(firstObj)
+                    end
+
+                    task.wait(10)
+                    isVoting = false
                 end
             end)
         end
-        task.wait(1) 
+        task.wait(1)
     end
 end)
-
-print("✅ SCRIPT AUTO VOTE (INTERNAL ID + BYPASS OFF-SCREEN) BERHASIL DIMUAT ✅")
