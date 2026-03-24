@@ -1,0 +1,24 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tunggu sampai UI utama selesai loading
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local ScreenGui = PlayerGui:WaitForChild("ScreenGui")
+
+-- Fungsi khusus untuk mengecek dan menghapus pop-up
+local function removeTemporaryPopUp(child)
+	if child.Name == "TemporaryPopUp" then
+		child:Destroy() -- Menghapus total elemen tersebut dari game
+		print("[Auto-Close] TemporaryPopUp berhasil dihapus!")
+	end
+end
+
+-- 1. BERSIHKAN POP-UP YANG SUDAH ADA (Jika script dieksekusi saat pop-up sudah muncul)
+for _, child in ipairs(ScreenGui:GetChildren()) do
+	removeTemporaryPopUp(child)
+end
+
+-- 2. PANTAU DAN HAPUS POP-UP BARU (Jika pop-up muncul lagi di masa depan)
+ScreenGui.ChildAdded:Connect(removeTemporaryPopUp)
+
+print("[Auto-Close] Script berjalan. Memantau kemunculan TemporaryPopUp...")
