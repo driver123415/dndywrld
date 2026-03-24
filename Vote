@@ -1,19 +1,18 @@
 -- ==============================================================================
--- AUTO VOTE BEST CARD (DANDY'S WORLD) + GUI
--- Otomatis memilih kartu berdasarkan daftar prioritas saat Elevator selesai
+-- AUTO VOTE BEST CARD (DANDY'S WORLD) + GUI (FIXED REMOTE EVENT)
+-- Otomatis memilih kartu menggunakan FireServer berdasarkan prioritas
 -- ==============================================================================
 
 local Config = {
     EnableAutoVote = true,
     
-    -- DAFTAR PRIORITAS KARTU (Urutkan dari yang PALING DIBUTUHKAN di atas)
     PriorityCards = {
-        "Skillcheck",       -- Prioritas 1: Bonus Skillcheck / Ichor Extraction
-        "Stamina",          -- Prioritas 2: Segala jenis kartu Stamina
-        "Stealth",          -- Prioritas 3: Kartu Stealth / Anti ketahuan
-        "Speed",            -- Prioritas 4: Segala jenis kartu Speed (Movement Speed)
-        "Health",           -- Prioritas 5: Max Health
-        "Heal"              -- Prioritas 6: Healing
+        "Skillcheck",       
+        "Stamina",          
+        "Stealth",          
+        "Speed",            
+        "Health",           
+        "Heal"              
     },
     
     VoteRandomIfNotFound = true 
@@ -29,7 +28,6 @@ local player = Players.LocalPlayer
 local isVoting = false
 
 -- ==================== GUI SETUP ====================
--- Hapus GUI lama jika ada (untuk mencegah double UI saat execute ulang)
 if CoreGui:FindFirstChild("AutoVoteGUI_Dandy") then
     CoreGui.AutoVoteGUI_Dandy:Destroy()
 end
@@ -134,81 +132,89 @@ local function getCardPriorityWeight(cardName)
     return 999 
 end
 
+-- Fungsi eksekusi RemoteEvent
+local function sendVoteToServer(cardName)
+    pcall(function()
+        local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
+        
+        -- Membuat StringValue sesuai format argumen yang dibutuhkan server
+        local argString = Instance.new("StringValue")
+        argString.Value = cardName
+        argString.Name = cardName -- Diset ganda untuk berjaga-jaga
+        
+        voteEvent:FireServer(argString)
+        print("[AUTO VOTE BERHASIL] Mengirim vote untuk: " .. cardName)
+    end)
+end
+
 local function startAutoVote()
     task.spawn(function()
-        -- Loop sekarang berjalan terus, tapi aksi hanya dilakukan jika EnableAutoVote = true
         while true do
             if Config.EnableAutoVote then
                 pcall(function()
                     local playerGui = player:WaitForChild("PlayerGui", 5)
                     if playerGui then
-                        local mainUI = playerGui:FindFirstChild("MainUI") or playerGui:FindFirstChild("Main")
                         
-                        if mainUI then
-                            local cardMenu = mainUI:FindFirstChild("CardVote") or mainUI:FindFirstChild("CardSelection")
-                            
-                            if cardMenu and cardMenu.Visible and not isVoting then
-                                isVoting = true
-                                print("[AUTO VOTE] Layar pemilihan kartu terdeteksi!")
-                                
-                                task.wait(0.5) 
-                                
-                                local bestCard = nil
-                                local bestWeight = 999
-                                local firstAvailableCard = nil
-                                
-                                for _, item in ipairs(cardMenu:GetDescendants()) do
-                                    if item:IsA("TextLabel") and (item.Name == "CardName" or item.Name == "Title") then
-                                        local cardName = item.Text
-                                        local cardButton = item.Parent 
-                                        
-                                        if cardButton and (cardButton:IsA("TextButton") or cardButton:IsA("ImageButton")) then
-                                            if not firstAvailableCard then
-                                                firstAvailableCard = cardButton
-                                            end
-                                            
-                                            local weight = getCardPriorityWeight(cardName)
-                                            
-                                            if weight < bestWeight then
-                                                bestWeight = weight
-                                                bestCard = cardButton
-                                            end
-                                        end
-                                    end
-                                end
-                                
-                                if bestCard then
-                                    print("[AUTO VOTE] >>> MEMILIH KARTU PRIORITAS: " .. bestCard:FindFirstChildWhichIsA("TextLabel").Text .. " <<<")
-                                    if getconnections then
-                                        for _, connection in pairs(getconnections(bestCard.MouseButton1Click)) do
-                                            connection:Fire()
-                                        end
-                                    else
-                                        print("[WARNING] Executor tidak support getconnections.")
-                                    end
-                                elseif Config.VoteRandomIfNotFound and firstAvailableCard then
-                                    print("[AUTO VOTE] >>> PRIORITAS TIDAK ADA. Memilih acak! <<<")
-                                    if getconnections then
-                                        for _, connection in pairs(getconnections(firstAvailableCard.MouseButton1Click)) do
-                                            connection:Fire()
-                                        end
-                                    end
-                                end
-                                
-                                task.wait(10) 
-                                isVoting = false
+                        -- Mencari VoteFrame di dalam semua ScreenGui
+                        local voteFrame = nil
+                        for _, gui in pairs(playerGui:GetChildren()) do
+                            if gui:IsA("ScreenGui") and gui:FindFirstChild("VoteFrame") then
+                                voteFrame = gui.VoteFrame
+                                break
                             end
+                        end
+                        
+                        if voteFrame and voteFrame.Visible and not isVoting then
+                            isVoting = true
+                            print("[AUTO VOTE] VoteFrame terdeteksi!")
+                            
+                            task.wait(1) -- Beri jeda 1 detik agar nama kartu muncul sempurna di UI
+                            
+                            local bestCardName = nil
+                            local bestWeight = 999
+                            local firstAvailableCardName = nil
+                            
+                            -- Scan semua TextLabel di dalam VoteFrame untuk mencari nama kartu
+                            for _, item in ipairs(voteFrame:GetDescendants()) do
+                                if item:IsA("TextLabel") and item.Text ~= "" and item.Text ~= "Vote" then
+                                    local cardName = item.Text
+                                    
+                                    if not firstAvailableCardName then
+                                        firstAvailableCardName = cardName
+                                    end
+                                    
+                                    local weight = getCardPriorityWeight(cardName)
+                                    if weight < bestWeight then
+                                        bestWeight = weight
+                                        bestCardName = cardName
+                                    end
+                                end
+                            end
+                            
+                            -- Eksekusi langsung ke Server
+                            if bestCardName then
+                                print("[AUTO VOTE] >>> MEMILIH PRIORITAS: " .. bestCardName .. " <<<")
+                                sendVoteToServer(bestCardName)
+                            elseif Config.VoteRandomIfNotFound and firstAvailableCardName then
+                                print("[AUTO VOTE] >>> PRIORITAS TIDAK ADA. Memilih acak: " .. firstAvailableCardName .. " <<<")
+                                sendVoteToServer(firstAvailableCardName)
+                            else
+                                print("[AUTO VOTE] Gagal menemukan nama kartu di UI.")
+                            end
+                            
+                            task.wait(10) -- Jeda panjang agar tidak spam RemoteEvent berulang-ulang
+                            isVoting = false
                         end
                     end
                 end)
             end
-            task.wait(1) -- Cek layar setiap 1 detik
+            task.wait(1) 
         end
     end)
 end
 
 -- ==================== EKSEKUSI ====================
 print("==================================================")
-print(" AUTO VOTE BEST CARD + GUI BERHASIL DIJALANKAN")
+print(" AUTO VOTE SERVER-SIDED + GUI BERHASIL DIJALANKAN")
 print("==================================================")
 startAutoVote()
