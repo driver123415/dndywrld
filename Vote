@@ -1,18 +1,43 @@
 -- ==============================================================================
--- AUTO VOTE BEST CARD (DANDY'S WORLD) + GUI (FIXED REMOTE EVENT)
--- Otomatis memilih kartu menggunakan FireServer berdasarkan prioritas
+-- AUTO VOTE BEST CARD (DANDY'S WORLD) + GUI
+-- OPTIMIZED FOR TELEPORT / FAST FARMING
 -- ==============================================================================
 
 local Config = {
-    EnableAutoVote = true,
+    EnableAutoVote = false, -- Default OFF dari awal
     
+    -- DAFTAR PRIORITAS KARTU (META AUTO-FARM)
     PriorityCards = {
-        "Skillcheck",       
-        "Stamina",          
-        "Stealth",          
-        "Speed",            
-        "Health",           
-        "Heal"              
+        -- === PRIORITAS 1: KECEPATAN EKSTRAKSI (Paling Penting!) ===
+        "Tech Savvy",                         -- Mesin beres 5 detik lebih cepat (Sangat OP untuk auto-farm)
+        
+        -- === PRIORITAS 2: KEBUTUHAN STAMINA TREADMILL ===
+        -- Karena kamu teleport, stamina cuma dipakai buat treadmill.
+        "TIME'S UP",                          -- Ambil ini kalau ada, +50 stamina bikin treadmill langsung rata
+        "Well-Paced", "Endurance",            -- Tambahan +10 max stamina buat cadangan treadmill
+        
+        -- === PRIORITAS 3: EKONOMI & LOOTING (Namanya juga farming) ===
+        "Spare Change", "Penny Pincher",      -- Dapet 45 Tapes gratis tiap lantai
+        "Avaricious", "Covetous",             -- Ningkatin drop rate item bagus/rare
+        "Lost and Found", "Blind Grab",       -- Random item gratis
+        "Frugal",                             -- Diskon kalau mampir ke Dandy's Shop
+        
+        -- === PRIORITAS 4: UTILITY & COOLDOWN ===
+        "Rehearsal", "Practice",              -- Cooldown skill Active berkurang 5 detik (Berguna kalau hero kamu punya skill farming)
+        
+        -- === PRIORITAS 5: PENCEGAH LANTAI MENGGANGGU ===
+        -- Teleport memang aman, tapi efek lantai kadang bikin layar gelap/berisik.
+        "Electrician",                        -- Mencegah lantai Blackout
+        "Piping Tape",                        -- Mencegah lantai Ichor Leak
+        "Air Freshener",                      -- Mencegah lantai Spring Fever
+        "Frost Shield",                       -- Mencegah lantai Iced Over
+        "Sparkplug",                          -- Terang saat blackout
+        
+        -- === PRIORITAS TERAKHIR: SURVIVAL DASAR ===
+        -- Karena kamu pakai teleport, kemungkinan kena hit sangat kecil.
+        "First Aid", "Medical Attention",     -- Heal darurat kalau kebetulan kesenggol
+        "Suppression",                        -- (Kurang berguna) Ngurangin speed monster
+        "Decency", "Etiquette"                -- (Kurang berguna) Waktu panic elevator nambah
     },
     
     VoteRandomIfNotFound = true 
@@ -132,18 +157,16 @@ local function getCardPriorityWeight(cardName)
     return 999 
 end
 
--- Fungsi eksekusi RemoteEvent
 local function sendVoteToServer(cardName)
     pcall(function()
         local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
         
-        -- Membuat StringValue sesuai format argumen yang dibutuhkan server
         local argString = Instance.new("StringValue")
+        argString.Name = cardName
         argString.Value = cardName
-        argString.Name = cardName -- Diset ganda untuk berjaga-jaga
         
         voteEvent:FireServer(argString)
-        print("[AUTO VOTE BERHASIL] Mengirim vote untuk: " .. cardName)
+        print("[AUTO VOTE BERHASIL] Tembakan RemoteEvent untuk: " .. cardName)
     end)
 end
 
@@ -155,7 +178,6 @@ local function startAutoVote()
                     local playerGui = player:WaitForChild("PlayerGui", 5)
                     if playerGui then
                         
-                        -- Mencari VoteFrame di dalam semua ScreenGui
                         local voteFrame = nil
                         for _, gui in pairs(playerGui:GetChildren()) do
                             if gui:IsA("ScreenGui") and gui:FindFirstChild("VoteFrame") then
@@ -168,30 +190,30 @@ local function startAutoVote()
                             isVoting = true
                             print("[AUTO VOTE] VoteFrame terdeteksi!")
                             
-                            task.wait(1) -- Beri jeda 1 detik agar nama kartu muncul sempurna di UI
+                            task.wait(1.5) 
                             
                             local bestCardName = nil
                             local bestWeight = 999
                             local firstAvailableCardName = nil
                             
-                            -- Scan semua TextLabel di dalam VoteFrame untuk mencari nama kartu
                             for _, item in ipairs(voteFrame:GetDescendants()) do
-                                if item:IsA("TextLabel") and item.Text ~= "" and item.Text ~= "Vote" then
-                                    local cardName = item.Text
-                                    
-                                    if not firstAvailableCardName then
-                                        firstAvailableCardName = cardName
-                                    end
-                                    
-                                    local weight = getCardPriorityWeight(cardName)
-                                    if weight < bestWeight then
-                                        bestWeight = weight
-                                        bestCardName = cardName
+                                if item:IsA("TextLabel") and item.Text ~= "" then
+                                    local text = item.Text
+                                    if string.len(text) < 20 and text ~= "Vote" and text ~= "Auto Vote Card" and text ~= "ON" and text ~= "OFF" then
+                                        
+                                        if not firstAvailableCardName then
+                                            firstAvailableCardName = text
+                                        end
+                                        
+                                        local weight = getCardPriorityWeight(text)
+                                        if weight < bestWeight then
+                                            bestWeight = weight
+                                            bestCardName = text
+                                        end
                                     end
                                 end
                             end
                             
-                            -- Eksekusi langsung ke Server
                             if bestCardName then
                                 print("[AUTO VOTE] >>> MEMILIH PRIORITAS: " .. bestCardName .. " <<<")
                                 sendVoteToServer(bestCardName)
@@ -199,10 +221,10 @@ local function startAutoVote()
                                 print("[AUTO VOTE] >>> PRIORITAS TIDAK ADA. Memilih acak: " .. firstAvailableCardName .. " <<<")
                                 sendVoteToServer(firstAvailableCardName)
                             else
-                                print("[AUTO VOTE] Gagal menemukan nama kartu di UI.")
+                                print("[AUTO VOTE] Gagal mendeteksi nama kartu (mungkin masih loading).")
                             end
                             
-                            task.wait(10) -- Jeda panjang agar tidak spam RemoteEvent berulang-ulang
+                            task.wait(10) 
                             isVoting = false
                         end
                     end
