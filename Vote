@@ -1,5 +1,6 @@
 -- ==============================================================================
 -- AUTO VOTE BEST CARD (META FARMING) - 100% FIXED BY DEBUGGER DATA
+-- DENGAN FUNGSI KLIK PAKSA & DEBUG LOGGING INTENSIF
 -- ==============================================================================
 
 local Config = {
@@ -70,21 +71,10 @@ Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 -- Drag Logic
 local dragging, dragStart, startPos
 mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true dragStart = input.Position startPos = mainFrame.Position end
 end)
-mainFrame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
+mainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
+UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
 
 toggleBtn.MouseButton1Click:Connect(function()
     Config.EnableAutoVote = not Config.EnableAutoVote
@@ -101,17 +91,48 @@ local function getCardPriorityWeight(cardName)
     return 999 
 end
 
-local function executeClick(btnInstance, cardName)
-    print("[AUTO VOTE] >>> MENGEKSEKUSI KLIK PADA: " .. cardName .. " <<<")
+-- FUNGSI KLIK PAKSA (Memaksakan Down -> Up -> Click)
+local function executeForceClick(btnInstance, cardName)
+    print("--------------------------------------------------")
+    print("🛠️ Mencoba Klik Paksa: " .. cardName .. "...")
+    
     if getconnections then
-        for _, connection in pairs(getconnections(btnInstance.MouseButton1Click)) do
+        local success = false
+        
+        -- 1. Picu MouseButton1Click (Cara Standar)
+        local clickConns = getconnections(btnInstance.MouseButton1Click)
+        for _, connection in pairs(clickConns) do
             connection:Fire()
+            print("   ✅ MouseButton1Click dipicu.")
+            success = true
         end
-        print("[AUTO VOTE BERHASIL] Tombol berhasil diklik oleh executor.")
+        
+        -- 2. Picu Down/Up (Fallback kalau UI rumit)
+        if #clickConns == 0 then
+            print("   ⚠️ Peringatan: MouseButton1Click kosong. Mencoba fallback Down/Up...")
+            
+            for _, conn in pairs(getconnections(btnInstance.MouseButton1Down)) do
+                conn:Fire()
+                print("   ✅ MouseButton1Down dipicu.")
+                success = true
+            end
+            task.wait(0.1) -- Jeda kecil biar game kerasa di-press
+            for _, conn in pairs(getconnections(btnInstance.MouseButton1Up)) do
+                conn:Fire()
+                print("   ✅ MouseButton1Up dipicu.")
+                success = true
+            end
+        end
+        
+        if success then
+            print("🎉 [AUTO VOTE BERHASIL] Pemicu klik berhasil dieksekusi.")
+        else
+            print("❌ [CRITICAL] Gagal menemukan koneksi pemicu klik di tombol ini!")
+        end
     else
-        print("[WARNING] Executor tidak mendukung getconnections. Mengeksekusi fallback remote...")
-        game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("CardVoteEvent"):FireServer(cardName)
+        print("❌ [CRITICAL ERROR] Executor kamu TIDAK mendukung getconnections! Script auto-vote UI tidak mungkin bekerja.")
     end
+    print("--------------------------------------------------")
 end
 
 task.spawn(function()
@@ -122,6 +143,7 @@ task.spawn(function()
                 if playerGui then
                     local validVoteFrame = nil
                     
+                    -- SCANNING FRAME VOTE
                     for _, gui in pairs(playerGui:GetChildren()) do
                         if gui:IsA("ScreenGui") and gui.Enabled and gui:FindFirstChild("VoteFrame", true) then
                             local vf = gui:FindFirstChild("VoteFrame", true)
@@ -132,9 +154,11 @@ task.spawn(function()
                         end
                     end
                     
+                    -- JIKA MENU VOTE TERBUKA
                     if validVoteFrame and not isVoting then
                         isVoting = true
-                        task.wait(1.5) 
+                        print(">> VOTE FRAME TERDETEKSI! <<")
+                        task.wait(2) -- Jeda biar render beres
                         
                         local bestCardName = nil
                         local bestCardBtn = nil
@@ -142,35 +166,48 @@ task.spawn(function()
                         local firstAvailableCardName = nil
                         local firstAvailableCardBtn = nil
                         
-                        -- SCAN BERDASARKAN HASIL DEBUGGER
+                        -- LOG DEBUGGER INTENSIF
+                        print("[DEBUG] Memulai Scanning Kartu...")
+                        
                         for _, child in ipairs(validVoteFrame:GetChildren()) do
-                            -- Pastikan dia TextButton, sedang terlihat, dan bukan Template sampah
+                            -- Gunakan validasi sesuai data Debugger (Visible TextButton & bukan Template)
                             if child:IsA("TextButton") and child.Visible and not string.find(child.Name, "Template") then
                                 local itemNameLabel = child:FindFirstChild("ItemName", true)
                                 
                                 if itemNameLabel and itemNameLabel:IsA("TextLabel") then
                                     local cardName = itemNameLabel.Text
+                                    local weight = getCardPriorityWeight(cardName)
+                                    
+                                    print("   [DEBUG KARTU] Ditemukan:", cardName, "| Prioritas Weight:", weight)
                                     
                                     if not firstAvailableCardName then
                                         firstAvailableCardName = cardName
                                         firstAvailableCardBtn = child
                                     end
                                     
-                                    local weight = getCardPriorityWeight(cardName)
                                     if weight < bestWeight then
                                         bestWeight = weight
                                         bestCardName = cardName
                                         bestCardBtn = child
                                     end
+                                else
+                                    print("   [DEBUG KARTU] TextButton '" .. child.Name .. "' tidak punya 'ItemName' label (Aneh).")
                                 end
+                            elseif child:IsA("TextButton") and not child.Visible then
+                                -- Tampilkan untuk memverifikasi kita mengabaikan Template sampah
+                                print("   [DEBUG KARTU] Mengabaikan kartu invisible:", child.Name)
                             end
                         end
                         
+                        -- EKSEKUSI KEPUTUSAN
                         if bestCardBtn then
-                            executeClick(bestCardBtn, bestCardName)
+                            print("[DEBUG] Keputusan Akhir: Memilih PRIORITAS Terbaik ->", bestCardName)
+                            executeForceClick(bestCardBtn, bestCardName)
                         elseif Config.VoteRandomIfNotFound and firstAvailableCardBtn then
-                            print("[AUTO VOTE] Prioritas kosong. Memilih acak: " .. firstAvailableCardName)
-                            executeClick(firstAvailableCardBtn, firstAvailableCardName)
+                            print("[DEBUG] Keputusan Akhir: Prioritas kosong. Memilih acak pertama ->", firstAvailableCardName)
+                            executeForceClick(firstAvailableCardBtn, firstAvailableCardName)
+                        else
+                            print("❌ [DEBUG ERROR] VoteFrame terbuka tapi tidak ada tombol kartu valid ditemukan.")
                         end
                         
                         task.wait(10) 
@@ -183,4 +220,5 @@ task.spawn(function()
     end
 end)
 
-print("✅ SCRIPT AUTO VOTE (DEBUGGER SYNCED) BERHASIL DIMUAT ✅")
+print("✅ SCRIPT AUTO VOTE (FORCE-CLICK META-FARM) BERHASIL DIMUAT ✅")
+print(">> Pastikan F9 terbuka untuk melihat Debug Logging.")
