@@ -1,9 +1,9 @@
 -- ==============================================================================
--- AUTO VOTE BEST CARD (META FARMING) - BYPASS OFF-SCREEN TRICK
+-- AUTO VOTE BEST CARD (META FARMING) - 100% FIXED BY INTERNAL ID DISCOVERY
 -- ==============================================================================
 
 local Config = {
-    EnableAutoVote = false, 
+    EnableAutoVote = true, 
     
     PriorityCards = {
         "Tech Savvy",                         
@@ -90,43 +90,35 @@ local function getCardPriorityWeight(cardName)
     return 999 
 end
 
--- DETEKSI ANTI OFF-SCREEN TRICK
 local function isOnScreen(guiObject)
     if not guiObject.Visible then return false end
-    
     local pos = guiObject.AbsolutePosition
     local size = guiObject.AbsoluteSize
     local viewport = workspace.CurrentCamera.ViewportSize
-    
-    -- Kalau ukurannya 0, berarti disembunyikan
     if size.X <= 0 or size.Y <= 0 then return false end
-    
-    -- Kalau posisinya ada di luar batas resolusi layar (digeser off-screen)
     if pos.X >= viewport.X or pos.Y >= viewport.Y then return false end
     if pos.X + size.X <= 0 or pos.Y + size.Y <= 0 then return false end
-    
     return true
 end
 
-local function executeForceClick(btnInstance, cardName)
+-- MENGGUNAKAN REMOTE EVENT DENGAN INTERNAL ID
+local function executeVote(internalID, displayName)
     print("--------------------------------------------------")
-    print("🛠️ Eksekusi Klik pada: " .. cardName)
+    print("🛠️ MENGIRIM VOTE KE SERVER...")
+    print("   -> Teks di Layar: " .. displayName)
+    print("   -> ID Server    : " .. internalID)
     
-    if getconnections then
-        local clickConns = getconnections(btnInstance.MouseButton1Click)
-        for _, connection in pairs(clickConns) do
-            connection:Fire()
-        end
+    pcall(function()
+        local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
         
-        if #clickConns == 0 then
-            for _, conn in pairs(getconnections(btnInstance.MouseButton1Down)) do conn:Fire() end
-            task.wait(0.1)
-            for _, conn in pairs(getconnections(btnInstance.MouseButton1Up)) do conn:Fire() end
-        end
-        print("🎉 [BERHASIL] Kartu diklik!")
-    else
-        print("❌ Executor TIDAK mendukung getconnections.")
-    end
+        -- Bungkus ID dengan StringValue sesuai permintaan server
+        local argString = Instance.new("StringValue")
+        argString.Name = internalID
+        argString.Value = internalID
+        
+        voteEvent:FireServer(argString)
+        print("🎉 [BERHASIL] RemoteEvent ditembak dengan ID: " .. internalID)
+    end)
     print("--------------------------------------------------")
 end
 
@@ -141,8 +133,6 @@ task.spawn(function()
                     for _, gui in pairs(playerGui:GetChildren()) do
                         if gui:IsA("ScreenGui") and gui.Enabled and gui:FindFirstChild("VoteFrame", true) then
                             local vf = gui:FindFirstChild("VoteFrame", true)
-                            
-                            -- Cek MENGGUNAKAN KOORDINAT ASLI (Bukan cuma .Visible)
                             if isOnScreen(vf) then
                                 validVoteFrame = vf
                                 break
@@ -156,37 +146,43 @@ task.spawn(function()
                         task.wait(2) 
                         
                         local bestCardName = nil
-                        local bestCardBtn = nil
+                        local bestInternalID = nil
                         local bestWeight = 999
+                        
                         local firstAvailableCardName = nil
-                        local firstAvailableCardBtn = nil
+                        local firstAvailableInternalID = nil
                         
                         for _, child in ipairs(validVoteFrame:GetChildren()) do
-                            if child:IsA("TextButton") and isOnScreen(child) and not string.find(child.Name, "Template") then
+                            -- Filter: Pastikan elemen ini adalah kartu valid
+                            if child:IsA("GuiObject") and isOnScreen(child) and not string.find(child.Name, "Template") and child.Name ~= "UIListLayout" and child.Name ~= "SelectionFrame" then
                                 local itemNameLabel = child:FindFirstChild("ItemName", true)
                                 
                                 if itemNameLabel and itemNameLabel:IsA("TextLabel") then
-                                    local cardName = itemNameLabel.Text
-                                    local weight = getCardPriorityWeight(cardName)
+                                    local displayCardName = itemNameLabel.Text
+                                    local internalCardID = child.Name -- INI KUNCI DARI GAMBARMU! ("Machine", "SurvivalPoint2", dll)
+                                    
+                                    local weight = getCardPriorityWeight(displayCardName)
                                     
                                     if not firstAvailableCardName then
-                                        firstAvailableCardName = cardName
-                                        firstAvailableCardBtn = child
+                                        firstAvailableCardName = displayCardName
+                                        firstAvailableInternalID = internalCardID
                                     end
                                     
                                     if weight < bestWeight then
                                         bestWeight = weight
-                                        bestCardName = cardName
-                                        bestCardBtn = child
+                                        bestCardName = displayCardName
+                                        bestInternalID = internalCardID
                                     end
                                 end
                             end
                         end
                         
-                        if bestCardBtn then
-                            executeForceClick(bestCardBtn, bestCardName)
-                        elseif Config.VoteRandomIfNotFound and firstAvailableCardBtn then
-                            executeForceClick(firstAvailableCardBtn, firstAvailableCardName)
+                        if bestInternalID then
+                            executeVote(bestInternalID, bestCardName)
+                        elseif Config.VoteRandomIfNotFound and firstAvailableInternalID then
+                            executeVote(firstAvailableInternalID, firstAvailableCardName)
+                        else
+                            print("❌ Gagal membaca kartu.")
                         end
                         
                         task.wait(10) 
@@ -199,4 +195,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ SCRIPT AUTO VOTE (ANTI OFF-SCREEN) BERHASIL DIMUAT ✅")
+print("✅ SCRIPT AUTO VOTE (INTERNAL ID + BYPASS OFF-SCREEN) BERHASIL DIMUAT ✅")
