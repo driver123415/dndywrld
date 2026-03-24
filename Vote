@@ -1,27 +1,26 @@
 -- ==============================================================================
--- AUTO VOTE BEST CARD (META FARMING) - 100% INTERNAL ID (BASED ON DEX DISCOVERY)
+-- AUTO VOTE BEST CARD (META FARMING) - THE "NIL INSTANCE" MEMORY HIJACKER
 -- ==============================================================================
 
 local Config = {
     EnableAutoVote = true, 
     
-    -- DAFTAR PRIORITAS MENGGUNAKAN NAMA INTERNAL SERVER (DARI REPLICATED STORAGE)
     PriorityCards = {
-        "Machine",               -- Tech Savvy (Mesin lebih cepat)
-        "Stamina2", "Stamina",   -- Endurance / Well-Paced (Max Stamina)
-        "SurvivalPoint2", "SurvivalPoint", -- Penny Pincher / Spare Change (Uang)
-        "ItemRarity2", "ItemRarity",       -- Avaricious / Covetous (Item langka)
-        "RandomItem2", "RandomItem",       -- Blind Grab / Lost and Found (Item gratis)
-        "DandyDiscount",         -- Frugal (Diskon Shop)
-        "AbilityCooldown2", "AbilityCooldown", -- Practice / Rehearsal (Cooldown Skill)
-        "BlackOut",              -- Electrician (Anti Blackout)
-        "PipingTape",            -- Piping Tape (Anti Ichor)
-        "PollenShield",          -- Air Freshener (Anti Spring Fever)
-        "FrostShield",           -- Frost Shield (Anti Es)
-        "GlowLight",             -- Sparkplug (Terang saat Blackout)
+        "Machine",               -- Tech Savvy 
+        "Stamina2", "Stamina",   -- Endurance / Well-Paced
+        "SurvivalPoint2", "SurvivalPoint", -- Penny Pincher / Spare Change
+        "ItemRarity2", "ItemRarity",       -- Avaricious / Covetous 
+        "RandomItem2", "RandomItem",       -- Blind Grab / Lost and Found
+        "DandyDiscount",         -- Frugal 
+        "AbilityCooldown2", "AbilityCooldown", -- Practice / Rehearsal 
+        "BlackOut",              -- Electrician 
+        "PipingTape",            -- Piping Tape 
+        "PollenShield",          -- Air Freshener 
+        "FrostShield",           -- Frost Shield 
+        "GlowLight",             -- Sparkplug 
         "Heal2", "Heal",         -- Medical Attention / First Aid
-        "MonsterPanicReduction", -- Suppression (Speed monster turun)
-        "Elevator2", "Elevator"  -- Etiquette / Decency (Waktu elevator)
+        "MonsterPanicReduction", -- Suppression 
+        "Elevator2", "Elevator"  -- Etiquette / Decency 
     },
     
     VoteRandomIfNotFound = true 
@@ -46,10 +45,10 @@ Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
 local title = Instance.new("TextLabel", mainFrame)
 title.Size = UDim2.new(1, 0, 0.4, 0)
 title.BackgroundTransparency = 1
-title.Text = "Auto Vote (Internal ID)"
+title.Text = "Auto Vote (Memory Hijack)"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 14
+title.TextSize = 13
 
 local toggleBtn = Instance.new("TextButton", mainFrame)
 toggleBtn.Size = UDim2.new(0.8, 0, 0.4, 0)
@@ -87,17 +86,54 @@ local function isOnScreen(gui)
     return true
 end
 
-local function executeVote(internalID)
+-- FUNGSI PENCULIK DARI MEMORI NIL
+local function getObjectFromNil(internalID)
+    if getnilinstances then
+        for _, obj in pairs(getnilinstances()) do
+            -- Biasanya developer menyimpan sbg StringValue, ObjectValue, atau Folder di nil
+            if obj.Name == internalID then
+                return obj
+            end
+        end
+    else
+        print("❌ [WARNING] Executor kamu tidak support getnilinstances!")
+    end
+    return nil
+end
+
+local function executeMemoryVote(internalID)
     print("--------------------------------------------------")
-    print("🚀 Mengirim Vote Internal ID: " .. internalID)
-    pcall(function()
-        local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
-        local argString = Instance.new("StringValue")
-        argString.Name = internalID
-        argString.Value = internalID
-        voteEvent:FireServer(argString)
-        print("✅ [SUKSES] Server menerima Vote: " .. internalID)
-    end)
+    print("🚀 Mencari Objek [" .. internalID .. "] di Memori (Nil)...")
+    
+    local realObject = getObjectFromNil(internalID)
+    
+    if realObject then
+        print("🔍 DITEMUKAN! Objek asli berhasil diculik dari memori.")
+        pcall(function()
+            local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
+            voteEvent:FireServer(realObject)
+            print("✅ [SUKSES] Vote berhasil masuk ke server!")
+        end)
+    else
+        print("⚠️ Objek tidak ada di Nil. Menggunakan Fallback Workspace (Cobalt Method)...")
+        -- Fallback ke metode workspace yang kamu temukan sebelumnya
+        pcall(function()
+            local fallbackObj = workspace:FindFirstChild("Info") and workspace.Info:FindFirstChild("CardVote") and workspace.Info.CardVote:FindFirstChild(internalID)
+            local voteEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("CardVoteEvent")
+            
+            if fallbackObj then
+                voteEvent:FireServer(fallbackObj)
+                print("✅ [SUKSES] Vote pakai objek Workspace berhasil!")
+            else
+                -- Ultimate Fallback
+                local argString = Instance.new("StringValue")
+                argString.Name = internalID
+                argString.Value = internalID
+                voteEvent:FireServer(argString)
+                print("✅ [SUKSES] Vote pakai StringValue buatan sendiri!")
+            end
+        end)
+    end
     print("--------------------------------------------------")
 end
 
@@ -122,20 +158,18 @@ task.spawn(function()
                     if validVoteFrame and not isVoting then
                         isVoting = true
                         print(">> VOTE FRAME DI LAYAR! <<")
-                        task.wait(2) 
+                        task.wait(1.5) 
                         
                         local bestWeight = 999
                         local bestInternalID = nil
                         local firstInternalID = nil
                         
-                        -- Cek langsung nama foldernya (contoh: "Machine", "PipingTape")
                         for _, child in ipairs(validVoteFrame:GetChildren()) do
                             if child:IsA("GuiObject") and isOnScreen(child) and not string.find(child.Name, "Template") and child.Name ~= "UIListLayout" then
                                 local internalID = child.Name
                                 
                                 if not firstInternalID then firstInternalID = internalID end
                                 
-                                -- Cocokkan dengan daftar prioritas
                                 for i, pID in ipairs(Config.PriorityCards) do
                                     if internalID == pID and i < bestWeight then
                                         bestWeight = i
@@ -147,10 +181,10 @@ task.spawn(function()
                         end
                         
                         if bestInternalID then
-                            executeVote(bestInternalID)
+                            executeMemoryVote(bestInternalID)
                         elseif Config.VoteRandomIfNotFound and firstInternalID then
-                            print("⚠️ Prioritas tidak ada, memilih acak: " .. firstInternalID)
-                            executeVote(firstInternalID)
+                            print("⚠️ Memilih acak: " .. firstInternalID)
+                            executeMemoryVote(firstInternalID)
                         end
                         
                         task.wait(10) 
@@ -163,4 +197,4 @@ task.spawn(function()
     end
 end)
 
-print("✅ SCRIPT AUTO VOTE (MASTER INTERNAL ID) BERHASIL DIMUAT ✅")
+print("✅ SCRIPT AUTO VOTE (MEMORY HIJACKER) BERHASIL DIMUAT ✅")
