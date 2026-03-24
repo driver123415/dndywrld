@@ -158,7 +158,7 @@ task.spawn(function()
                     if validVoteFrame and not isVoting then
                         isVoting = true
                         print(">> VOTE FRAME DI LAYAR! <<")
-                        task.wait(1.5) 
+                        task.wait(1) ------------------------------------------------- ini penting rubah jika ingin cepat -- UBAH ANGKA 1.5 INI MENJADI 0.2 
                         
                         local bestWeight = 999
                         local bestInternalID = nil
@@ -187,8 +187,8 @@ task.spawn(function()
                             executeMemoryVote(firstInternalID)
                         end
                         
-                        task.wait(10) 
-                        isVoting = false
+                        task.wait(5) 
+                        isVoting = false ------------------------------------------------- ini penting rubah jika ingin cepat -- UBAH ANGKA 10 INI MENJADI 2
                     end
                 end
             end)
