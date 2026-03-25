@@ -1,0 +1,179 @@
+--easter
+wait (5)
+local args = {
+	"Flyte"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidayTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Eggson"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidayTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Cocoa"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidayTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Bassie"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidayTower"):InvokeServer(unpack(args))
+
+-- Toon Biasa
+
+wait (0.5)
+local args = {
+	"Poppy"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Shrimpo"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Tisha"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Toodles"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Brightney"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Cosmo"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+--- skin
+
+wait (0.5)
+local args = {
+	"BelleBasket"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"SunflowerPatch"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"SpringOuting"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"WildberryDelight"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"LilacHaunting"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"PaintedPatterns"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"LunaMoth"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"SpringSky"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"SwirlingMixUp"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"PebbleEgged"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"BunnyWabbit"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"SpringFormal"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"SpringQuilt"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"BlossomBuddy"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"StillHip" -- ini bayar Ichor
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+--Stiker
+wait (0.5)
+local args = {
+	"Could you repeat that"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySticker"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Full Inventory!"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySticker"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Here for you!"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySticker"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Need some help"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySticker"):InvokeServer(unpack(args))
