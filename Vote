@@ -6,7 +6,11 @@ local Config = {
     EnableAutoVote = true, 
     
     PriorityCards = {
+        "DyleFloor",             -- TIME'S UP (+50 Stamina Permanen)
         "Machine",               -- Tech Savvy 
+        "PipingTape",            -- Piping Tape 
+        "MonsterPanicReduction", -- Suppression 
+        "PollenShield",          -- Air Freshener (Easter exclusive)
         "Stamina2", "Stamina",   -- Endurance / Well-Paced
         "SurvivalPoint2", "SurvivalPoint", -- Penny Pincher / Spare Change
         "ItemRarity2", "ItemRarity",       -- Avaricious / Covetous 
@@ -14,12 +18,9 @@ local Config = {
         "DandyDiscount",         -- Frugal 
         "AbilityCooldown2", "AbilityCooldown", -- Practice / Rehearsal 
         "BlackOut",              -- Electrician 
-        "PipingTape",            -- Piping Tape 
-        "PollenShield",          -- Air Freshener 
-        "FrostShield",           -- Frost Shield 
+        "FrostShield",           -- Frost Shield (Christmas exclusive)
         "GlowLight",             -- Sparkplug 
         "Heal2", "Heal",         -- Medical Attention / First Aid
-        "MonsterPanicReduction", -- Suppression 
         "Elevator2", "Elevator"  -- Etiquette / Decency 
     },
     
