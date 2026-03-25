@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SMART AUTO ABILITY (DANDY'S WORLD) - UPGRADED
+-- SMART AUTO ABILITY (DANDY'S WORLD) - COOLDOWN CHECK ADDED
 -- ==============================================================================
 
 local Config = {
@@ -86,7 +86,6 @@ local function isDecodingMachine(character)
     return decoding and decoding.Value ~= nil
 end
 
--- [FUNGSI BARU] Mencari player lain secara acak untuk dijadikan target teleport
 local function getAnotherPlayerRoot()
     local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
     if inGamePlayers then
@@ -102,6 +101,31 @@ local function getAnotherPlayerRoot()
     return nil
 end
 
+-- ==============================================================================
+-- [FUNGSI BARU] 🕒 PENGECEKAN COOLDOWN SKILL (Sesuai Referensi DEX)
+-- ==============================================================================
+local function isSkillReady()
+    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+    if inGamePlayers then
+        local myPlayerModel = inGamePlayers:FindFirstChild(player.Name)
+        if myPlayerModel then
+            local abilitiesFolder = myPlayerModel:FindFirstChild("Abilities")
+            if abilitiesFolder then
+                local ability1 = abilitiesFolder:FindFirstChild("Ability1")
+                if ability1 then
+                    local cooldownVal = ability1:FindFirstChild("CurrentCooldown")
+                    -- Mengecek apakah Value sudah berada di angka 0 (atau kurang dari 0)
+                    if cooldownVal and cooldownVal:IsA("NumberValue") then
+                        return cooldownVal.Value <= 0 
+                    end
+                end
+            end
+        end
+    end
+    -- Jika gagal menemukan folder/value-nya, kembalikan false agar tidak asal pencet
+    return false 
+end
+
 -- ==================== FUNGSI UTAMA ====================
 local function startSmartAbility()
     task.spawn(function()
@@ -113,8 +137,13 @@ local function startSmartAbility()
                     local rootPart = character:FindFirstChild("HumanoidRootPart")
                     local shouldCastSkill = true
                     
+                    -- [0] Evaluasi Mutlak: Apakah Skill Sedang Cooldown?
+                    if not isSkillReady() then
+                        shouldCastSkill = false
+                    end
+                    
                     -- 1. Evaluasi: Sedang Decoding
-                    if Config.Conditions.DontUseWhileDecoding and isDecodingMachine(character) then
+                    if shouldCastSkill and Config.Conditions.DontUseWhileDecoding and isDecodingMachine(character) then
                         shouldCastSkill = false
                     end
                     
@@ -127,7 +156,6 @@ local function startSmartAbility()
                     
                     -- 3. Evaluasi: Support/Player Terdekat
                     if shouldCastSkill and Config.Conditions.RequirePlayerNearby and rootPart then
-                        -- Jika config teleport menyala, abaikan pengecekan jarak ini karena kita AKAN mendekatinya nanti
                         if not Config.Conditions.TeleportToPlayerBeforeSkill then
                             if not isPlayerNearby(rootPart.Position, Config.Conditions.NearbyRadius) then
                                 shouldCastSkill = false
@@ -138,29 +166,24 @@ local function startSmartAbility()
                     -- ==================== EKSEKUSI SKILL ====================
                     if shouldCastSkill then
                         
-                        -- [FITUR BARU] Teleport sebelum menembak skill
+                        -- Teleport sebelum menembak skill
                         if Config.Conditions.TeleportToPlayerBeforeSkill and rootPart then
                             local targetRoot = getAnotherPlayerRoot()
                             if targetRoot then
-                                -- Teleport ke samping player lain (offset 3 stud agar karakter tidak nyangkut/numpuk)
                                 rootPart.CFrame = targetRoot.CFrame * CFrame.new(3, 0, 0)
-                                task.wait(0.2) -- Jeda wajib agar server meregister posisimu di dekat dia
+                                task.wait(0.2) 
                             else
-                                -- Jika ternyata tidak ada player lain yang hidup, batalkan skill agar tidak terbuang
                                 shouldCastSkill = false
                             end
                         end
                         
                         -- Eksekusi akhir pencet tombol
                         if shouldCastSkill then
-                            -- Tembak Skill (Simulasi tekan keyboard)
                             VirtualInputManager:SendKeyEvent(true, Config.SkillKey, false, game)
                             task.wait(0.05)
                             VirtualInputManager:SendKeyEvent(false, Config.SkillKey, false, game)
                             
                             -- print("[SMART ABILITY] Memencet tombol: " .. tostring(Config.SkillKey))
-                            
-                            -- Jeda 3 detik setelah memencet agar tidak spam dan memberi waktu animasi
                             task.wait(3) 
                         end
                     end
