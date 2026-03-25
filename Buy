@@ -1,0 +1,182 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- ==========================================
+-- ⚙️ KONFIGURASI SCRIPT (AUTO-GENERATOR BUILD)
+-- ==========================================
+local Config = {
+    EnableAutoBuy = true,
+    PriorityItems = {
+        "DandyEasterEggs",
+        "ChristmasCookie",
+        "Ornament",
+        "Basket",
+        "Pumpkin",
+        "Valve",                  -- Instan kelar 100%
+        "JumperCable",            -- Nambah 33% progres
+        "Instructions",           -- Speed ekstraksi +100%
+        "SmokeBomb",              -- Kabur dari kejaran
+        "EjectButton",            -- Speed & Stealth boost
+        "HealthKit",              -- Medkit
+        "ExtractionSpeedCandy",   -- Speed ekstraksi +50%
+        "SkillCheckCandy",        -- Boost skill check
+        "Stopwatch",              -- Permudah zona putih
+        "PopBottle",              -- Full stamina
+        "SpeedCandy",             -- Speed boost
+        "Bandage"                 -- Heal kecil
+    },
+
+    -- 🔴 DAFTAR HITAM (Dilarang keras dibeli! Akan di-skip otomatis)
+    BlacklistItems = {
+        "AirHorn",                -- Memanggil monster (Haram untuk generator)
+        "Jawbreaker",             -- Efeknya random 50% (Terlalu beresiko)
+        "Gumball",                -- Efek stat random
+        "ChocolateBox",           -- Hanya nambah max stamina, tidak terlalu butuh
+        "Chocolate",
+        "StaminaCandy",           -- Kalah prioritas dibanding PopBottle
+        "StealthCandy",           -- Kalah prioritas dibanding SmokeBomb
+        "ProteinBar",
+        "Tape",                   -- Item utilitas, tidak bantu ngerjain mesin
+        "Pop"                     -- Kalah prioritas dibanding PopBottle
+    },
+
+    BuyDelay = 0.5
+}
+-- ==========================================
+
+print("==================================================")
+print(" 🛒 AUTO BUY DANDY SHOP (ULTRA-OPTIMIZED STANDBY) AKTIF")
+print("==================================================")
+
+local isShopping = false
+
+local function isBlacklisted(itemName)
+    local nameLower = string.lower(itemName)
+    for _, badItem in ipairs(Config.BlacklistItems) do
+        if string.find(nameLower, string.lower(badItem)) then return true end
+    end
+    return false
+end
+
+local function getShopPriorityWeight(itemName)
+    local nameLower = string.lower(itemName)
+    for i, priorityName in ipairs(Config.PriorityItems) do
+        if string.find(nameLower, string.lower(priorityName)) then return i end
+    end
+    return 999 
+end
+
+-- Fungsi utama untuk mengeksekusi pembelian (hanya butuh target folder tokonya)
+local function executeBuy(dandyStore)
+    if not Config.EnableAutoBuy then return end
+    
+    print("\n[AUTO BUY] 🛎️ Item terdeteksi di Slot! Memindai rak Dandy...")
+    
+    local availableItems = {}
+    
+    for _, slot in ipairs(dandyStore:GetChildren()) do
+        if string.match(slot.Name, "Slot") then 
+            for _, itemModel in ipairs(slot:GetChildren()) do
+                -- Mengabaikan "Attachment" seperti logikamu
+                if itemModel.Name ~= "Attachment" then
+                    
+                    if isBlacklisted(itemModel.Name) then
+                        print("   ⚠️ Diabaikan (Blacklist): " .. itemModel.Name)
+                        continue
+                    end
+                    
+                    local promptPart = itemModel:FindFirstChild("Prompt")
+                    if promptPart then
+                        local proxPrompt = promptPart:FindFirstChildWhichIsA("ProximityPrompt")
+                        if proxPrompt and proxPrompt.Enabled then
+                            local weight = getShopPriorityWeight(itemModel.Name)
+                            if weight ~= 999 then
+                                table.insert(availableItems, {
+                                    Name = itemModel.Name,
+                                    PromptObj = proxPrompt,
+                                    PartCFrame = promptPart.CFrame,
+                                    Weight = weight
+                                })
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    table.sort(availableItems, function(a, b) return a.Weight < b.Weight end)
+    
+    if #availableItems > 0 then
+        local character = LocalPlayer.Character
+        local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
+        
+        if humanoidRootPart then
+            for _, itemData in ipairs(availableItems) do
+                print("   💰 [MEMBELI] " .. itemData.Name .. " (Prioritas: " .. itemData.Weight .. ")")
+                
+                humanoidRootPart.CFrame = itemData.PartCFrame
+                task.wait(0.2) 
+                
+                if fireproximityprompt then
+                    fireproximityprompt(itemData.PromptObj)
+                end
+                task.wait(Config.BuyDelay)
+            end
+            print("[AUTO BUY] Transaksi selesai! Kembali ke mode Tidur (Standby).")
+        end
+    else
+        print("[AUTO BUY] Tidak ada barang prioritas. Koin aman! Kembali Standby.")
+    end
+    
+    -- Jeda pendinginan agar tidak tereksekusi dua kali saat item lain loading
+    task.wait(5)
+    isShopping = false
+end
+
+-- =========================================================================
+-- 🛡️ SISTEM PEMANTAU STANDBY (EVENT-DRIVEN) - PENGGANTI LOOPING
+-- =========================================================================
+local elevatorsFolder = Workspace:WaitForChild("Elevators", 10)
+
+if elevatorsFolder then
+    -- Ini adalah "CCTV" pasif. Tidak makan CPU sama sekali.
+    -- Dia hanya bereaksi kalau game tiba-tiba memunculkan objek baru di dalam folder Elevators.
+    elevatorsFolder.DescendantAdded:Connect(function(descendant)
+        -- Jika yang muncul adalah part bernama "Prompt" (artinya item fisik sudah muncul di etalase)
+        if descendant.Name == "Prompt" and descendant.Parent.Name ~= "Attachment" then
+            
+            -- Pastikan itemnya ada di dalam DandyStore
+            local parentModel = descendant.Parent
+            if parentModel and parentModel.Parent and string.match(parentModel.Parent.Name, "Slot") then
+                local dandyStore = parentModel.Parent.Parent
+                
+                if dandyStore and dandyStore.Name == "DandyStore" then
+                    -- Trigger fungsi beli, pastikan tidak double trigger
+                    if not isShopping then
+                        isShopping = true
+                        -- Tunggu 1.5 detik agar SEMUA item di slot lain selesai bermunculan
+                        task.wait(1.5) 
+                        executeBuy(dandyStore)
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- [PENGECEKAN AWAL]
+    -- Kalau script baru dieksekusi SAAT kamu sudah di dalam lift (item sudah ada)
+    local activeElevator = elevatorsFolder:FindFirstChild("Elevator")
+    if activeElevator then
+        local existingStore = activeElevator:FindFirstChild("DandyStore")
+        if existingStore then
+            isShopping = true
+            executeBuy(existingStore)
+        end
+    end
+    
+    print("[AUTO BUY] CCTV terpasang! Script masuk mode DORMANT (Standby).")
+else
+    warn("[AUTO BUY] Folder 'Elevators' tidak ditemukan di Workspace!")
+end
