@@ -10,7 +10,7 @@ local INGAME_PLACE_ID = 16552821455
 
 if game.PlaceId ~= INGAME_PLACE_ID then
     warn("[🛡️ KEAMANAN] Script dibatalkan! Kamu tidak berada di in-game Dandy's World.")
-    return -- Mematikan script seketika
+    return 
 end
 
 -- ==========================================
@@ -60,10 +60,25 @@ local Config = {
 -- ==========================================
 
 print("==================================================")
-print(" ⚡ AUTO BUY DANDY SHOP (OPTIMIZED INSTANT) AKTIF ⚡")
+print(" ⚡ AUTO BUY DANDY SHOP (PROXIMITY BYPASS) AKTIF ⚡")
 print("==================================================")
 
 local isShopping = false
+
+-- =========================================================================
+-- 🔑 FUNGSI BARU: INTERAKSI PROXIMITY (Dari Referensimu)
+-- =========================================================================
+local function interactWithPrompt(prompt)
+    if prompt.HoldDuration == 0 then
+        prompt:InputHoldBegin()
+        prompt:InputHoldEnd()
+    else
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration) -- Menunggu persis sesuai durasi lingkaran hijaunya
+        prompt:InputHoldEnd()
+    end
+end
+-- =========================================================================
 
 local function isBlacklisted(itemName)
     local nameLower = string.lower(itemName)
@@ -86,7 +101,6 @@ local function executeBuy(dandyStore)
     
     local availableItems = {}
     
-    -- Memindai slot dengan sangat cepat
     for _, slot in ipairs(dandyStore:GetChildren()) do
         if string.match(slot.Name, "Slot") then 
             for _, itemModel in ipairs(slot:GetChildren()) do
@@ -121,39 +135,35 @@ local function executeBuy(dandyStore)
         
         if humanoidRootPart then
             for _, itemData in ipairs(availableItems) do
-                print("⚡ [INSTANT BUY] Mengamankan: " .. itemData.Name)
+                print("⚡ [INSTANT BUY] Mengeksekusi: " .. itemData.Name)
                 
                 -- 1. Teleport ke barang
                 humanoidRootPart.CFrame = itemData.PartCFrame
                 
-                -- 2. Jeda wajib 1 frame agar server sadar kita pindah lokasi
-                task.wait() 
+                -- 2. Jeda agar server mendaftarkan posisimu di dekat barang
+                task.wait(0.1) 
                 
-                -- 3. Eksekusi beli
-                if fireproximityprompt then
-                    fireproximityprompt(itemData.PromptObj)
-                end
+                -- 3. Eksekusi beli pakai fungsi interaksi pura-pura manusia
+                interactWithPrompt(itemData.PromptObj)
                 
-                -- 4. Jeda aman antar barang (Sweet Spot idemu)
+                -- 4. Jeda aman antar barang
                 task.wait(Config.BuyDelay) 
             end
             print("[AUTO BUY] Sapu bersih selesai!")
         end
     end
     
-    -- Jeda pendinginan setelah memborong agar tidak trigger berulang
     task.wait(2)
     isShopping = false
 end
 
 -- =========================================================================
--- 🛡️ SISTEM PEMANTAU STANDBY (INSTANT TRIGGER)
+-- 🛡️ SISTEM PEMANTAU STANDBY
 -- =========================================================================
 local elevatorsFolder = Workspace:WaitForChild("Elevators", 10)
 
 if elevatorsFolder then
     elevatorsFolder.DescendantAdded:Connect(function(descendant)
-        -- Trigger ketika ProximityPrompt dari barang muncul di Workspace
         if descendant:IsA("ProximityPrompt") and descendant.Parent.Name == "Prompt" then
             local parentModel = descendant.Parent.Parent
             
@@ -164,7 +174,6 @@ if elevatorsFolder then
                     if not isShopping then
                         isShopping = true
                         
-                        -- Jeda 50 milidetik agar semua barang di Slot1, Slot2, Slot3 muncul bersamaan dulu
                         task.delay(0.05, function()
                             executeBuy(dandyStore)
                         end)
@@ -174,7 +183,6 @@ if elevatorsFolder then
         end
     end)
     
-    -- Pengecekan awal (Jika script dieksekusi saat toko sudah buka di depan mata)
     local activeElevator = elevatorsFolder:FindFirstChild("Elevator")
     if activeElevator then
         local existingStore = activeElevator:FindFirstChild("DandyStore")
@@ -186,5 +194,7 @@ if elevatorsFolder then
     
     print("[🛡️ KEAMANAN] Place ID Valid. Menunggu mangsa di mode Standby...")
 else
+    warn("[AUTO BUY] Folder 'Elevators' tidak ditemukan!")
+end
     warn("[AUTO BUY] Folder 'Elevators' tidak ditemukan!")
 end
