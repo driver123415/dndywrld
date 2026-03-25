@@ -27,8 +27,8 @@ local Config = {
         "Basket",
         "Pumpkin",
         "Valve",                  -- Instan kelar 100%
-        "JumperCable",            -- Nambah 33% progres
         "Instructions",           -- Speed ekstraksi +100%
+        "JumperCable",            -- Nambah 33% progres
         "SmokeBomb",              -- Kabur dari kejaran
         "EjectButton",            -- Speed & Stealth boost
         "HealthKit",              -- Medkit
