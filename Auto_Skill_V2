@@ -1,0 +1,175 @@
+-- ==============================================================================
+-- SMART AUTO ABILITY (DANDY'S WORLD) - UPGRADED
+-- ==============================================================================
+
+local Config = {
+    -- ==================================================================
+    -- ⚙️ PENGATURAN TOMBOL SKILL (Ubah huruf F dengan tombol skill karaktermu)
+    -- ==================================================================
+    SkillKey = Enum.KeyCode.F, 
+    
+    -- Matikan/Nyalakan fitur Auto Ability secara keseluruhan
+    EnableSmartAbility = true,
+    
+    -- ==================== SYARAT & KONDISI (SMART LOGIC) ====================
+    Conditions = {
+        -- [1] DEFENSIVE: Hanya gunakan skill jika sedang DIKEJAR MONSTER
+        UseOnlyWhenChased = false, 
+        
+        -- [2] SUPPORT: Hanya gunakan skill jika ada PLAYER LAIN di dekatmu
+        RequirePlayerNearby = false,
+        NearbyRadius = 25,
+        
+        -- [NEW] 🚀 FITUR TELEPORT: Teleport ke player lain sesaat sebelum pencet skill!
+        TeleportToPlayerBeforeSkill = true,
+        
+        -- [3] ANTI-INTERRUPT: Jangan gunakan skill jika sedang mengerjakan Mesin
+        DontUseWhileDecoding = false 
+    },
+    
+    AttemptInterval = 1 -- Jeda pengecekan setiap 1 detik
+}
+
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+
+print("==================================================")
+print(" SMART AUTO ABILITY BERHASIL DIJALANKAN (TOMBOL: " .. tostring(Config.SkillKey) .. ")")
+print("==================================================")
+
+-- ==================== FUNGSI PEMERIKSAAN KONDISI ====================
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
+
+local function isChasedByMonster(character)
+    local map = getMap()
+    if map then
+        local monstersFolder = map:FindFirstChild("Monsters")
+        if monstersFolder then
+            for _, monster in pairs(monstersFolder:GetChildren()) do
+                local chasingVal = monster:FindFirstChild("ChasingValue")
+                if chasingVal and chasingVal.Value == character then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function isPlayerNearby(characterPosition, radius)
+    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+    if inGamePlayers then
+        for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
+            if otherPlayer.Name ~= player.Name then
+                local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
+                if otherRoot then
+                    local distance = (otherRoot.Position - characterPosition).Magnitude
+                    if distance <= radius then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function isDecodingMachine(character)
+    local decoding = character:FindFirstChild("Decoding")
+    return decoding and decoding.Value ~= nil
+end
+
+-- [FUNGSI BARU] Mencari player lain secara acak untuk dijadikan target teleport
+local function getAnotherPlayerRoot()
+    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+    if inGamePlayers then
+        for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
+            if otherPlayer.Name ~= player.Name then
+                local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
+                if otherRoot then
+                    return otherRoot
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- ==================== FUNGSI UTAMA ====================
+local function startSmartAbility()
+    task.spawn(function()
+        while Config.EnableSmartAbility do
+            pcall(function()
+                local character = player.Character
+                
+                if character and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                    local rootPart = character:FindFirstChild("HumanoidRootPart")
+                    local shouldCastSkill = true
+                    
+                    -- 1. Evaluasi: Sedang Decoding
+                    if Config.Conditions.DontUseWhileDecoding and isDecodingMachine(character) then
+                        shouldCastSkill = false
+                    end
+                    
+                    -- 2. Evaluasi: Sedang Dikejar Monster
+                    if shouldCastSkill and Config.Conditions.UseOnlyWhenChased then
+                        if not isChasedByMonster(character) then
+                            shouldCastSkill = false
+                        end
+                    end
+                    
+                    -- 3. Evaluasi: Support/Player Terdekat
+                    if shouldCastSkill and Config.Conditions.RequirePlayerNearby and rootPart then
+                        -- Jika config teleport menyala, abaikan pengecekan jarak ini karena kita AKAN mendekatinya nanti
+                        if not Config.Conditions.TeleportToPlayerBeforeSkill then
+                            if not isPlayerNearby(rootPart.Position, Config.Conditions.NearbyRadius) then
+                                shouldCastSkill = false
+                            end
+                        end
+                    end
+                    
+                    -- ==================== EKSEKUSI SKILL ====================
+                    if shouldCastSkill then
+                        
+                        -- [FITUR BARU] Teleport sebelum menembak skill
+                        if Config.Conditions.TeleportToPlayerBeforeSkill and rootPart then
+                            local targetRoot = getAnotherPlayerRoot()
+                            if targetRoot then
+                                -- Teleport ke samping player lain (offset 3 stud agar karakter tidak nyangkut/numpuk)
+                                rootPart.CFrame = targetRoot.CFrame * CFrame.new(3, 0, 0)
+                                task.wait(0.2) -- Jeda wajib agar server meregister posisimu di dekat dia
+                            else
+                                -- Jika ternyata tidak ada player lain yang hidup, batalkan skill agar tidak terbuang
+                                shouldCastSkill = false
+                            end
+                        end
+                        
+                        -- Eksekusi akhir pencet tombol
+                        if shouldCastSkill then
+                            -- Tembak Skill (Simulasi tekan keyboard)
+                            VirtualInputManager:SendKeyEvent(true, Config.SkillKey, false, game)
+                            task.wait(0.05)
+                            VirtualInputManager:SendKeyEvent(false, Config.SkillKey, false, game)
+                            
+                            -- print("[SMART ABILITY] Memencet tombol: " .. tostring(Config.SkillKey))
+                            
+                            -- Jeda 3 detik setelah memencet agar tidak spam dan memberi waktu animasi
+                            task.wait(3) 
+                        end
+                    end
+                end
+            end)
+            
+            task.wait(Config.AttemptInterval)
+        end
+    end)
+end
+
+startSmartAbility()
