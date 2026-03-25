@@ -55,7 +55,7 @@ local Config = {
     },
     
     -- Jeda aman agar server tidak menolak transaksi karena dianggap spamming
-    BuyDelay = 0.1 
+    BuyDelay = 0.5
 }
 -- ==========================================
 
