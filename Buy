@@ -14,10 +14,12 @@ if game.PlaceId ~= INGAME_PLACE_ID then
 end
 
 -- ==========================================
--- ⚙️ KONFIGURASI SCRIPT (INSTANT BUILD)
+-- ⚙️ KONFIGURASI SCRIPT (INSTANT BUILD + SAFE DELAY)
 -- ==========================================
 local Config = {
     EnableAutoBuy = true,
+    
+    -- 🟢 DAFTAR PUTIH (Prioritas Tertinggi di Atas)
     PriorityItems = {
         "DandyEasterEggs",
         "ChristmasCookie",
@@ -38,26 +40,27 @@ local Config = {
         "Bandage"                 -- Heal kecil
     },
 
-    -- 🔴 DAFTAR HITAM (Dilarang keras dibeli! Akan di-skip otomatis)
+    -- 🔴 DAFTAR HITAM (Dilarang keras dibeli)
     BlacklistItems = {
-        "AirHorn",                -- Memanggil monster (Haram untuk generator)
-        "Jawbreaker",             -- Efeknya random 50% (Terlalu beresiko)
-        "Gumball",                -- Efek stat random
-        "ChocolateBox",           -- Hanya nambah max stamina, tidak terlalu butuh
+        "AirHorn",                -- Memanggil monster
+        "Jawbreaker",             -- Efek random
+        "Gumball",                -- Efek random
+        "ChocolateBox",
         "Chocolate",
-        "StaminaCandy",           -- Kalah prioritas dibanding PopBottle
-        "StealthCandy",           -- Kalah prioritas dibanding SmokeBomb
+        "StaminaCandy",
+        "StealthCandy",
         "ProteinBar",
-        "Tape",                   -- Item utilitas, tidak bantu ngerjain mesin
-        "Pop"                     -- Kalah prioritas dibanding PopBottle
+        "Tape",
+        "Pop"
     },
     
-    -- Jeda (BuyDelay) DIHAPUS TOTAL untuk kecepatan maksimal!
+    -- Jeda aman agar server tidak menolak transaksi karena dianggap spamming
+    BuyDelay = 0.1 
 }
 -- ==========================================
 
 print("==================================================")
-print(" ⚡ AUTO BUY DANDY SHOP (INSTANT/NO DELAY) AKTIF ⚡")
+print(" ⚡ AUTO BUY DANDY SHOP (OPTIMIZED INSTANT) AKTIF ⚡")
 print("==================================================")
 
 local isShopping = false
@@ -120,22 +123,25 @@ local function executeBuy(dandyStore)
             for _, itemData in ipairs(availableItems) do
                 print("⚡ [INSTANT BUY] Mengamankan: " .. itemData.Name)
                 
-                -- Teleport seketika
+                -- 1. Teleport ke barang
                 humanoidRootPart.CFrame = itemData.PartCFrame
                 
-                -- Jeda 1 frame (sepersekian detik) WAJIB ada agar server mendaftarkan posisimu di depan barang
+                -- 2. Jeda wajib 1 frame agar server sadar kita pindah lokasi
                 task.wait() 
                 
+                -- 3. Eksekusi beli
                 if fireproximityprompt then
                     fireproximityprompt(itemData.PromptObj)
                 end
-                -- Tidak ada jeda antar barang. Langsung loncat ke barang kedua!
+                
+                -- 4. Jeda aman antar barang (Sweet Spot idemu)
+                task.wait(Config.BuyDelay) 
             end
             print("[AUTO BUY] Sapu bersih selesai!")
         end
     end
     
-    -- Jeda pendinginan setelah memborong agar tidak error
+    -- Jeda pendinginan setelah memborong agar tidak trigger berulang
     task.wait(2)
     isShopping = false
 end
@@ -158,8 +164,7 @@ if elevatorsFolder then
                     if not isShopping then
                         isShopping = true
                         
-                        -- Memberi waktu 0.05 detik (50 milidetik) agar semua barang di Slot1, Slot2, Slot3 muncul bersamaan
-                        -- Ini memastikan fitur penyortiran (Priority) tetap bekerja tanpa terasa ada delay oleh manusia
+                        -- Jeda 50 milidetik agar semua barang di Slot1, Slot2, Slot3 muncul bersamaan dulu
                         task.delay(0.05, function()
                             executeBuy(dandyStore)
                         end)
@@ -169,7 +174,7 @@ if elevatorsFolder then
         end
     end)
     
-    -- Pengecekan awal (Jika script dieksekusi saat toko sudah buka)
+    -- Pengecekan awal (Jika script dieksekusi saat toko sudah buka di depan mata)
     local activeElevator = elevatorsFolder:FindFirstChild("Elevator")
     if activeElevator then
         local existingStore = activeElevator:FindFirstChild("DandyStore")
