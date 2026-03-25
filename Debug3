@@ -1,0 +1,150 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- =======================================================
+-- 🧹 BERSIHKAN GUI LAMA (Mencegah dobel jika di-execute berkali-kali)
+-- =======================================================
+local oldGui = PlayerGui:FindFirstChild("AkbarDebugScanner")
+if oldGui then oldGui:Destroy() end
+
+-- =======================================================
+-- 🎨 MEMBUAT TAMPILAN GUI (DRAGGABLE)
+-- =======================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AkbarDebugScanner"
+ScreenGui.ResetOnSpawn = false
+-- Coba masukkan ke CoreGui agar aman dari deteksi game, jika gagal masuk ke PlayerGui
+local success, err = pcall(function()
+	ScreenGui.Parent = game:GetService("CoreGui")
+end)
+if not success then ScreenGui.Parent = PlayerGui end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 90)
+MainFrame.Position = UDim2.new(0.5, -110, 0.1, 0) -- Muncul di atas tengah
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 2
+MainFrame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+MainFrame.Active = true
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+Title.Text = "🛠️ UI Debugger (Tarik)"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Parent = MainFrame
+
+local ScanBtn = Instance.new("TextButton")
+ScanBtn.Size = UDim2.new(0.9, 0, 0, 40)
+ScanBtn.Position = UDim2.new(0.05, 0, 0, 40)
+ScanBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+ScanBtn.Text = "Scan Mouse (Jeda 3s)"
+ScanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ScanBtn.Font = Enum.Font.GothamBold
+ScanBtn.TextSize = 14
+ScanBtn.Parent = MainFrame
+
+-- =======================================================
+-- 🖱️ FUNGSI AGAR GUI BISA DI-DRAG (DIPINDAH)
+-- =======================================================
+local dragging, dragInput, dragStart, startPos
+
+Title.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+Title.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- =======================================================
+-- 🔍 FUNGSI SCANNING KETIKA TOMBOL DITEKAN
+-- =======================================================
+ScanBtn.MouseButton1Click:Connect(function()
+	-- Mencegah di-klik dobel saat sedang menghitung mundur
+	if ScanBtn.Text ~= "Scan Mouse (Jeda 3s)" then return end
+	
+	-- Menghitung mundur
+	ScanBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+	for i = 3, 1, -1 do
+		ScanBtn.Text = "Arahkan Mouse... " .. i
+		task.wait(1)
+	end
+	
+	ScanBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	ScanBtn.Text = "MEMINDAI!"
+	
+	-- Proses Pemindaian
+	local mouseLocation = UserInputService:GetMouseLocation()
+	local guisAtPosition = PlayerGui:GetGuiObjectsAtPosition(mouseLocation.X, mouseLocation.Y)
+	
+	print("\n==================================================")
+	if #guisAtPosition > 0 then
+		print("🔍 [DEBUG] HASIL SCAN UI DI BAWAH MOUSE:")
+		
+		-- Memfilter hasil agar Scanner ini tidak ikut terdeteksi
+		local targetGui = nil
+		for _, gui in ipairs(guisAtPosition) do
+			if not gui:IsDescendantOf(ScreenGui) then
+				targetGui = gui
+				break
+			end
+		end
+		
+		if targetGui then
+			local path = targetGui.Name
+			local current = targetGui.Parent
+			
+			while current and current ~= game do
+				path = current.Name .. " -> " .. path
+				current = current.Parent
+			end
+			
+			print(">> 📂 Path Lengkap : " .. path)
+			print(">> 🏷️ Nama Elemen  : " .. targetGui.Name)
+			print(">> 📦 Tipe Class   : " .. targetGui.ClassName)
+			
+			if targetGui:IsA("TextButton") or targetGui:IsA("TextLabel") then
+				print(">> 📝 Teks Bawaan  : '" .. tostring(targetGui.Text) .. "'")
+			end
+			
+			print(">> 📁 Nama Parent  : " .. targetGui.Parent.Name)
+		else
+			print("❌ [DEBUG] Hanya menemukan Scanner GUI. Arahkan mouse ke UI gamenya!")
+		end
+	else
+		print("❌ [DEBUG] Tidak ada elemen UI di bawah mouse saat ini.")
+	end
+	print("==================================================\n")
+	
+	-- Mengembalikan tombol ke keadaan semula
+	task.wait(1)
+	ScanBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	ScanBtn.Text = "Scan Mouse (Jeda 3s)"
+end)
+
+print("[🛠️ UI DEBUGGER] GUI berhasil dimuat! Silakan buka console (F9) untuk melihat hasil.")
