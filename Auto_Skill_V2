@@ -21,7 +21,7 @@ local Config = {
         NearbyRadius = 25,
         
         -- [NEW] 🚀 FITUR TELEPORT: Teleport ke player lain sesaat sebelum pencet skill!
-        TeleportToPlayerBeforeSkill = true,
+        TeleportToPlayerBeforeSkill = false,
         
         -- [3] ANTI-INTERRUPT: Jangan gunakan skill jika sedang mengerjakan Mesin
         DontUseWhileDecoding = false 
