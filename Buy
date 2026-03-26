@@ -55,7 +55,7 @@ local Config = {
     },
     
     -- Jeda aman agar server tidak menolak transaksi karena dianggap spamming
-    BuyDelay = 0.5
+    BuyDelay = 0.1
 }
 -- ==========================================
 
@@ -194,7 +194,5 @@ if elevatorsFolder then
     
     print("[🛡️ KEAMANAN] Place ID Valid. Menunggu mangsa di mode Standby...")
 else
-    warn("[AUTO BUY] Folder 'Elevators' tidak ditemukan!")
-end
     warn("[AUTO BUY] Folder 'Elevators' tidak ditemukan!")
 end
