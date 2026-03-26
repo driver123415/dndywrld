@@ -57,7 +57,7 @@ local Config = {
         DelayNext = 1.0,        
         UndergroundOffset = 11.5,
         LooseRadius = 15,
-        LooseMonsters = { "RodgerMonster", "RazzleDazzleMonster" } 
+        LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster" } 
     },
     GenESP = {
         Enable = true,          
