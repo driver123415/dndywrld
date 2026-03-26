@@ -1,0 +1,32 @@
+wait(1)
+--print("script run")
+print("Full Script Is Running")
+local function executeScripts(scripts)
+    for _, script in ipairs(scripts) do
+        local co = coroutine.create(function()
+            loadstring(game:HttpGet(script))()
+        end)
+        coroutine.resume(co)
+    end
+end
+
+local scripts = {
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey2"
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey3",--multiiiiiiiii
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",--solo
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST6",--coba    
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST5",--coba    
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST7",--coba    
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck",--PlayerCheck 3
+    "https://raw.githubusercontent.com/EarthC123/FjoneScript/refs/heads/main/NoxiousAutoFarmFix.lua",--coba ANTI MONSTER JATOH TANAH    
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up   
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Buy",--beli lah
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use 
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote",--vote
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi"--ready
+}
+
+executeScripts(scripts)
