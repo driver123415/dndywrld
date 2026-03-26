@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 13: THE ULTIMATE MASTER (NO BOUNCING, 0-DELAY EVADE, PCALL)
+-- MAIN SCRIPT REVISION 14: ALWAYS SECURE FAKE ELEVATOR (NO CAMPING ON FULL GEN)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -661,12 +661,11 @@ local function startAutoFarming()
                     local genFolder = map:FindFirstChild("Generators")
                     if genFolder then
                         
-                        -- [REVISI 13]: Logika Pemilihan Target Cerdas
+                        -- [REVISI 14]: Logika Pemilihan Target Super Cerdas (SELALU KOSONG)
                         local needSync = isTrinketActive()
                         local targetGen = nil
                         local uncompletedCount = 0
                         local anyEmptyGen = nil
-                        local anyGen = nil
                         
                         for _, gen in pairs(genFolder:GetChildren()) do
                             if gen:IsA("Model") and gen.PrimaryPart then
@@ -679,7 +678,6 @@ local function startAutoFarming()
                                         uncompletedCount = uncompletedCount + 1
                                         if not connie then
                                             if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) then
-                                                if not anyGen then anyGen = gen end
                                                 if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                     if not anyEmptyGen then anyEmptyGen = gen end
                                                 end
@@ -690,12 +688,8 @@ local function startAutoFarming()
                             end
                         end
                         
-                        -- Penentuan Target Berdasarkan Status Trinket
-                        if needSync then
-                            targetGen = anyEmptyGen -- Hanya cari yang kosong demi Trinket
-                        else
-                            targetGen = anyEmptyGen or anyGen -- Fast-Mode: Kosong lebih baik, penuh pun hajar
-                        end
+                        -- Target SELALU mengutamakan mesin kosong. anyGen dihapus.
+                        targetGen = anyEmptyGen 
                         
                         if uncompletedCount == 0 then
                             if not inElevatorStandby then
@@ -744,7 +738,7 @@ local function startAutoFarming()
                                         isContested = true
                                     end
                                 else
-                                    print("[FAST-MODE] Trinket 'Inactive'/Kosong. Langsung Ekstrak!")
+                                    print("[FAST-MODE] Mencari mesin kosong...")
                                     if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
                                         isContested = true
                                     end
@@ -754,7 +748,7 @@ local function startAutoFarming()
                                     print("[SYNC/SAFETY] Batal Ekstrak! Mesin tidak aman atau ada pemain lain (Trinket dijaga).")
                                     rootPart.Anchored = false
                                 else
-                                    -- Area Aman! Eksekusi (TIDAK ADA KATA MUNDUR/BATAL KARENA ORANG LAIN)
+                                    -- Area Aman! Eksekusi (Mesin KOSONG)
                                     local hasStartedInteracting = false
                                     local instantNext = false
                                     local failTimer = 0 
@@ -773,39 +767,17 @@ local function startAutoFarming()
                                             break 
                                         end
                                         
-                                        -- [REVISI 13]: 0-DELAY EVASION
+                                        -- 0-DELAY EVASION
                                         if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
                                             forceStop()
                                             rootPart.Anchored = false
                                             
-                                            local safeAlternative = false
-                                            if not needSync then
-                                                -- Fast mode bisa cari alternatif mesin lain yg aman walau ada orang
-                                                for _, genAlt in pairs(genFolder:GetChildren()) do
-                                                    if genAlt ~= targetGen and genAlt:IsA("Model") and genAlt.PrimaryPart then
-                                                        local altStats = genAlt:FindFirstChild("Stats")
-                                                        if altStats and not (altStats:FindFirstChild("Completed") and altStats.Completed.Value) and not (altStats:FindFirstChild("Connie") and altStats.Connie.Value) then
-                                                            if not isThreatened(genAlt.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) then
-                                                                safeAlternative = true
-                                                                targetGen = genAlt
-                                                                local altCenterPos = getModelCenter(targetGen)
-                                                                targetCFrame = CFrame.new(altCenterPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, altCenterPos.Z)
-                                                                moveToPositionGen(targetCFrame, true)
-                                                                break
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                            
-                                            if not safeAlternative then
-                                                print("[SAFETY] 0-Delay Evade! Ngungsi ke Fake Elevator...")
-                                                local safePos = getFakeElevatorPosition()
-                                                if safePos then teleportplr(CFrame.new(safePos))
-                                                else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
-                                                instantNext = true
-                                                break
-                                            end
+                                            print("[SAFETY] 0-Delay Evade! Ngungsi ke Fake Elevator...")
+                                            local safePos = getFakeElevatorPosition()
+                                            if safePos then teleportplr(CFrame.new(safePos))
+                                            else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                                            instantNext = true
+                                            break
                                         end
                                         
                                         rootPart.CFrame = targetCFrame
@@ -840,8 +812,8 @@ local function startAutoFarming()
                             end
                             
                         else
-                            -- [REVISI 13]: NGUNGSI JIKA SEMUA MESIN PENUH & TRINKET ACTIVE
-                            print("[INFO] Semua mesin ditempati orang & Trinket butuh dijaga. Ngungsi ke Safe Place...")
+                            -- [REVISI 14]: NGUNGSI JIKA SEMUA MESIN PENUH (Fast mode juga mengungsi)
+                            print("[INFO] Semua mesin ditempati orang atau tidak aman. Ngungsi ke Safe Place...")
                             rootPart.Anchored = false
                             local safePos = getFakeElevatorPosition()
                             if safePos then teleportplr(CFrame.new(safePos)) end
@@ -894,7 +866,7 @@ task.spawn(function()
                     character = player.Character or player.CharacterAdded:Wait()
                     rootPart = character:WaitForChild("HumanoidRootPart")
                     
-                    -- [REVISI 13]: PROTEKSI PCALL ANTI-CRASH ITEM
+                    -- PROTEKSI PCALL ANTI-CRASH ITEM
                     local success, err = pcall(function()
                         executePickup() 
                     end)
