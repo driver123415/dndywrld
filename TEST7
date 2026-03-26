@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 12: CUSTOM SYNC DELAY & MONSTER ESP (ULTIMATE)
+-- MAIN SCRIPT REVISION 13: THE ULTIMATE MASTER (NO BOUNCING, 0-DELAY EVADE, PCALL)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -38,10 +38,9 @@ local Config = {
     },
     ItemESP = { Enable = true },
     
-    -- [FITUR BARU] MONSTER ESP
     MonsterESP = {
         Enable = true,
-        Color = Color3.fromRGB(255, 0, 0) -- Warna Merah Tajam
+        Color = Color3.fromRGB(255, 0, 0)
     },
 
     Skillcheck = { Enable = false }, 
@@ -52,9 +51,8 @@ local Config = {
         SafeRadius = 30,        
         PlayerRadius = 8,       
         
-        -- [FITUR BARU] PENGATURAN DELAY SINKRONISASI TRINKET
-        SyncDelayMin = 0.1,     -- Waktu tunggu minimal (detik)
-        SyncDelayMax = 0.4,     -- Waktu tunggu maksimal (detik)
+        SyncDelayMin = 0.1,     
+        SyncDelayMax = 0.4,     
         
         DelayNext = 1.0,        
         UndergroundOffset = 11.5,
@@ -145,7 +143,7 @@ local function isThreatened(targetPosition, radius)
     return false
 end
 
--- ==================== FUNGSI MONSTER ESP ====================
+-- ==================== MONSTER ESP ====================
 local function updateMonsterESP()
     if not Config.MonsterESP.Enable then return end
     local map = getMap()
@@ -344,11 +342,11 @@ local function executePickup()
             if item and item.Parent and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
                 
                 if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
-                    print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item, lari ke Safe Place...")
+                    print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item, lari ke Safe Place (0 Detik)...")
                     local safePos = getFakeElevatorPosition()
                     if safePos then teleportplr(CFrame.new(safePos))
                     else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
-                    task.wait(4)
+                    task.wait(1)
                     break
                 end
 
@@ -385,11 +383,11 @@ local function executePickup()
                 if platform then platform:Destroy() end
 
                 if interrupted then
-                    print("[SAFETY - ITEM] Diserang saat memungut item! Kabur!")
+                    print("[SAFETY - ITEM] Diserang saat memungut item! Kabur (0 Detik)!")
                     local safePos = getFakeElevatorPosition()
                     if safePos then teleportplr(CFrame.new(safePos))
                     else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
-                    task.wait(4)
+                    task.wait(1)
                     break
                 end
                 
@@ -411,8 +409,8 @@ local function executePickup()
 
     isItemAuraActive = false
     print("[DONE] Pengambilan item selesai. Melanjutkan ke target Generator...")
-    isItemFarmingActive = false 
 end
+
 
 -- ==================== GENERATOR AUTO-FARM ====================
 local function isInteractingUI()
@@ -430,7 +428,6 @@ local function isInteractingUI()
     return false
 end
 
--- Pengecekan Status Trinket via UI
 local function isTrinketActive()
     local playerGui = player:FindFirstChild("PlayerGui")
     if not playerGui then return false end
@@ -451,7 +448,6 @@ local function isTrinketActive()
             end
         end
     end
-    
     return false
 end
 
@@ -574,7 +570,7 @@ local function moveToPositionGen(targetCFrame, usePlatform)
     
     if Config.Teleport.Mode == "Instant" then
         rootPart.CFrame = targetCFrame
-        task.wait(0.1) 
+        task.wait(0.05) 
     else
         local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
         local distance = (rootPart.Position - targetCFrame.Position).Magnitude
@@ -629,7 +625,7 @@ local function startAutoFarming()
     task.spawn(function()
         while isMasterFarming do
             updateGeneratorESP()
-            updateMonsterESP() -- Panggilan ESP Monster
+            updateMonsterESP() 
             updateSafeRadiusVisual()
             task.wait(0.1)
         end
@@ -664,8 +660,13 @@ local function startAutoFarming()
                 if map then
                     local genFolder = map:FindFirstChild("Generators")
                     if genFolder then
+                        
+                        -- [REVISI 13]: Logika Pemilihan Target Cerdas
+                        local needSync = isTrinketActive()
                         local targetGen = nil
                         local uncompletedCount = 0
+                        local anyEmptyGen = nil
+                        local anyGen = nil
                         
                         for _, gen in pairs(genFolder:GetChildren()) do
                             if gen:IsA("Model") and gen.PrimaryPart then
@@ -676,14 +677,24 @@ local function startAutoFarming()
                                     
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
-                                        if not connie and not targetGen then
-                                            if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
-                                                targetGen = gen
+                                        if not connie then
+                                            if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) then
+                                                if not anyGen then anyGen = gen end
+                                                if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
+                                                    if not anyEmptyGen then anyEmptyGen = gen end
+                                                end
                                             end
                                         end
                                     end
                                 end
                             end
+                        end
+                        
+                        -- Penentuan Target Berdasarkan Status Trinket
+                        if needSync then
+                            targetGen = anyEmptyGen -- Hanya cari yang kosong demi Trinket
+                        else
+                            targetGen = anyEmptyGen or anyGen -- Fast-Mode: Kosong lebih baik, penuh pun hajar
                         end
                         
                         if uncompletedCount == 0 then
@@ -711,10 +722,8 @@ local function startAutoFarming()
                                 moveToPositionGen(targetCFrame, true)
                                 
                                 local isContested = false
-                                local needSync = isTrinketActive()
                                 
                                 if needSync then
-                                    -- [REVISI 12] Kalkulasi Delay Acak dari Config
                                     local minD = Config.Teleport.SyncDelayMin
                                     local maxD = Config.Teleport.SyncDelayMax
                                     local syncDelay = minD + (math.random() * (maxD - minD))
@@ -731,7 +740,7 @@ local function startAutoFarming()
                                         elapsed = elapsed + 0.1
                                     end
                                     
-                                    if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                    if not isContested and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                         isContested = true
                                     end
                                 else
@@ -742,9 +751,10 @@ local function startAutoFarming()
                                 end
                                 
                                 if isContested then
-                                    print("[SYNC/SAFETY] Area tidak aman (Pemain lain / Monster)! Mencari target lain...")
+                                    print("[SYNC/SAFETY] Batal Ekstrak! Mesin tidak aman atau ada pemain lain (Trinket dijaga).")
                                     rootPart.Anchored = false
                                 else
+                                    -- Area Aman! Eksekusi (TIDAK ADA KATA MUNDUR/BATAL KARENA ORANG LAIN)
                                     local hasStartedInteracting = false
                                     local instantNext = false
                                     local failTimer = 0 
@@ -763,43 +773,39 @@ local function startAutoFarming()
                                             break 
                                         end
                                         
+                                        -- [REVISI 13]: 0-DELAY EVASION
                                         if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
                                             forceStop()
-                                            task.wait(0.1)
                                             rootPart.Anchored = false
+                                            
                                             local safeAlternative = false
-                                            for _, genAlt in pairs(genFolder:GetChildren()) do
-                                                if genAlt ~= targetGen and genAlt:IsA("Model") and genAlt.PrimaryPart then
-                                                    local altStats = genAlt:FindFirstChild("Stats")
-                                                    if altStats and not (altStats:FindFirstChild("Completed") and altStats.Completed.Value) and not (altStats:FindFirstChild("Connie") and altStats.Connie.Value) then
-                                                        if not isThreatened(genAlt.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) and not isMachineOccupied(genAlt, Config.Teleport.PlayerRadius) then
-                                                            safeAlternative = true
-                                                            targetGen = genAlt
-                                                            local altCenterPos = getModelCenter(targetGen)
-                                                            targetCFrame = CFrame.new(altCenterPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, altCenterPos.Z)
-                                                            moveToPositionGen(targetCFrame, true)
-                                                            task.wait(0.1)
-                                                            break
+                                            if not needSync then
+                                                -- Fast mode bisa cari alternatif mesin lain yg aman walau ada orang
+                                                for _, genAlt in pairs(genFolder:GetChildren()) do
+                                                    if genAlt ~= targetGen and genAlt:IsA("Model") and genAlt.PrimaryPart then
+                                                        local altStats = genAlt:FindFirstChild("Stats")
+                                                        if altStats and not (altStats:FindFirstChild("Completed") and altStats.Completed.Value) and not (altStats:FindFirstChild("Connie") and altStats.Connie.Value) then
+                                                            if not isThreatened(genAlt.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) then
+                                                                safeAlternative = true
+                                                                targetGen = genAlt
+                                                                local altCenterPos = getModelCenter(targetGen)
+                                                                targetCFrame = CFrame.new(altCenterPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, altCenterPos.Z)
+                                                                moveToPositionGen(targetCFrame, true)
+                                                                break
+                                                            end
                                                         end
                                                     end
                                                 end
                                             end
                                             
                                             if not safeAlternative then
+                                                print("[SAFETY] 0-Delay Evade! Ngungsi ke Fake Elevator...")
                                                 local safePos = getFakeElevatorPosition()
                                                 if safePos then teleportplr(CFrame.new(safePos))
                                                 else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
-                                                task.wait(5) 
                                                 instantNext = true
                                                 break
                                             end
-                                        end
-                                        
-                                        if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                            forceStop()
-                                            task.wait(0.1)
-                                            instantNext = true
-                                            break
                                         end
                                         
                                         rootPart.CFrame = targetCFrame
@@ -809,7 +815,6 @@ local function startAutoFarming()
                                             failTimer = 0 
                                         elseif hasStartedInteracting and not currentlyInteracting then
                                             forceStop()
-                                            task.wait(0.1)
                                             instantNext = true
                                             break
                                         else
@@ -821,7 +826,6 @@ local function startAutoFarming()
                                                 rootPart.CFrame = targetCFrame
                                             elseif failTimer >= 25 then
                                                 forceStop()
-                                                task.wait(0.1)
                                                 instantNext = true
                                                 break
                                             end
@@ -830,12 +834,14 @@ local function startAutoFarming()
                                     end
                                     
                                     rootPart.Anchored = false
-                                    if instantNext then task.wait(0.1)
+                                    if instantNext then task.wait(0.05)
                                     else task.wait(Config.Teleport.DelayNext) end
                                 end
                             end
                             
                         else
+                            -- [REVISI 13]: NGUNGSI JIKA SEMUA MESIN PENUH & TRINKET ACTIVE
+                            print("[INFO] Semua mesin ditempati orang & Trinket butuh dijaga. Ngungsi ke Safe Place...")
                             rootPart.Anchored = false
                             local safePos = getFakeElevatorPosition()
                             if safePos then teleportplr(CFrame.new(safePos)) end
@@ -888,7 +894,17 @@ task.spawn(function()
                     character = player.Character or player.CharacterAdded:Wait()
                     rootPart = character:WaitForChild("HumanoidRootPart")
                     
-                    executePickup() 
+                    -- [REVISI 13]: PROTEKSI PCALL ANTI-CRASH ITEM
+                    local success, err = pcall(function()
+                        executePickup() 
+                    end)
+                    
+                    if not success then
+                        print("[WARNING] Error saat executePickup: ", err)
+                        isItemAuraActive = false
+                    end
+                    
+                    isItemFarmingActive = false
                 end
             end
         end
