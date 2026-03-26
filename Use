@@ -1,0 +1,42 @@
+-- ==============================================================================
+-- STANDALONE SCRIPT: AUTO USE ITEM
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+local Config = {
+    AutoUse = {
+        Enable = true,              
+        UseInterval = 0.1,          
+        Slots = {
+            Slot1 = true,
+            Slot2 = true,
+            Slot3 = true,
+            Slot4 = false            
+        }
+    }
+}
+
+if not Config.AutoUse.Enable then return end
+print("[SYSTEM] Standalone Auto-Use Script berjalan!")
+
+task.spawn(function()
+    while true do
+        local char = player.Character
+        if char and char:FindFirstChild("Inventory") then
+            for slotName, isActive in pairs(Config.AutoUse.Slots) do
+                if isActive then
+                    local slotItem = char.Inventory:FindFirstChild(slotName)
+                    if slotItem then
+                        pcall(function() 
+                            ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
+                        end)
+                    end
+                end
+            end
+        end
+        task.wait(Config.AutoUse.UseInterval)
+    end
+end)
