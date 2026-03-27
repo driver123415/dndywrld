@@ -54,16 +54,20 @@ local Config = {
         "Pop"
     },
     
-    -- Jeda aman agar server tidak menolak transaksi karena dianggap spamming
-    BuyDelay = 0.1,
+    -- [REVISI] Jeda pindah ke barang SELANJUTNYA (diperbesar agar aman)
+    BuyDelay = 0.5,
 
-    -- ⏳ [BARU] Waktu tunggu animasi meja toko Dandy naik (dalam detik)
-    StoreLoadDelay = 3.5
+    -- ⏳ [BARU] Sistem Auto-Retry jika gagal beli
+    MaxRetries = 3,       -- Maksimal mencoba beli per barang
+    RetryDelay = 0.5,     -- Jeda antar percobaan pencet tombol
+
+    -- ⏳ Waktu tunggu animasi meja toko Dandy naik
+    StoreLoadDelay = 2.5
 }
 -- ==========================================
 
 print("==================================================")
-print(" ⚡ AUTO BUY DANDY SHOP (SOLID PLATFORM V6) AKTIF ⚡")
+print(" ⚡ AUTO BUY DANDY SHOP (AUTO-RETRY V7) AKTIF ⚡")
 print("==================================================")
 
 local isShopping = false
@@ -78,7 +82,7 @@ local function interactWithPrompt(prompt)
     pcall(function()
         if prompt.HoldDuration == 0 then
             prompt:InputHoldBegin()
-            task.wait(0.15) -- Jeda simulasi ketukan layar diperbesar sedikit agar server merespon
+            task.wait(0.15) 
             prompt:InputHoldEnd()
         else
             prompt:InputHoldBegin()
@@ -145,46 +149,54 @@ local function executeBuy(dandyStore)
         if humanoidRootPart then
             print("[AUTO BUY] Animasi meja selesai. Mengeksekusi " .. #availableItems .. " barang prioritas...")
             
-            -- [TRIK BARU] Membuat pijakan fisik sementara (Platform)
             local platform = Instance.new("Part")
             platform.Size = Vector3.new(10, 1, 10)
             platform.Anchored = true
             platform.CanCollide = true
-            platform.Transparency = 1 -- Dibuat tembus pandang
+            platform.Transparency = 1 
             platform.Parent = Workspace
             
             for _, itemData in ipairs(availableItems) do
-                print("⚡ [INSTANT BUY] Mengambil: " .. itemData.Name)
+                print("⚡ [PROSES] Mengamankan: " .. itemData.Name)
                 
-                -- Hapus rotasi bawaan objek agar teleportasi tidak miring (anti nyangkut)
                 local promptPos = itemData.PartCFrame.Position
-                
-                -- Posisikan platform tepat di bawah karakter
                 platform.CFrame = CFrame.new(promptPos + Vector3.new(0, -3.5, 0))
                 
-                -- Teleport karakter pas di posisi barang
                 humanoidRootPart.CFrame = CFrame.new(promptPos)
                 humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
                 
-                -- [SANGAT KRUSIAL] Jeda 0.3 detik agar Server me-register karaktermu SEDANG BERDIRI stabil (Grounded)
                 task.wait(0.3) 
                 
-                local timeout = 20
-                while not itemData.PromptObj.Enabled and timeout > 0 do
-                    task.wait(0.1)
-                    timeout = timeout - 1
-                end
+                local successBuy = false
                 
-                if itemData.PromptObj.Enabled then
+                -- ========================================================
+                -- 🔄 [SISTEM BARU] LOOP RETRY PEMBELIAN
+                -- ========================================================
+                for attempt = 1, Config.MaxRetries do
+                    
+                    -- CEK KEBERHASILAN: Jika prompt hilang/disable, artinya barang sudah kebeli!
+                    if not itemData.PromptObj or not itemData.PromptObj.Parent or not itemData.PromptObj.Enabled then
+                        print("   ✅ [SUKSES] " .. itemData.Name .. " berhasil dibeli pada percobaan ke-" .. attempt)
+                        successBuy = true
+                        break -- Langsung hentikan loop retry dan lanjut ke barang berikutnya
+                    end
+                    
+                    print("   🔄 Mencoba memencet... (Percobaan " .. attempt .. "/" .. Config.MaxRetries .. ")")
                     interactWithPrompt(itemData.PromptObj)
-                else
-                    print("⚠️ [GAGAL] Prompt " .. itemData.Name .. " tidak bisa ditekan.")
+                    
+                    -- Tunggu server memproses transaksi sebelum mencoba lagi
+                    task.wait(Config.RetryDelay)
                 end
                 
+                if not successBuy then
+                    print("   ⚠️ [GAGAL] Menyerah pada " .. itemData.Name .. " setelah " .. Config.MaxRetries .. " kali mencoba. (Mungkin koin tidak cukup atau lag parah)")
+                end
+                -- ========================================================
+                
+                -- Jeda santai sebelum pindah ke barang selanjutnya
                 task.wait(Config.BuyDelay) 
             end
             
-            -- Hapus platform setelah selesai memborong
             platform:Destroy()
             print("[AUTO BUY] Sapu bersih selesai!")
         end
