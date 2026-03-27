@@ -1,9 +1,10 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V14 - THE REAL MASTERPIECE)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V15 - FULL SCRIPT & SIMPLIFIED DETECTOR)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
 local Config = {
@@ -15,7 +16,7 @@ local Config = {
         -- SAKLAR KONTROL UTAMA
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        EnableAutoUtility = false,  
+        EnableAutoUtility = true,  
         EnableAutoMachineItem = true, 
 
         Slots = {
@@ -41,24 +42,23 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto Use V14 Berjalan! (Fitur Lengkap + Deteksi Value Simpel & Brutal)")
+print("[SYSTEM] Smart Auto Use V15 Berjalan! (Full Script dengan Deteksi Value Murni)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
 local function getCurrentHealth()
     local PlayerGui = player:FindFirstChild("PlayerGui")
     
-    -- Jalur UI yang 100% sudah Fix sesuai gambar terakhir
+    -- Jalur UI yang 100% sudah Fix
     local contentFolder = PlayerGui and PlayerGui:FindFirstChild("ScreenGui")
         and PlayerGui.ScreenGui:FindFirstChild("Menu")
         and PlayerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
         and PlayerGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Status")
         and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status:FindFirstChild("Bottom")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom:FindFirstChild("StaminaBin")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin:FindFirstChild("InfoBin")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin:FindFirstChild("HealthBin")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin:FindFirstChild("Bar")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar:FindFirstChild("Content")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom:FindFirstChild("InfoBin")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.InfoBin:FindFirstChild("HealthBin")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.InfoBin.HealthBin:FindFirstChild("Bar")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.InfoBin.HealthBin.Bar:FindFirstChild("Content")
 
     if not contentFolder then return nil end
 
@@ -84,14 +84,28 @@ local function isInteractingUI()
     return false
 end
 
+local function getActiveCharacterAndInventory()
+    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+    local char1 = inGamePlayers and inGamePlayers:FindFirstChild(player.Name)
+    if char1 and char1:FindFirstChild("Inventory") then
+        return char1, char1.Inventory
+    end
+    
+    local char2 = player.Character
+    if char2 and char2:FindFirstChild("Inventory") then
+        return char2, char2.Inventory
+    end
+    
+    return nil, nil
+end
+
 -- ==================== MAIN LOGIC ====================
 
 task.spawn(function()
     while true do
-        -- Kita pakai player.Character langsung karena itu yang diminta server di log Cobalt
-        local char = player.Character
+        local char, inventory = getActiveCharacterAndInventory()
         
-        if char and char:FindFirstChild("Inventory") then
+        if char and inventory then
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
             
@@ -101,18 +115,18 @@ task.spawn(function()
 
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
-                    local slotItem = char.Inventory:FindFirstChild(slotName)
+                    local slotItem = inventory:FindFirstChild(slotName)
                     
                     if slotItem and slotItem:IsA("StringValue") then
-                        -- Ambil nama item, bersihin dari spasi nyasar biar aman
+                        -- LOGIKA DETEKSI SIMPEL: Ambil nama item, bersihkan spasi
                         local rawName = slotItem.Value
                         local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
                         
-                        -- LOGIKA SIMPEL: Jika Value bukan "None" dan tidak kosong
+                        -- Jika slot tidak kosong dan bukan "None"
                         if itemName ~= "None" and itemName ~= "" then
                             local shouldUse = false
 
-                            -- Filter lewat Otak Pintar (Kategori & Kondisi)
+                            -- LOGIKA KEPINTARAN SCRIPT
                             if table.find(Config.ItemCategories.MachineItems, itemName) then
                                 if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then shouldUse = true end
 
@@ -129,7 +143,7 @@ task.spawn(function()
                                 if Config.AutoUse.EnableAutoUtility then shouldUse = true end
                             end
 
-                            -- Eksekusi: SPAM BRUTAL JIKA SYARAT TERPENUHI
+                            -- JIKA SYARAT TERPENUHI, LANGSUNG EKSEKUSI
                             if shouldUse then
                                 task.spawn(function()
                                     pcall(function() 
