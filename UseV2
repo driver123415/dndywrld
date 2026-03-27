@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V4 - CUSTOM MAX HEALTH & TOGGLES)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V5 - ANTI SPAM / DEBOUNCE)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -10,14 +10,13 @@ local Config = {
     AutoUse = {
         Enable = true,      
         UseInterval = 0.2, 
+        ItemCooldown = 2.5, -- WAKTU JEDA (Detik). Script akan menunggu 2.5 detik sebelum mencoba memakai item di slot yang sama lagi.
         
-        -- SETTING NYAWA KARAKTER (Ubah sesuai jumlah nyawa Toon yang kamu pakai)
         MaxHealth = 3, 
         
-        -- SAKLAR SMART USE (Pilih mana yang mau diotomatisasi)
-        EnableAutoHeal = true,      -- Otomatis heal sesuai sisa darah
-        EnableAutoBuff = true,      -- Otomatis makan permen/buff saat didapat (Ubah ke false kalau mau manual)
-        EnableAutoUtility = true,  -- Saran: Dimatikan (false) agar SmokeBomb/Valve tidak terbuang sia-sia
+        EnableAutoHeal = true,      
+        EnableAutoBuff = true,      
+        EnableAutoUtility = false,  
 
         Slots = {
             Slot1 = true,
@@ -43,9 +42,8 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Standalone Auto-Use V4 berjalan! Max Health diset: " .. Config.AutoUse.MaxHealth)
+print("[SYSTEM] Standalone Auto-Use V5 berjalan! Sistem Anti-Spam (Debounce) Aktif.")
 
--- Fungsi membaca sisa nyawa berdasarkan Config.MaxHealth
 local function getCurrentHealth()
     local PlayerGui = player:FindFirstChild("PlayerGui")
     if not PlayerGui then return nil end
@@ -65,7 +63,6 @@ local function getCurrentHealth()
 
     local currentHealth = 0
 
-    -- Hanya mengecek Heart sebanyak MaxHealth yang di-setting di Config
     for i = 1, Config.AutoUse.MaxHealth do 
         local heart = contentFolder:FindFirstChild("Heart" .. tostring(i))
         if heart then
@@ -79,6 +76,9 @@ local function getCurrentHealth()
     return currentHealth
 end
 
+-- Tabel untuk menyimpan waktu terakhir sebuah slot digunakan
+local slotCooldowns = {}
+
 task.spawn(function()
     while true do
         local inGamePlayers = workspace:FindFirstChild("InGamePlayers")
@@ -86,48 +86,55 @@ task.spawn(function()
         if not char then char = player.Character end 
         
         if char and char:FindFirstChild("Inventory") then
-            -- Hitung nyawa
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
             if currentHealth then
                 missingHealth = Config.AutoUse.MaxHealth - currentHealth
             end
 
-            -- Scan Inventory
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
                     
                     if slotItem and slotItem:IsA("StringValue") then
                         local itemName = slotItem.Value
+                        local currentTime = tick() -- Mengambil waktu komputer saat ini
                         
+                        -- Cek apakah item bukan "None" DAN slot ini sedang tidak dalam masa Cooldown
                         if itemName ~= "None" and itemName ~= "" then
-                            local shouldUse = false
+                            -- Jika slot belum pernah dipakai ATAU waktu saat ini sudah melewati masa cooldown slot tersebut
+                            if not slotCooldowns[slotName] or currentTime > slotCooldowns[slotName] then
+                                
+                                local shouldUse = false
 
-                            -- LOGIKA PER KATEGORI
-                            if table.find(Config.ItemCategories.SmallHeal, itemName) then
-                                if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then
-                                    shouldUse = true
+                                if table.find(Config.ItemCategories.SmallHeal, itemName) then
+                                    if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then
+                                        shouldUse = true
+                                    end
+                                elseif table.find(Config.ItemCategories.BigHeal, itemName) then
+                                    if Config.AutoUse.EnableAutoHeal and missingHealth >= 2 then
+                                        shouldUse = true
+                                    end
+                                elseif table.find(Config.ItemCategories.StaminaAndBuffs, itemName) then
+                                    if Config.AutoUse.EnableAutoBuff then
+                                        shouldUse = true
+                                    end
+                                elseif table.find(Config.ItemCategories.UtilityAndTools, itemName) then
+                                    if Config.AutoUse.EnableAutoUtility then
+                                        shouldUse = true
+                                    end
                                 end
-                            elseif table.find(Config.ItemCategories.BigHeal, itemName) then
-                                if Config.AutoUse.EnableAutoHeal and missingHealth >= 2 then
-                                    shouldUse = true
-                                end
-                            elseif table.find(Config.ItemCategories.StaminaAndBuffs, itemName) then
-                                if Config.AutoUse.EnableAutoBuff then
-                                    shouldUse = true
-                                end
-                            elseif table.find(Config.ItemCategories.UtilityAndTools, itemName) then
-                                if Config.AutoUse.EnableAutoUtility then
-                                    shouldUse = true
-                                end
-                            end
 
-                            -- Eksekusi
-                            if shouldUse then
-                                pcall(function() 
-                                    ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
-                                end)
+                                if shouldUse then
+                                    -- Segera catat waktu cooldown untuk slot ini (Waktu Sekarang + 2.5 Detik)
+                                    slotCooldowns[slotName] = currentTime + Config.AutoUse.ItemCooldown
+                                    
+                                    pcall(function() 
+                                        ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
+                                        print("[Auto-Use] Menggunakan: " .. itemName .. " di " .. slotName)
+                                    end)
+                                end
+                                
                             end
                         end
                     end
