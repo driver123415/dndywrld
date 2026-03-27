@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V10 - PURE BRUTAL FORCE)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V13 - ULTIMATE PATH FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -10,11 +10,9 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,      
-        UseInterval = 0.2, -- Kecepatan spam (0.2 detik)
-        
+        UseInterval = 0.2, 
         MaxHealth = 3, 
         
-        -- SAKLAR KONTROL UTAMA
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
         EnableAutoUtility = true,  
@@ -43,15 +41,14 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Standalone Auto-Use V10 berjalan! (No Blacklist / Brutal Force Mode)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
 local function getCurrentHealth()
     local PlayerGui = player:FindFirstChild("PlayerGui")
-    if not PlayerGui then return nil end
     
-    local contentFolder = PlayerGui:FindFirstChild("ScreenGui")
+    -- [PATH FIX 100% SESUAI GAMBAR TERBARU]
+    local contentFolder = PlayerGui and PlayerGui:FindFirstChild("ScreenGui")
         and PlayerGui.ScreenGui:FindFirstChild("Menu")
         and PlayerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
         and PlayerGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Status")
@@ -67,9 +64,8 @@ local function getCurrentHealth()
     local currentHealth = 0
     for i = 1, Config.AutoUse.MaxHealth do 
         local heart = contentFolder:FindFirstChild("Heart" .. tostring(i))
-        if heart then
-            local pulse = heart:FindFirstChild("Pulse")
-            if pulse and pulse.Visible == true then currentHealth = currentHealth + 1 end
+        if heart and heart:FindFirstChild("Pulse") and heart.Pulse.Visible == true then 
+            currentHealth = currentHealth + 1 
         end
     end
     return currentHealth
@@ -79,36 +75,51 @@ local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
         local screenGui = playerGui:FindFirstChild("ScreenGui")
-        if screenGui then
-            local menu = screenGui:FindFirstChild("Menu")
-            if menu then
-                local stopGen = menu:FindFirstChild("StopGenerator")
-                return stopGen and stopGen.Visible or false
-            end
+        if screenGui and screenGui:FindFirstChild("Menu") then
+            local stopGen = screenGui.Menu:FindFirstChild("StopGenerator")
+            return stopGen and stopGen.Visible or false
         end
     end
     return false
+end
+
+local function getActiveCharacterAndInventory()
+    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+    local char1 = inGamePlayers and inGamePlayers:FindFirstChild(player.Name)
+    if char1 and char1:FindFirstChild("Inventory") then
+        return char1, char1.Inventory
+    end
+    
+    local char2 = player.Character
+    if char2 and char2:FindFirstChild("Inventory") then
+        return char2, char2.Inventory
+    end
+    
+    return nil, nil
 end
 
 -- ==================== MAIN LOGIC ====================
 
 task.spawn(function()
     while true do
-        local char = player.Character
+        local char, inventory = getActiveCharacterAndInventory()
         
-        if char and char:FindFirstChild("Inventory") then
+        if char and inventory then
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
-            if currentHealth then missingHealth = Config.AutoUse.MaxHealth - currentHealth end
+            
+            if currentHealth then 
+                missingHealth = Config.AutoUse.MaxHealth - currentHealth 
+            end
 
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
-                    local slotItem = char.Inventory:FindFirstChild(slotName)
+                    local slotItem = inventory:FindFirstChild(slotName)
                     
                     if slotItem and slotItem:IsA("StringValue") then
-                        local itemName = slotItem.Value
+                        local rawName = slotItem.Value
+                        local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
                         
-                        -- HANYA JALAN JIKA ADA ITEM
                         if itemName ~= "None" and itemName ~= "" then
                             local shouldUse = false
 
@@ -129,7 +140,6 @@ task.spawn(function()
                             end
 
                             if shouldUse then
-                                -- BRUTAL FORCE SPAM (Dibungkus task.spawn agar tidak bikin game freeze/ngelag)
                                 task.spawn(function()
                                     pcall(function() 
                                         ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
