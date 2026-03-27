@@ -55,37 +55,31 @@ local Config = {
     },
     
     -- Jeda aman agar server tidak menolak transaksi karena dianggap spamming
-    BuyDelay = 0.1,
-
-    -- ⏳ [BARU] Waktu tunggu animasi meja toko Dandy naik (dalam detik)
-    StoreLoadDelay = 2.5
+    BuyDelay = 0.1
 }
 -- ==========================================
 
 print("==================================================")
-print(" ⚡ AUTO BUY DANDY SHOP (MOBILE FIX V5) AKTIF ⚡")
+print(" ⚡ AUTO BUY DANDY SHOP (MOBILE FIX + INSTANT) AKTIF ⚡")
 print("==================================================")
 
 local isShopping = false
 
 -- =========================================================================
--- 🔑 FUNGSI BARU: INTERAKSI PROXIMITY (Murni Simulasi Jari / Anti-Dummy)
+-- 🔑 FUNGSI: INTERAKSI PROXIMITY (Murni Simulasi Jari / Anti-Dummy)
 -- =========================================================================
 local function interactWithPrompt(prompt)
-    -- Bypass Keamanan Server agar bisa ditekan walau terhalang meja
     prompt.RequiresLineOfSight = false
     prompt.MaxActivationDistance = math.huge
 
-    -- KITA HAPUS fireproximityprompt KARENA RUSAK DI EKSEKUTOR MOBILE
-    -- Murni menggunakan simulasi tekan layar (Hold Begin)
     pcall(function()
         if prompt.HoldDuration == 0 then
             prompt:InputHoldBegin()
-            task.wait(0.1) -- Jeda klik agar diproses server
+            task.wait(0.1)
             prompt:InputHoldEnd()
         else
             prompt:InputHoldBegin()
-            task.wait(prompt.HoldDuration + 0.1) -- Ditambah 0.1s untuk ping
+            task.wait(prompt.HoldDuration + 0.1) 
             prompt:InputHoldEnd()
         end
     end)
@@ -146,7 +140,7 @@ local function executeBuy(dandyStore)
         local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
         
         if humanoidRootPart then
-            print("[AUTO BUY] Animasi meja selesai. Mengeksekusi " .. #availableItems .. " barang prioritas...")
+            print("[AUTO BUY] Mengeksekusi " .. #availableItems .. " barang prioritas...")
             
             local originalGravity = Workspace.Gravity
             Workspace.Gravity = 0
@@ -156,9 +150,8 @@ local function executeBuy(dandyStore)
                 
                 humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
                 
-                -- [REVISI CFRAME]: Geser ke Z + 2. Posisikan karakter berdiri tegap di DEPAN meja (bukan di atasnya)
-                -- Sama persis posisinya seperti di screenshot yang kamu kirimkan
-                humanoidRootPart.CFrame = itemData.PartCFrame * CFrame.new(0, 0, 2)
+                -- KEMBALI KE POSISI ASLI (Tanpa offset aneh-aneh agar tidak jatuh ke bawah map)
+                humanoidRootPart.CFrame = itemData.PartCFrame
                 task.wait(0.2) 
                 
                 local timeout = 20
@@ -188,7 +181,7 @@ local function executeBuy(dandyStore)
 end
 
 -- =========================================================================
--- 🛡️ SISTEM PEMANTAU STANDBY
+-- 🛡️ SISTEM PEMANTAU STANDBY (INSTANT TRIGGER)
 -- =========================================================================
 local elevatorsFolder = Workspace:WaitForChild("Elevators", 10)
 
@@ -204,9 +197,9 @@ if elevatorsFolder then
                     if not isShopping then
                         isShopping = true
                         
-                        print("🛎️ [AUTO BUY] Toko muncul! Menunggu " .. Config.StoreLoadDelay .. " detik agar animasi meja selesai...")
-                        
-                        task.delay(Config.StoreLoadDelay, function()
+                        -- KEMBALI KE INSTANT DELAY (0.05 Detik)
+                        -- Agar karakter langsung nempel ke lift saat meja baru mau naik!
+                        task.delay(0.05, function()
                             executeBuy(dandyStore)
                         end)
                     end
