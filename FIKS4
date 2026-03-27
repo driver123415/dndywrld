@@ -25,7 +25,8 @@ local scripts = {
     "https://raw.githubusercontent.com/EarthC123/FjoneScript/refs/heads/main/NoxiousAutoFarmFix.lua",--coba ANTI MONSTER JATOH TANAH    
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up   
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Buy",--beli lah
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Use",--mesin lari
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Use",--
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV2",--
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use 
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote",--vote
