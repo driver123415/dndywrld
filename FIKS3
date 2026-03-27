@@ -11,7 +11,7 @@ local function executeScripts(scripts)
 end
 
 local scripts = {
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck",--min3
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",--solo
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey3",--multi
