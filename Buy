@@ -58,7 +58,7 @@ local Config = {
     BuyDelay = 0.1,
 
     -- ⏳ [BARU] Waktu tunggu animasi meja toko Dandy naik (dalam detik)
-    StoreLoadDelay = 2.5
+    StoreLoadDelay = 3.5
 }
 -- ==========================================
 
