@@ -1,0 +1,139 @@
+-- ==============================================================================
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V4 - CUSTOM MAX HEALTH & TOGGLES)
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+local Config = {
+    AutoUse = {
+        Enable = true,      
+        UseInterval = 0.2, 
+        
+        -- SETTING NYAWA KARAKTER (Ubah sesuai jumlah nyawa Toon yang kamu pakai)
+        MaxHealth = 3, 
+        
+        -- SAKLAR SMART USE (Pilih mana yang mau diotomatisasi)
+        EnableAutoHeal = true,      -- Otomatis heal sesuai sisa darah
+        EnableAutoBuff = true,      -- Otomatis makan permen/buff saat didapat (Ubah ke false kalau mau manual)
+        EnableAutoUtility = true,  -- Saran: Dimatikan (false) agar SmokeBomb/Valve tidak terbuang sia-sia
+
+        Slots = {
+            Slot1 = true,
+            Slot2 = true,
+            Slot3 = true,
+            Slot4 = false            
+        },
+        
+        ItemCategories = {
+            SmallHeal = {"Bandage"},
+            BigHeal = {"HealthKit"},
+            StaminaAndBuffs = {
+                "ProteinBar", "SpeedCandy", "StaminaCandy", "ExtractionSpeedCandy", "StealthCandy",
+                "SkillCheckCandy", "Pop", "PopBottle", "Chocolate", "ChocolateBox",
+                "Gumball", "Jawbreaker", "BonBon", "ChristmasCookie", "DandyEasterEggs"
+            },
+            UtilityAndTools = {
+                "Instructions", "JumperCable", "SmokeBomb", "EjectButton", 
+                "Stopwatch", "AirHorn", "Valve", "Tape"
+            }
+        }
+    }
+}
+
+if not Config.AutoUse.Enable then return end
+print("[SYSTEM] Standalone Auto-Use V4 berjalan! Max Health diset: " .. Config.AutoUse.MaxHealth)
+
+-- Fungsi membaca sisa nyawa berdasarkan Config.MaxHealth
+local function getCurrentHealth()
+    local PlayerGui = player:FindFirstChild("PlayerGui")
+    if not PlayerGui then return nil end
+    
+    local contentFolder = PlayerGui:FindFirstChild("ScreenGui")
+        and PlayerGui.ScreenGui:FindFirstChild("Menu")
+        and PlayerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Status")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status:FindFirstChild("Bottom")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom:FindFirstChild("StaminaBin")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin:FindFirstChild("InfoBin")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin:FindFirstChild("HealthBin")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin:FindFirstChild("Bar")
+        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar:FindFirstChild("Content")
+
+    if not contentFolder then return nil end
+
+    local currentHealth = 0
+
+    -- Hanya mengecek Heart sebanyak MaxHealth yang di-setting di Config
+    for i = 1, Config.AutoUse.MaxHealth do 
+        local heart = contentFolder:FindFirstChild("Heart" .. tostring(i))
+        if heart then
+            local pulse = heart:FindFirstChild("Pulse")
+            if pulse and pulse.Visible == true then
+                currentHealth = currentHealth + 1
+            end
+        end
+    end
+
+    return currentHealth
+end
+
+task.spawn(function()
+    while true do
+        local inGamePlayers = workspace:FindFirstChild("InGamePlayers")
+        local char = inGamePlayers and inGamePlayers:FindFirstChild(player.Name) 
+        if not char then char = player.Character end 
+        
+        if char and char:FindFirstChild("Inventory") then
+            -- Hitung nyawa
+            local currentHealth = getCurrentHealth()
+            local missingHealth = 0
+            if currentHealth then
+                missingHealth = Config.AutoUse.MaxHealth - currentHealth
+            end
+
+            -- Scan Inventory
+            for slotName, isActive in pairs(Config.AutoUse.Slots) do
+                if isActive then
+                    local slotItem = char.Inventory:FindFirstChild(slotName)
+                    
+                    if slotItem and slotItem:IsA("StringValue") then
+                        local itemName = slotItem.Value
+                        
+                        if itemName ~= "None" and itemName ~= "" then
+                            local shouldUse = false
+
+                            -- LOGIKA PER KATEGORI
+                            if table.find(Config.ItemCategories.SmallHeal, itemName) then
+                                if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then
+                                    shouldUse = true
+                                end
+                            elseif table.find(Config.ItemCategories.BigHeal, itemName) then
+                                if Config.AutoUse.EnableAutoHeal and missingHealth >= 2 then
+                                    shouldUse = true
+                                end
+                            elseif table.find(Config.ItemCategories.StaminaAndBuffs, itemName) then
+                                if Config.AutoUse.EnableAutoBuff then
+                                    shouldUse = true
+                                end
+                            elseif table.find(Config.ItemCategories.UtilityAndTools, itemName) then
+                                if Config.AutoUse.EnableAutoUtility then
+                                    shouldUse = true
+                                end
+                            end
+
+                            -- Eksekusi
+                            if shouldUse then
+                                pcall(function() 
+                                    ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(Config.AutoUse.UseInterval)
+    end
+end)
