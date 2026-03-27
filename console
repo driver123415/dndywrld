@@ -1,4 +1,4 @@
---NEW CONSOLE MOBILE
+--NEW CONSOLE MOBILE new scroll off
 local screen = Instance.new("ScreenGui")
 screen.IgnoreGuiInset = false
 screen.ResetOnSpawn = true
@@ -47,20 +47,20 @@ uigradient.Parent = uistroke
 
 --// Judul Console (Tengah Atas)
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -40, 0, 30) -- Dikurangi sedikit agar tidak menabrak tombol minimize
-titleLabel.Position = UDim2.new(0, 0, 0, 10)
+titleLabel.Size = UDim2.new(1, -150, 0, 30) -- Dikurangi agar tidak menabrak tombol
+titleLabel.Position = UDim2.new(0, 10, 0, 10)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "CONSOLE"
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 22
-titleLabel.TextXAlignment = Enum.TextXAlignment.Center
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = console
 
---// Tombol Minimize (-) - Dipindahkan ke posisi yang lebih estetis
+--// Tombol Minimize (-)
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -35, 0, 10) -- Diturunkan sedikit
+minimizeBtn.Position = UDim2.new(1, -35, 0, 10)
 minimizeBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
 minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
 minimizeBtn.Font = Enum.Font.SourceSansBold
@@ -71,6 +71,22 @@ minimizeBtn.Parent = console
 local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(1, 0)
 minCorner.Parent = minimizeBtn
+
+--// Tombol Toggle Auto-Scroll
+local autoScrollEnabled = true
+local autoScrollBtn = Instance.new("TextButton")
+autoScrollBtn.Size = UDim2.new(0, 100, 0, 30)
+autoScrollBtn.Position = UDim2.new(1, -145, 0, 10) -- Diposisikan di sebelah kiri tombol minimize
+autoScrollBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34) -- Hijau (ON)
+autoScrollBtn.TextColor3 = Color3.new(1, 1, 1)
+autoScrollBtn.Font = Enum.Font.SourceSansBold
+autoScrollBtn.TextSize = 14
+autoScrollBtn.Text = "AutoScroll: ON"
+autoScrollBtn.Parent = console
+
+local asCorner = Instance.new("UICorner")
+asCorner.CornerRadius = UDim.new(0, 6)
+asCorner.Parent = autoScrollBtn
 
 --// Logic Minimize & Unminimize
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -103,8 +119,8 @@ console_2.Active = true
 console_2.BackgroundColor3 = Color3.new(0.101961, 0.101961, 0.101961)
 console_2.BackgroundTransparency = 1
 console_2.BorderSizePixel = 0
-console_2.Position = UDim2.new(0.02, 0, 0.15, 0) -- Diturunkan agar tidak menutupi tombol minimize
-console_2.Size = UDim2.new(0.96, 0, 0.82, 0) -- Disesuaikan
+console_2.Position = UDim2.new(0.02, 0, 0.15, 0)
+console_2.Size = UDim2.new(0.96, 0, 0.82, 0)
 console_2.Visible = true
 console_2.Name = "ConsoleList"
 console_2.Parent = console
@@ -114,54 +130,54 @@ logs.Name = "Logs"
 logs.Parent = console_2
 
 local uilist_layout = Instance.new("UIListLayout")
-uilist_layout.Padding = UDim.new(0, 10) -- Padding antar log lebih besar
+uilist_layout.Padding = UDim.new(0, 10)
 uilist_layout.SortOrder = Enum.SortOrder.LayoutOrder
-uilist_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Log akan di tengah frame
+uilist_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 uilist_layout.Parent = logs
 
---// Template Frame Log (Example) - Perbaikan Total
+--// Template Frame Log (Example)
 local example = Instance.new("Frame")
 example.BackgroundColor3 = Color3.new(1, 1, 1)
 example.BackgroundTransparency = 1
-example.Size = UDim2.new(1, -15, 0, 30) -- Ukuran fixed untuk list layout
-example.Visible = false -- Disembunyikan agar template asli tidak terlihat
+example.Size = UDim2.new(1, -15, 0, 30)
+example.Visible = false
 example.Name = "Example"
 example.Parent = logs
 
--- Label Baris ("1 - ") - Dipisahkan ke frame sendiri
+-- Label Baris ("1 - ")
 local lineLabel = Instance.new("TextLabel")
-lineLabel.Font = Enum.Font.Code -- Font monospace lebih rapi
+lineLabel.Font = Enum.Font.Code
 lineLabel.Text = "1 - "
 lineLabel.TextColor3 = Color3.new(0.282353, 0.282353, 0.282353)
 lineLabel.TextSize = 14
 lineLabel.BackgroundColor3 = Color3.new(1, 1, 1)
 lineLabel.BackgroundTransparency = 1
 lineLabel.Position = UDim2.new(0, 5, 0, 0)
-lineLabel.Size = UDim2.new(0, 30, 1, 0) -- Lebar wadah label baris
-lineLabel.TextXAlignment = Enum.TextXAlignment.Left -- Teks di kiri
+lineLabel.Size = UDim2.new(0, 30, 1, 0)
+lineLabel.TextXAlignment = Enum.TextXAlignment.Left
 lineLabel.Visible = true
 lineLabel.Name = "LineLabel"
 lineLabel.Parent = example
 
--- Label Teks Log Utama - Diberi ruang besar dan pembungkusan
+-- Label Teks Log Utama
 local logLabel = Instance.new("TextLabel")
-logLabel.Font = Enum.Font.Cartoon -- Sesuai permintaan
+logLabel.Font = Enum.Font.Cartoon
 logLabel.Text = "Log: Hello, World"
 logLabel.TextColor3 = Color3.new(0.423529, 0.8, 1)
 logLabel.TextSize = 14
 logLabel.BackgroundColor3 = Color3.new(1, 1, 1)
 logLabel.BackgroundTransparency = 1
-logLabel.Position = UDim2.new(0, 35, 0, 0) -- Di kanan label baris
-logLabel.Size = UDim2.new(1, -110, 1, 0) -- Disesuaikan agar muat tombol copy
-logLabel.TextXAlignment = Enum.TextXAlignment.Left -- Teks di kiri
-logLabel.TextYAlignment = Enum.TextYAlignment.Center -- Teks di tengah vertikal
-logLabel.TextWrapped = true -- Teks terbungkus ke baris baru
-logLabel.TextScaled = false -- Jangan diskalakan agar keterbacaan terjaga
+logLabel.Position = UDim2.new(0, 35, 0, 0)
+logLabel.Size = UDim2.new(1, -110, 1, 0)
+logLabel.TextXAlignment = Enum.TextXAlignment.Left
+logLabel.TextYAlignment = Enum.TextYAlignment.Center
+logLabel.TextWrapped = true
+logLabel.TextScaled = false
 logLabel.Visible = true
 logLabel.Name = "LogLabel"
 logLabel.Parent = example
 
---// Tombol Copy di dalam log - Tetap sama
+--// Tombol Copy di dalam log
 local copyBtn = Instance.new("TextButton")
 copyBtn.Size = UDim2.new(0, 50, 0, 22)
 copyBtn.Position = UDim2.new(1, -55, 0.5, -11)
@@ -228,6 +244,19 @@ UIS.InputChanged:Connect(function(input)
 	end
 end)
 
+--// Logic Toggle Auto-Scroll
+autoScrollBtn.MouseButton1Click:Connect(function()
+	autoScrollEnabled = not autoScrollEnabled
+	if autoScrollEnabled then
+		autoScrollBtn.Text = "AutoScroll: ON"
+		autoScrollBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34) -- Hijau
+		-- Langsung scroll ke paling bawah saat dinyalakan kembali
+		console_2.CanvasPosition = Vector2.new(0, console_2.CanvasSize.Y.Offset)
+	else
+		autoScrollBtn.Text = "AutoScroll: OFF"
+		autoScrollBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2) -- Merah
+	end
+end)
 
 --// Hook & Core Script
 task.spawn(function()
@@ -267,9 +296,13 @@ task.spawn(function()
 
 		NewFrame.Parent = Logs
 		
-		-- Auto-scroll mengikuti log terbaru
+		-- Update ukuran Canvas agar list bisa terus bertambah
 		console_2.CanvasSize = UDim2.new(0, 0, 0, uilist_layout.AbsoluteContentSize.Y + 10)
-		console_2.CanvasPosition = Vector2.new(0, console_2.CanvasSize.Y.Offset)
+		
+		-- Auto-scroll hanya dieksekusi jika fiturnya menyala
+		if autoScrollEnabled then
+			console_2.CanvasPosition = Vector2.new(0, console_2.CanvasSize.Y.Offset)
+		end
 	end
 
 	local function tableToString(tbl)
