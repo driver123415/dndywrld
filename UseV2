@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V8 - SPECIAL MACHINE ITEMS)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V10 - PURE BRUTAL FORCE)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -10,8 +10,7 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,      
-        UseInterval = 0.2, 
-        MaxAttempts = 10, 
+        UseInterval = 0.2, -- Kecepatan spam (0.2 detik)
         
         MaxHealth = 3, 
         
@@ -19,14 +18,14 @@ local Config = {
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
         EnableAutoUtility = true,  
-        EnableAutoMachineItem = true, -- [BARU] Otomatis pakai Valve/Stopwatch/dll saat ekstrak mesin
+        EnableAutoMachineItem = true, 
 
         Slots = {
             Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false            
         },
         
         ItemCategories = {
-            SmallHeal = {"Bandage"}, -- ProteinBar dipindah ke StaminaAndBuffs
+            SmallHeal = {"Bandage"},
             BigHeal = {"HealthKit"},
             StaminaAndBuffs = {
                 "ProteinBar", "SpeedCandy", "StaminaCandy", "ExtractionSpeedCandy", "StealthCandy",
@@ -36,7 +35,7 @@ local Config = {
             UtilityAndTools = {
                 "SmokeBomb", "EjectButton", "AirHorn", "Tape"
             },
-            MachineItems = { -- [BARU] Kategori Khusus Item Ekstrak Mesin
+            MachineItems = { 
                 "Stopwatch", "Valve", "JumperCable", "Instructions"
             }
         }
@@ -44,7 +43,7 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Standalone Auto-Use V8 (Special Machine Items) berjalan!")
+print("[SYSTEM] Standalone Auto-Use V10 berjalan! (No Blacklist / Brutal Force Mode)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
@@ -91,31 +90,11 @@ local function isInteractingUI()
     return false
 end
 
-local function getMap()
-    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
-end
-
 -- ==================== MAIN LOGIC ====================
-
-local slotAttempts = {}
-local blacklistedSlots = {}
-local lastSeenItem = {}
-local currentMapModel = getMap()
 
 task.spawn(function()
     while true do
-        -- Cek Perpindahan Lantai
-        local newMapModel = getMap()
-        if currentMapModel ~= newMapModel then
-            currentMapModel = newMapModel
-            print("\n[SYSTEM] 🏢 Lantai Baru Terdeteksi! Me-reset blacklist slot...")
-            for k, _ in pairs(blacklistedSlots) do blacklistedSlots[k] = false end
-            for k, _ in pairs(slotAttempts) do slotAttempts[k] = 0 end
-        end
-
-        local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
-        local char = inGamePlayers and inGamePlayers:FindFirstChild(player.Name) 
-        if not char then char = player.Character end 
+        local char = player.Character
         
         if char and char:FindFirstChild("Inventory") then
             local currentHealth = getCurrentHealth()
@@ -129,20 +108,12 @@ task.spawn(function()
                     if slotItem and slotItem:IsA("StringValue") then
                         local itemName = slotItem.Value
                         
-                        if lastSeenItem[slotName] ~= itemName then
-                            lastSeenItem[slotName] = itemName
-                            slotAttempts[slotName] = 0
-                            blacklistedSlots[slotName] = false
-                        end
-
-                        if itemName ~= "None" and itemName ~= "" and not blacklistedSlots[slotName] then
+                        -- HANYA JALAN JIKA ADA ITEM
+                        if itemName ~= "None" and itemName ~= "" then
                             local shouldUse = false
 
-                            -- LOGIKA BARU UNTUK 4 ITEM SPESIAL
                             if table.find(Config.ItemCategories.MachineItems, itemName) then
-                                if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then 
-                                    shouldUse = true 
-                                end
+                                if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then shouldUse = true end
 
                             elseif table.find(Config.ItemCategories.SmallHeal, itemName) then
                                 if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then shouldUse = true end
@@ -158,16 +129,12 @@ task.spawn(function()
                             end
 
                             if shouldUse then
-                                slotAttempts[slotName] = (slotAttempts[slotName] or 0) + 1
-                                
-                                if slotAttempts[slotName] >= Config.AutoUse.MaxAttempts then
-                                    blacklistedSlots[slotName] = true
-                                    warn("[Auto-Use] Slot " .. slotName .. " DIBLACKLIST sementara! (Gagal " .. Config.AutoUse.MaxAttempts .. "x)")
-                                else
+                                -- BRUTAL FORCE SPAM (Dibungkus task.spawn agar tidak bikin game freeze/ngelag)
+                                task.spawn(function()
                                     pcall(function() 
                                         ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
                                     end)
-                                end
+                                end)
                             end
                         end
                     end
