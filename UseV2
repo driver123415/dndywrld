@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V7 - FINAL MASTERPIECE)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V8 - SPECIAL MACHINE ITEMS)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -11,41 +11,43 @@ local Config = {
     AutoUse = {
         Enable = true,      
         UseInterval = 0.2, 
-        MaxAttempts = 10, -- Batas tembakan sebelum slot diblacklist (mencegah spam)
+        MaxAttempts = 10, 
         
-        MaxHealth = 3, -- Sesuaikan dengan maksimal nyawa karaktermu
+        MaxHealth = 3, 
         
+        -- SAKLAR KONTROL UTAMA
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        EnableAutoUtility = false,  -- Tetap false agar utility biasa tidak terbuang
+        EnableAutoUtility = true,  
+        EnableAutoMachineItem = true, -- [BARU] Otomatis pakai Valve/Stopwatch/dll saat ekstrak mesin
 
         Slots = {
             Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false            
         },
         
         ItemCategories = {
-            SmallHeal = {"Bandage", "ProteinBar"},
+            SmallHeal = {"Bandage"}, -- ProteinBar dipindah ke StaminaAndBuffs
             BigHeal = {"HealthKit"},
             StaminaAndBuffs = {
-                "SpeedCandy", "StaminaCandy", "ExtractionSpeedCandy", "StealthCandy",
+                "ProteinBar", "SpeedCandy", "StaminaCandy", "ExtractionSpeedCandy", "StealthCandy",
                 "SkillCheckCandy", "Pop", "PopBottle", "Chocolate", "ChocolateBox",
                 "Gumball", "Jawbreaker", "BonBon", "ChristmasCookie", "DandyEasterEggs"
             },
             UtilityAndTools = {
-                "Instructions", "JumperCable", "SmokeBomb", "EjectButton", 
-                "AirHorn", "Valve", "Tape"
-                -- "Stopwatch" sengaja tidak dimasukkan ke sini karena dia punya logika spesial
+                "SmokeBomb", "EjectButton", "AirHorn", "Tape"
+            },
+            MachineItems = { -- [BARU] Kategori Khusus Item Ekstrak Mesin
+                "Stopwatch", "Valve", "JumperCable", "Instructions"
             }
         }
     }
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Standalone Auto-Use V7 (Smart & Context-Aware) berjalan!")
+print("[SYSTEM] Standalone Auto-Use V8 (Special Machine Items) berjalan!")
 
 -- ==================== HELPER FUNCTIONS ====================
 
--- Membaca nyawa dari UI Heart
 local function getCurrentHealth()
     local PlayerGui = player:FindFirstChild("PlayerGui")
     if not PlayerGui then return nil end
@@ -74,7 +76,6 @@ local function getCurrentHealth()
     return currentHealth
 end
 
--- Mengecek apakah UI Skill Check (StopGenerator) sedang aktif
 local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
     if playerGui then
@@ -90,7 +91,6 @@ local function isInteractingUI()
     return false
 end
 
--- Mendapatkan model Map/Lantai saat ini
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
@@ -104,11 +104,11 @@ local currentMapModel = getMap()
 
 task.spawn(function()
     while true do
-        -- 1. CEK PERPINDAHAN LANTAI (RESET BLACKLIST)
+        -- Cek Perpindahan Lantai
         local newMapModel = getMap()
         if currentMapModel ~= newMapModel then
             currentMapModel = newMapModel
-            print("\n[SYSTEM] 🏢 Lantai Baru Terdeteksi! Me-reset semua blacklist slot...")
+            print("\n[SYSTEM] 🏢 Lantai Baru Terdeteksi! Me-reset blacklist slot...")
             for k, _ in pairs(blacklistedSlots) do blacklistedSlots[k] = false end
             for k, _ in pairs(slotAttempts) do slotAttempts[k] = 0 end
         end
@@ -118,7 +118,6 @@ task.spawn(function()
         if not char then char = player.Character end 
         
         if char and char:FindFirstChild("Inventory") then
-            -- Hitung nyawa yang kurang
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
             if currentHealth then missingHealth = Config.AutoUse.MaxHealth - currentHealth end
@@ -130,7 +129,6 @@ task.spawn(function()
                     if slotItem and slotItem:IsA("StringValue") then
                         local itemName = slotItem.Value
                         
-                        -- RESET BLACKLIST JIKA ITEM DI SLOT BERUBAH / DIBUANG
                         if lastSeenItem[slotName] ~= itemName then
                             lastSeenItem[slotName] = itemName
                             slotAttempts[slotName] = 0
@@ -140,10 +138,11 @@ task.spawn(function()
                         if itemName ~= "None" and itemName ~= "" and not blacklistedSlots[slotName] then
                             local shouldUse = false
 
-                            -- LOGIKA PENGGUNAAN ITEM
-                            if itemName == "Stopwatch" then
-                                -- SPESIAL STOPWATCH: Hanya aktif saat sedang ekstrak mesin
-                                if isInteractingUI() then shouldUse = true end
+                            -- LOGIKA BARU UNTUK 4 ITEM SPESIAL
+                            if table.find(Config.ItemCategories.MachineItems, itemName) then
+                                if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then 
+                                    shouldUse = true 
+                                end
 
                             elseif table.find(Config.ItemCategories.SmallHeal, itemName) then
                                 if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then shouldUse = true end
@@ -158,13 +157,12 @@ task.spawn(function()
                                 if Config.AutoUse.EnableAutoUtility then shouldUse = true end
                             end
 
-                            -- EKSEKUSI PENGGUNAAN ITEM
                             if shouldUse then
                                 slotAttempts[slotName] = (slotAttempts[slotName] or 0) + 1
                                 
                                 if slotAttempts[slotName] >= Config.AutoUse.MaxAttempts then
                                     blacklistedSlots[slotName] = true
-                                    warn("[Auto-Use] Slot " .. slotName .. " DIBLACKLIST sementara! (Server menolak item).")
+                                    warn("[Auto-Use] Slot " .. slotName .. " DIBLACKLIST sementara! (Gagal " .. Config.AutoUse.MaxAttempts .. "x)")
                                 else
                                     pcall(function() 
                                         ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
