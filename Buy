@@ -55,18 +55,21 @@ local Config = {
     },
     
     -- Jeda aman agar server tidak menolak transaksi karena dianggap spamming
-    BuyDelay = 0.1
+    BuyDelay = 0.1,
+
+    -- ⏳ [BARU] Waktu tunggu animasi meja toko Dandy naik (dalam detik)
+    StoreLoadDelay = 2.5
 }
 -- ==========================================
 
 print("==================================================")
-print(" ⚡ AUTO BUY DANDY SHOP (MOBILE FIX + INSTANT) AKTIF ⚡")
+print(" ⚡ AUTO BUY DANDY SHOP (SOLID PLATFORM V6) AKTIF ⚡")
 print("==================================================")
 
 local isShopping = false
 
 -- =========================================================================
--- 🔑 FUNGSI: INTERAKSI PROXIMITY (Murni Simulasi Jari / Anti-Dummy)
+-- 🔑 FUNGSI: INTERAKSI PROXIMITY MURNI
 -- =========================================================================
 local function interactWithPrompt(prompt)
     prompt.RequiresLineOfSight = false
@@ -75,11 +78,11 @@ local function interactWithPrompt(prompt)
     pcall(function()
         if prompt.HoldDuration == 0 then
             prompt:InputHoldBegin()
-            task.wait(0.1)
+            task.wait(0.15) -- Jeda simulasi ketukan layar diperbesar sedikit agar server merespon
             prompt:InputHoldEnd()
         else
             prompt:InputHoldBegin()
-            task.wait(prompt.HoldDuration + 0.1) 
+            task.wait(prompt.HoldDuration + 0.1)
             prompt:InputHoldEnd()
         end
     end)
@@ -140,19 +143,31 @@ local function executeBuy(dandyStore)
         local humanoidRootPart = character and character:FindFirstChild("HumanoidRootPart")
         
         if humanoidRootPart then
-            print("[AUTO BUY] Mengeksekusi " .. #availableItems .. " barang prioritas...")
+            print("[AUTO BUY] Animasi meja selesai. Mengeksekusi " .. #availableItems .. " barang prioritas...")
             
-            local originalGravity = Workspace.Gravity
-            Workspace.Gravity = 0
+            -- [TRIK BARU] Membuat pijakan fisik sementara (Platform)
+            local platform = Instance.new("Part")
+            platform.Size = Vector3.new(10, 1, 10)
+            platform.Anchored = true
+            platform.CanCollide = true
+            platform.Transparency = 1 -- Dibuat tembus pandang
+            platform.Parent = Workspace
             
             for _, itemData in ipairs(availableItems) do
                 print("⚡ [INSTANT BUY] Mengambil: " .. itemData.Name)
                 
+                -- Hapus rotasi bawaan objek agar teleportasi tidak miring (anti nyangkut)
+                local promptPos = itemData.PartCFrame.Position
+                
+                -- Posisikan platform tepat di bawah karakter
+                platform.CFrame = CFrame.new(promptPos + Vector3.new(0, -3.5, 0))
+                
+                -- Teleport karakter pas di posisi barang
+                humanoidRootPart.CFrame = CFrame.new(promptPos)
                 humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
                 
-                -- KEMBALI KE POSISI ASLI (Tanpa offset aneh-aneh agar tidak jatuh ke bawah map)
-                humanoidRootPart.CFrame = itemData.PartCFrame
-                task.wait(0.2) 
+                -- [SANGAT KRUSIAL] Jeda 0.3 detik agar Server me-register karaktermu SEDANG BERDIRI stabil (Grounded)
+                task.wait(0.3) 
                 
                 local timeout = 20
                 while not itemData.PromptObj.Enabled and timeout > 0 do
@@ -169,7 +184,8 @@ local function executeBuy(dandyStore)
                 task.wait(Config.BuyDelay) 
             end
             
-            Workspace.Gravity = originalGravity
+            -- Hapus platform setelah selesai memborong
+            platform:Destroy()
             print("[AUTO BUY] Sapu bersih selesai!")
         end
     else
@@ -181,7 +197,7 @@ local function executeBuy(dandyStore)
 end
 
 -- =========================================================================
--- 🛡️ SISTEM PEMANTAU STANDBY (INSTANT TRIGGER)
+-- 🛡️ SISTEM PEMANTAU STANDBY
 -- =========================================================================
 local elevatorsFolder = Workspace:WaitForChild("Elevators", 10)
 
@@ -197,9 +213,9 @@ if elevatorsFolder then
                     if not isShopping then
                         isShopping = true
                         
-                        -- KEMBALI KE INSTANT DELAY (0.05 Detik)
-                        -- Agar karakter langsung nempel ke lift saat meja baru mau naik!
-                        task.delay(0.05, function()
+                        print("🛎️ [AUTO BUY] Toko muncul! Menunggu " .. Config.StoreLoadDelay .. " detik agar animasi meja selesai...")
+                        
+                        task.delay(Config.StoreLoadDelay, function()
                             executeBuy(dandyStore)
                         end)
                     end
