@@ -1,21 +1,21 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V13 - ULTIMATE PATH FIX)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V14 - THE REAL MASTERPIECE)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
 local Config = {
     AutoUse = {
         Enable = true,      
-        UseInterval = 0.2, 
+        UseInterval = 0.2, -- Spam brutal tiap 0.2 detik
         MaxHealth = 3, 
         
+        -- SAKLAR KONTROL UTAMA
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        EnableAutoUtility = true,  
+        EnableAutoUtility = false,  
         EnableAutoMachineItem = true, 
 
         Slots = {
@@ -41,13 +41,14 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
+print("[SYSTEM] Smart Auto Use V14 Berjalan! (Fitur Lengkap + Deteksi Value Simpel & Brutal)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
 local function getCurrentHealth()
     local PlayerGui = player:FindFirstChild("PlayerGui")
     
-    -- [PATH FIX 100% SESUAI GAMBAR TERBARU]
+    -- Jalur UI yang 100% sudah Fix sesuai gambar terakhir
     local contentFolder = PlayerGui and PlayerGui:FindFirstChild("ScreenGui")
         and PlayerGui.ScreenGui:FindFirstChild("Menu")
         and PlayerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
@@ -83,28 +84,14 @@ local function isInteractingUI()
     return false
 end
 
-local function getActiveCharacterAndInventory()
-    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
-    local char1 = inGamePlayers and inGamePlayers:FindFirstChild(player.Name)
-    if char1 and char1:FindFirstChild("Inventory") then
-        return char1, char1.Inventory
-    end
-    
-    local char2 = player.Character
-    if char2 and char2:FindFirstChild("Inventory") then
-        return char2, char2.Inventory
-    end
-    
-    return nil, nil
-end
-
 -- ==================== MAIN LOGIC ====================
 
 task.spawn(function()
     while true do
-        local char, inventory = getActiveCharacterAndInventory()
+        -- Kita pakai player.Character langsung karena itu yang diminta server di log Cobalt
+        local char = player.Character
         
-        if char and inventory then
+        if char and char:FindFirstChild("Inventory") then
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
             
@@ -114,15 +101,18 @@ task.spawn(function()
 
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
-                    local slotItem = inventory:FindFirstChild(slotName)
+                    local slotItem = char.Inventory:FindFirstChild(slotName)
                     
                     if slotItem and slotItem:IsA("StringValue") then
+                        -- Ambil nama item, bersihin dari spasi nyasar biar aman
                         local rawName = slotItem.Value
                         local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
                         
+                        -- LOGIKA SIMPEL: Jika Value bukan "None" dan tidak kosong
                         if itemName ~= "None" and itemName ~= "" then
                             local shouldUse = false
 
+                            -- Filter lewat Otak Pintar (Kategori & Kondisi)
                             if table.find(Config.ItemCategories.MachineItems, itemName) then
                                 if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then shouldUse = true end
 
@@ -139,6 +129,7 @@ task.spawn(function()
                                 if Config.AutoUse.EnableAutoUtility then shouldUse = true end
                             end
 
+                            -- Eksekusi: SPAM BRUTAL JIKA SYARAT TERPENUHI
                             if shouldUse then
                                 task.spawn(function()
                                     pcall(function() 
