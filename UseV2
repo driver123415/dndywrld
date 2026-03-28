@@ -14,7 +14,7 @@ local Config = {
         
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        EnableAutoUtility = false,  
+        EnableAutoUtility = true,  
         EnableAutoMachineItem = true, 
 
         Slots = { Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false },
