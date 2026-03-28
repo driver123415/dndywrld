@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V27 - OMNI STRING MATCHER FIX)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V28 - FIXED)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -12,7 +12,6 @@ local Config = {
         UseInterval = 0.1, 
         MaxHealth = 3, 
         
-        -- SAKLAR FITUR (TIDAK ADA YANG DIHAPUS)
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
         EnableAutoUtility = true,  
@@ -35,21 +34,28 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V27 Berjalan! (Omni-Matcher Anti Karakter Gaib)")
+print("[SYSTEM] Smart Auto-Use V28 Berjalan!")
 
--- Siapkan Remote Event di awal agar tidak delay/yield saat loop berjalan
 local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
 
 -- ==================== HELPER FUNCTIONS ====================
 
--- [BARU] Fungsi Pencocok Super Agresif (Mengabaikan karakter gaib/spasi)
+-- [FIX] Ambil nama item dengan aman: coba .Value dulu, fallback ke .Name
+local function getItemName(slotItem)
+    -- Kalau StringValue, ambil .Value (isi nama item)
+    if slotItem:IsA("StringValue") then
+        return slotItem.Value
+    end
+    -- Fallback: pakai .Name dari instance-nya langsung
+    return slotItem.Name
+end
+
 local function isItemInCategory(itemName, categoryTable)
-    if not itemName then return false end
+    -- [FIX] Guard nil di sini, bukan di luar
+    if not itemName or itemName == "" then return false end
     local lowerItemName = string.lower(itemName)
-    
     for _, catItem in ipairs(categoryTable) do
-        -- Jika nama kategori ADA DI DALAM nama item, maka sah!
-        if string.find(lowerItemName, string.lower(catItem)) then
+        if string.find(lowerItemName, string.lower(catItem), 1, true) then
             return true
         end
     end
@@ -64,7 +70,6 @@ task.spawn(function()
         
         if char and char:FindFirstChild("Inventory") then
             
-            -- OTAK PINTAR (Diisolasi pakai pcall agar anti-crash kalau UI belum load)
             local missingHealth = 0
             local isExtracting = false
             
@@ -99,19 +104,19 @@ task.spawn(function()
                 end
             end)
 
-            -- PROSES INVENTORY
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
                     
-                    if slotItem and slotItem:IsA("StringValue") then
-                        local val = slotItem.Value
+                    -- [FIX] Hapus IsA("StringValue"), cukup cek exists saja seperti Script 1
+                    if slotItem then
+                        -- [FIX] Pakai fungsi getItemName yang aman
+                        local val = getItemName(slotItem)
                         
-                        -- Pastikan tidak kosong dan bukan "None"
-                        if val and string.find(string.lower(val), "none") == nil and val ~= "" then
+                        -- [FIX] Guard nil dipindah ke dalam isItemInCategory, cukup cek "none" di sini
+                        if val and val ~= "" and not string.find(string.lower(val), "none", 1, true) then
                             local shouldUse = false
                             
-                            -- PENCARIAN AGRESIF MENGGUNAKAN OMNI-MATCHER
                             if isItemInCategory(val, Config.ItemCategories.MachineItems) then
                                 shouldUse = Config.AutoUse.EnableAutoMachineItem and isExtracting
                             elseif isItemInCategory(val, Config.ItemCategories.SmallHeal) then
@@ -124,11 +129,9 @@ task.spawn(function()
                                 shouldUse = Config.AutoUse.EnableAutoUtility
                             end
 
-                            -- EKSEKUSI (Fotokopi 100% dari Remote Spy aslimu)
                             if shouldUse then
                                 pcall(function() 
-                                    local args = { char, slotItem }
-                                    ItemEvent:InvokeServer(unpack(args))
+                                    ItemEvent:InvokeServer(char, slotItem)
                                 end)
                             end
                         end
