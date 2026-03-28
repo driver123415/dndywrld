@@ -34,7 +34,7 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V28 Berjalan!")
+print("[SYSTEM] Smart Auto-Use V29 Berjalan!")
 
 local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
 
