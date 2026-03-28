@@ -1,7 +1,3 @@
--- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V28 - ISOLATION TEST)
--- ==============================================================================
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
@@ -9,59 +5,124 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.1, 
-        
+        UseInterval = 1, -- Diperlambat biar log mudah dibaca
+        MaxHealth = 3, 
+        EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        
+        EnableAutoUtility = true,  
+        EnableAutoMachineItem = true, 
         Slots = { Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false },
-        
         ItemCategories = {
+            SmallHeal = {"Bandage"},
+            BigHeal = {"HealthKit"},
             StaminaAndBuffs = {
                 "ProteinBar", "SpeedCandy", "StaminaCandy", "ExtractionSpeedCandy", "StealthCandy",
                 "SkillCheckCandy", "Pop", "PopBottle", "Chocolate", "ChocolateBox",
                 "Gumball", "Jawbreaker", "BonBon", "ChristmasCookie", "DandyEasterEggs"
-            }
+            },
+            UtilityAndTools = { "SmokeBomb", "EjectButton", "AirHorn", "Tape" },
+            MachineItems = { "Stopwatch", "Valve", "JumperCable", "Instructions" }
         }
     }
 }
 
-if not Config.AutoUse.Enable then return end
-print("[SYSTEM] V28 Berjalan: Mengetes Filter Kategori (Tanpa UI Check)")
+local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
+
+local function getItemName(slotItem)
+    if slotItem:IsA("StringValue") then return slotItem.Value end
+    if slotItem:IsA("ObjectValue") and slotItem.Value then return slotItem.Value.Name end
+    return slotItem.Name
+end
+
+local function isItemInCategory(itemName, categoryTable)
+    if not itemName or itemName == "" then return false end
+    local lower = string.lower(itemName)
+    for _, catItem in ipairs(categoryTable) do
+        if string.find(lower, string.lower(catItem), 1, true) then
+            return true
+        end
+    end
+    return false
+end
 
 task.spawn(function()
     while true do
         local char = player.Character
         if char and char:FindFirstChild("Inventory") then
-            
+
+            -- Baca health
+            local missingHealth = 0
+            local isExtracting = false
+            pcall(function()
+                local pGui = player:FindFirstChild("PlayerGui")
+                if pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("Menu") then
+                    local stopGen = pGui.ScreenGui.Menu:FindFirstChild("StopGenerator")
+                    if stopGen and stopGen.Visible then isExtracting = true end
+
+                    local content = pGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
+                        and pGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Status")
+                        and pGui.ScreenGui.Menu.BottomLeftCorner.Status:FindFirstChild("Bottom")
+                        and pGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom:FindFirstChild("StaminaBin")
+                        and pGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin:FindFirstChild("InfoBin")
+                        and pGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin:FindFirstChild("HealthBin")
+                        and pGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin:FindFirstChild("Bar")
+                        and pGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar:FindFirstChild("Content")
+
+                    if content then
+                        local currentHP = 0
+                        for i = 1, Config.AutoUse.MaxHealth do
+                            local heart = content:FindFirstChild("Heart" .. i)
+                            if heart and heart:FindFirstChild("Pulse") and heart.Pulse.Visible then
+                                currentHP += 1
+                            end
+                        end
+                        missingHealth = Config.AutoUse.MaxHealth - currentHP
+                    end
+                end
+            end)
+
+            -- LOG STATUS
+            print(string.format("[DEBUG] missingHealth=%d | isExtracting=%s", missingHealth, tostring(isExtracting)))
+
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
-                    
-                    if slotItem and slotItem:IsA("StringValue") then
-                        local val = string.gsub(slotItem.Value, "%s+", "") -- Bersihin spasi
-                        
-                        -- LOGIKA PINTAR: HANYA CEK KATEGORI BUFF
-                        if val ~= "None" and val ~= "" then
+                    if slotItem then
+                        local val = getItemName(slotItem)
+                        print(string.format("[DEBUG] %s → val='%s' | class='%s'", slotName, tostring(val), slotItem.ClassName))
+
+                        if val and val ~= "" and not string.find(string.lower(val), "none", 1, true) then
                             local shouldUse = false
-                            
-                            -- Cocokkan dengan kategori StaminaAndBuffs
-                            for _, buffName in ipairs(Config.ItemCategories.StaminaAndBuffs) do
-                                if string.find(string.lower(val), string.lower(buffName)) then
-                                    shouldUse = Config.AutoUse.EnableAutoBuff
-                                    break
-                                end
+                            local reason = "NO CATEGORY MATCH"
+
+                            if isItemInCategory(val, Config.ItemCategories.MachineItems) then
+                                shouldUse = Config.AutoUse.EnableAutoMachineItem and isExtracting
+                                reason = "MachineItem, isExtracting=" .. tostring(isExtracting)
+                            elseif isItemInCategory(val, Config.ItemCategories.SmallHeal) then
+                                shouldUse = Config.AutoUse.EnableAutoHeal and (missingHealth >= 1)
+                                reason = "SmallHeal, missingHealth=" .. missingHealth
+                            elseif isItemInCategory(val, Config.ItemCategories.BigHeal) then
+                                shouldUse = Config.AutoUse.EnableAutoHeal and (missingHealth >= 2)
+                                reason = "BigHeal, missingHealth=" .. missingHealth
+                            elseif isItemInCategory(val, Config.ItemCategories.StaminaAndBuffs) then
+                                shouldUse = Config.AutoUse.EnableAutoBuff
+                                reason = "Buff"
+                            elseif isItemInCategory(val, Config.ItemCategories.UtilityAndTools) then
+                                shouldUse = Config.AutoUse.EnableAutoUtility
+                                reason = "Utility"
                             end
 
-                            -- EKSEKUSI JIKA COCOK
+                            print(string.format("[DEBUG] → reason='%s' | shouldUse=%s", reason, tostring(shouldUse)))
+
                             if shouldUse then
-                                print("[ACTION] 🔥 Menemukan Item Buff! Mengeksekusi: " .. val)
-                                pcall(function() 
-                                    local args = { char, slotItem }
-                                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(unpack(args))
-                                end)
+                                pcall(function() ItemEvent:InvokeServer(char, slotItem) end)
+                                print("[DEBUG] → ✅ FIRED!")
                             end
+                        else
+                            print("[DEBUG] → SKIP (val kosong/none)")
                         end
-                        
+                    else
+                        print("[DEBUG] " .. slotName .. " → SLOT KOSONG")
                     end
                 end
             end
