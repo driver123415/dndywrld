@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V18 - DEBUGGER / CCTV EDITION)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V20 - FLOOR UPDATE DEBUGGER)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -10,7 +10,7 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 1, -- Diperlambat jadi 1 detik khusus untuk baca F9
+        UseInterval = 0.2,          
         MaxHealth = 3, 
         
         EnableAutoHeal = true,      
@@ -18,7 +18,9 @@ local Config = {
         EnableAutoUtility = false,  
         EnableAutoMachineItem = true, 
 
-        Slots = { Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false },
+        Slots = {
+            Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false            
+        },
         
         ItemCategories = {
             SmallHeal = {"Bandage"},
@@ -28,14 +30,18 @@ local Config = {
                 "SkillCheckCandy", "Pop", "PopBottle", "Chocolate", "ChocolateBox",
                 "Gumball", "Jawbreaker", "BonBon", "ChristmasCookie", "DandyEasterEggs"
             },
-            UtilityAndTools = { "SmokeBomb", "EjectButton", "AirHorn", "Tape" },
-            MachineItems = { "Stopwatch", "Valve", "JumperCable", "Instructions" }
+            UtilityAndTools = {
+                "SmokeBomb", "EjectButton", "AirHorn", "Tape"
+            },
+            MachineItems = { 
+                "Stopwatch", "Valve", "JumperCable", "Instructions"
+            }
         }
     }
 }
 
 if not Config.AutoUse.Enable then return end
-print("[DEBUG] Standalone Auto-Use V18 (Debugger) Berjalan!")
+print("[SYSTEM] Smart Auto-Use V20 Berjalan! (Dengan Floor-Update Debugger)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
@@ -52,10 +58,7 @@ local function getCurrentHealth()
         and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin:FindFirstChild("Bar")
         and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar:FindFirstChild("Content")
 
-    if not contentFolder then 
-        print("[DEBUG-ERROR] Gagal menemukan folder Content untuk Health!")
-        return nil 
-    end
+    if not contentFolder then return nil end
 
     local currentHealth = 0
     for i = 1, Config.AutoUse.MaxHealth do 
@@ -79,19 +82,48 @@ local function isInteractingUI()
     return false
 end
 
+-- Deteksi Lantai/Room Saat Ini
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
+
 -- ==================== MAIN LOGIC ====================
+
+local currentMapModel = getMap()
 
 task.spawn(function()
     while true do
-        local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
-        local realChar = inGamePlayers and inGamePlayers:FindFirstChild(player.Name)
-        local dummyChar = player.Character
+        local char = player.Character or player.CharacterAdded:Wait()
+        local inventory = char:WaitForChild("Inventory", 5) 
         
-        local readInventory = (realChar and realChar:FindFirstChild("Inventory")) or (dummyChar and dummyChar:FindFirstChild("Inventory"))
-        local sendInventory = dummyChar and dummyChar:FindFirstChild("Inventory")
+        -- Cek apakah kita pindah lantai
+        local newMapModel = getMap()
+        if currentMapModel ~= newMapModel then
+            currentMapModel = newMapModel
+            
+            -- [DEBUGGER AKTIF HANYA SAAT PINDAH LANTAI]
+            print("\n==============================================")
+            print("[DEBUG] 🏢 Update Lantai Baru!")
+            if inventory then
+                for i = 1, 3 do
+                    local sName = "Slot" .. tostring(i)
+                    local sItem = inventory:FindFirstChild(sName)
+                    if sItem and sItem:IsA("StringValue") then
+                        local iName = string.match(sItem.Value, "^%s*(.-)%s*$") or sItem.Value
+                        if iName ~= "None" and iName ~= "" then
+                            print("  -> " .. sName .. " : Terdeteksi Item [" .. iName .. "]")
+                        else
+                            print("  -> " .. sName .. " : Kosong (None)")
+                        end
+                    end
+                end
+            else
+                print("  -> Inventory belum siap saat absen lantai.")
+            end
+            print("==============================================\n")
+        end
 
-        -- Hanya nge-print kalau Inventory ketemu biar gak spam banget
-        if readInventory then
+        if char and inventory then
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
             if currentHealth then 
@@ -100,66 +132,42 @@ task.spawn(function()
 
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
-                    local realSlot = readInventory:FindFirstChild(slotName)
-                    local dummySlot = sendInventory and sendInventory:FindFirstChild(slotName)
+                    local slotItem = inventory:WaitForChild(slotName, 1)
                     
-                    if realSlot and realSlot:IsA("StringValue") then
-                        local rawName = realSlot.Value
+                    if slotItem and slotItem:IsA("StringValue") then
+                        local rawName = slotItem.Value
                         local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
                         
-                        -- JIKA ADA ITEM, KITA FOKUS DEBUG DI SINI
+                        -- LOGIKA EKSEKUSI
                         if itemName ~= "None" and itemName ~= "" then
-                            print("--------------------------------------------------")
-                            print("[DEBUG] 1. ITEM DITEMUKAN: " .. itemName .. " di " .. slotName)
-                            print("[DEBUG] 2. STATUS: Darah Kurang=" .. tostring(missingHealth) .. " | Ekstrak Mesin=" .. tostring(isInteractingUI()))
-                            
                             local shouldUse = false
 
                             if table.find(Config.ItemCategories.MachineItems, itemName) then
                                 if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then shouldUse = true end
-                                print("[DEBUG] 3. Cek MachineItems: " .. tostring(shouldUse))
 
                             elseif table.find(Config.ItemCategories.SmallHeal, itemName) then
                                 if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then shouldUse = true end
-                                print("[DEBUG] 3. Cek SmallHeal: " .. tostring(shouldUse))
 
                             elseif table.find(Config.ItemCategories.BigHeal, itemName) then
                                 if Config.AutoUse.EnableAutoHeal and missingHealth >= 2 then shouldUse = true end
-                                print("[DEBUG] 3. Cek BigHeal: " .. tostring(shouldUse))
 
                             elseif table.find(Config.ItemCategories.StaminaAndBuffs, itemName) then
                                 if Config.AutoUse.EnableAutoBuff then shouldUse = true end
-                                print("[DEBUG] 3. Cek StaminaAndBuffs: " .. tostring(shouldUse))
 
                             elseif table.find(Config.ItemCategories.UtilityAndTools, itemName) then
                                 if Config.AutoUse.EnableAutoUtility then shouldUse = true end
-                                print("[DEBUG] 3. Cek UtilityAndTools: " .. tostring(shouldUse))
-                            else
-                                print("[DEBUG] 3. KATEGORI TIDAK DITEMUKAN UNTUK: " .. itemName)
                             end
 
                             if shouldUse then
-                                print("[DEBUG] 4. MEMUTUSKAN UNTUK USE ITEM! Mengirim ke server...")
-                                if dummyChar and dummySlot then
-                                    pcall(function() 
-                                        ReplicatedStorage.Events.ItemEvent:InvokeServer(dummyChar, dummySlot) 
-                                        print("[DEBUG] 5. InvokeServer SUKSES TERKIRIM!")
-                                    end)
-                                else
-                                    print("[DEBUG-ERROR] Gagal Invoke! dummyChar atau dummySlot nil!")
-                                end
-                            else
-                                print("[DEBUG] 4. TIDAK DI-USE. Syarat (shouldUse) bernilai FALSE.")
+                                pcall(function() 
+                                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(char, slotItem)
+                                end)
                             end
-                            print("--------------------------------------------------")
                         end
                     end
                 end
             end
-        else
-            print("[DEBUG-ERROR] Inventory tidak ditemukan di karakter mana pun!")
         end
-        
         task.wait(Config.AutoUse.UseInterval)
     end
 end)
