@@ -1,22 +1,28 @@
-print("TESTA1")
+-- ==============================================================================
+-- SMART AUTO USE - FINAL + MaxHealth Config
+-- ==============================================================================
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
--- KATEGORI ITEM
+-- ===================== KONFIGURASI =====================
+local MaxHealth = 3       -- Ganti sesuai karakter: 3 atau 4
+
+local Slots = { Slot1=true, Slot2=true, Slot3=true, Slot4=false }
+
+local EnableHeal    = true
+local EnableBuff    = true
+local EnableUtility = true
+local EnableMachine = true
+
 local Heal    = {"Bandage", "HealthKit"}
 local Buff    = {"ProteinBar","SpeedCandy","StaminaCandy","ExtractionSpeedCandy","StealthCandy",
                  "SkillCheckCandy","Pop","PopBottle","Chocolate","ChocolateBox",
                  "Gumball","Jawbreaker","BonBon","ChristmasCookie","DandyEasterEggs"}
 local Utility = {"SmokeBomb","EjectButton","AirHorn","Tape"}
 local Machine = {"Stopwatch","Valve","JumperCable","Instructions"}
-
--- SAKLAR
-local EnableHeal    = true
-local EnableBuff    = true
-local EnableUtility = true
-local EnableMachine = true  -- hanya aktif saat di mesin
-local MaxHealth     = 3     -- total HP maksimal
+-- =======================================================
 
 local function inList(val, list)
     local low = string.lower(val)
@@ -26,33 +32,42 @@ local function inList(val, list)
     return false
 end
 
-print("[SYSTEM] Smart Auto-Use Berjalan!")
+print("[SYSTEM] Smart Auto-Use Berjalan! MaxHealth=" .. MaxHealth)
 
 task.spawn(function()
     while true do
         local char = player.Character
         if char and char:FindFirstChild("Inventory") then
 
-            -- Baca HP
             local missingHP    = 0
             local isExtracting = false
+
             pcall(function()
                 local menu = player.PlayerGui.ScreenGui.Menu
-                local stopGen = menu:FindFirstChild("StopGenerator")
-                if stopGen and stopGen.Visible then isExtracting = true end
 
-                local bar = menu.BottomLeftCorner.Status.Bottom
-                    .StaminaBin.InfoBin.HealthBin.Bar.Content
-                local hp = 0
-                for i = 1, MaxHealth do
-                    local heart = bar:FindFirstChild("Heart"..i)
-                    if heart and heart.Pulse.Visible then hp += 1 end
+                -- Cek ekstraksi
+                local stopGen = menu:FindFirstChild("StopGenerator")
+                if stopGen and stopGen.Visible then
+                    isExtracting = true
                 end
-                missingHP = MaxHealth - hp
+
+                -- Baca HP hanya sampai MaxHealth
+                local content = menu.BottomLeftCorner.Status.Bottom
+                    .StaminaBin.InfoBin.HealthBin.Bar.Content
+
+                local currentHP = 0
+                for i = 1, MaxHealth do
+                    local heart = content:FindFirstChild("Heart"..i)
+                    if heart and heart:FindFirstChild("Pulse") and heart.Pulse.Visible then
+                        currentHP = i
+                    end
+                end
+
+                missingHP = MaxHealth - currentHP
             end)
 
-            -- Loop slot — SAMA PERSIS SCRIPT 1
-            for slotName, isActive in pairs({Slot1=true, Slot2=true, Slot3=true, Slot4=false}) do
+            -- Loop slot
+            for slotName, isActive in pairs(Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
                     if slotItem then
@@ -61,14 +76,20 @@ task.spawn(function()
                         if val ~= "" and val ~= "None" then
                             local use = false
 
-                            if   inList(val, Machine) then use = EnableMachine and isExtracting
-                            elseif inList(val, Heal)    then use = EnableHeal and (missingHP >= 1)
-                            elseif inList(val, Buff)    then use = EnableBuff
-                            elseif inList(val, Utility) then use = EnableUtility
-                            else                             use = true  -- item tidak dikenal → pakai saja
+                            if inList(val, Machine) then
+                                use = EnableMachine and isExtracting
+
+                            elseif inList(val, Heal) then
+                                -- Pakai kalau ada nyawa yang hilang
+                                use = EnableHeal and (missingHP >= 1)
+
+                            elseif inList(val, Buff) then
+                                use = EnableBuff
+
+                            elseif inList(val, Utility) then
+                                use = EnableUtility
                             end
 
-                            -- FIRE — SAMA PERSIS SCRIPT 1
                             if use then
                                 pcall(function()
                                     ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem)
