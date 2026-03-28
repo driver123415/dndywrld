@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V22 - THE NAKED TRUTH)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V23 - TRACE ROUTE EDITION)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -9,7 +9,7 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.1,          
+        UseInterval = 0.2,          
         MaxHealth = 3, 
         
         EnableAutoHeal = true,      
@@ -34,7 +34,7 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V22 Berjalan! (Buka-bukaan Tanpa Pcall)")
+print("[SYSTEM] Smart Auto-Use V23 Berjalan! (Sistem Pelacak Jejak Aktif)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
@@ -77,6 +77,8 @@ end
 
 -- ==================== MAIN LOGIC ====================
 
+local lastPrintedItem = {} -- Mencegah F9 spam berkali-kali
+
 task.spawn(function()
     while true do
         local char = player.Character
@@ -102,37 +104,52 @@ task.spawn(function()
                             
                             if itemName ~= "None" and itemName ~= "" then
                                 local shouldUse = false
+                                local detectedCategory = "TIDAK DIKETAHUI"
 
-                                -- CHECKER
+                                -- CEK KATEGORI
                                 if table.find(Config.ItemCategories.MachineItems, itemName) then
+                                    detectedCategory = "MachineItems"
                                     if Config.AutoUse.EnableAutoMachineItem and isExtracting then shouldUse = true end
 
                                 elseif table.find(Config.ItemCategories.SmallHeal, itemName) then
+                                    detectedCategory = "SmallHeal"
                                     if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then shouldUse = true end
 
                                 elseif table.find(Config.ItemCategories.BigHeal, itemName) then
+                                    detectedCategory = "BigHeal"
                                     if Config.AutoUse.EnableAutoHeal and missingHealth >= 2 then shouldUse = true end
 
                                 elseif table.find(Config.ItemCategories.StaminaAndBuffs, itemName) then
+                                    detectedCategory = "StaminaAndBuffs"
                                     if Config.AutoUse.EnableAutoBuff then shouldUse = true end
 
                                 elseif table.find(Config.ItemCategories.UtilityAndTools, itemName) then
+                                    detectedCategory = "UtilityAndTools"
                                     if Config.AutoUse.EnableAutoUtility then shouldUse = true end
                                 end
 
-                                -- EKSEKUSI (TANPA PCALL BIAR KETAHUAN ERRORNYA)
-                                if shouldUse then
-                                    print("⚠️ [EKSEKUSI] Menembak item " .. itemName .. " di " .. slotName .. " ke server!")
+                                -- PRINT TRACE ROUTE (HANYA SEKALI TIAP ITEM BARU MASUK)
+                                if lastPrintedItem[slotName] ~= itemName then
+                                    print("--------------------------------------------------")
+                                    print("🔍 [TRACE] " .. slotName .. " terisi: " .. itemName)
+                                    print("📂 [TRACE] Masuk kategori: " .. detectedCategory)
+                                    print("❤️ [TRACE] Missing Health: " .. tostring(missingHealth) .. " | Is Extracting: " .. tostring(isExtracting))
+                                    print("✅ [TRACE] Keputusan shouldUse: " .. tostring(shouldUse))
+                                    print("--------------------------------------------------")
                                     
-                                    local args = {
-                                        char,
-                                        slotItem
-                                    }
-                                    
-                                    -- Eksekusi persis gaya referensi
-                                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(unpack(args))
+                                    lastPrintedItem[slotName] = itemName
                                 end
-                                
+
+                                -- EKSEKUSI
+                                if shouldUse then
+                                    pcall(function() 
+                                        local args = { char, slotItem }
+                                        ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(unpack(args))
+                                    end)
+                                end
+                            else
+                                -- Reset tracker kalau slot kembali kosong
+                                lastPrintedItem[slotName] = nil
                             end
                         end
                     end
