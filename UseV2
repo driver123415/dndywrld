@@ -1,28 +1,25 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (FINAL HYBRID - ALL FEATURES KEPT)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V17 - THE PLOT TWIST FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.1, -- Pakai 0.1 persis seperti referensi agar instant          
+        UseInterval = 0.2,          
         MaxHealth = 3, 
         
-        -- SAKLAR KONTROL UTAMA
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        EnableAutoUtility = false,  
+        EnableAutoUtility = true,  
         EnableAutoMachineItem = true, 
 
         Slots = {
-            Slot1 = true,
-            Slot2 = true,
-            Slot3 = true,
-            Slot4 = false            
+            Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false            
         },
         
         ItemCategories = {
@@ -44,14 +41,14 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Standalone Smart Auto-Use berjalan! (Full Fitur + Instant Execution)")
+print("[SYSTEM] Smart Auto-Use V17 Berjalan! (Bypass Dual-Character Game System)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
 local function getCurrentHealth()
     local PlayerGui = player:FindFirstChild("PlayerGui")
     
-    -- Jalur UI yang sudah fix
+    -- Jalur UI Fix: InfoBin ternyata di DALAM StaminaBin
     local contentFolder = PlayerGui and PlayerGui:FindFirstChild("ScreenGui")
         and PlayerGui.ScreenGui:FindFirstChild("Menu")
         and PlayerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
@@ -91,10 +88,17 @@ end
 
 task.spawn(function()
     while true do
-        local char = player.Character
-        if char and char:FindFirstChild("Inventory") then
+        -- 1. Dapatkan DUA Karakter (Satu buat dibaca, satu buat dikirim)
+        local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+        local realChar = inGamePlayers and inGamePlayers:FindFirstChild(player.Name)
+        local dummyChar = player.Character
+        
+        -- Kita baca teks dari realChar, tapi tembak remote pakai dummyChar
+        local readInventory = (realChar and realChar:FindFirstChild("Inventory")) or (dummyChar and dummyChar:FindFirstChild("Inventory"))
+        local sendInventory = dummyChar and dummyChar:FindFirstChild("Inventory")
+
+        if readInventory and sendInventory then
             
-            -- Panggil fungsi cek darah kita
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
             if currentHealth then 
@@ -103,18 +107,18 @@ task.spawn(function()
 
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
-                    local slotItem = char.Inventory:FindFirstChild(slotName)
+                    local realSlot = readInventory:FindFirstChild(slotName)
+                    local dummySlot = sendInventory:FindFirstChild(slotName)
                     
-                    if slotItem and slotItem:IsA("StringValue") then
-                        -- Ambil nama item (bersihkan spasi ekstra untuk jaga-jaga)
-                        local rawName = slotItem.Value
+                    if realSlot and dummySlot and realSlot:IsA("StringValue") then
+                        -- BACA TEKS DARI REAL INVENTORY (Biar gak kebaca "None" terus)
+                        local rawName = realSlot.Value
                         local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
                         
-                        -- LOGIKA UTAMA: JIKA BUKAN NONE
                         if itemName ~= "None" and itemName ~= "" then
                             local shouldUse = false
 
-                            -- OTAK PINTAR KITA BERPIKIR DI SINI
+                            -- OTAK PINTAR KITA
                             if table.find(Config.ItemCategories.MachineItems, itemName) then
                                 if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then shouldUse = true end
 
@@ -131,10 +135,10 @@ task.spawn(function()
                                 if Config.AutoUse.EnableAutoUtility then shouldUse = true end
                             end
 
-                            -- EKSEKUSI INSTAN PERSIS SEPERTI REFERENSI ASLIMU
+                            -- EKSEKUSI MENGGUNAKAN DUMMY INVENTORY (Sesuai Log Cobalt)
                             if shouldUse then
                                 pcall(function() 
-                                    ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
+                                    ReplicatedStorage.Events.ItemEvent:InvokeServer(dummyChar, dummySlot) 
                                 end)
                             end
                         end
