@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V21 - UNPACK ARGS FIX)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V22 - THE NAKED TRUTH)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -9,21 +9,15 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.1, -- Kecepatan sesuai referensi aslimu          
+        UseInterval = 0.1,          
         MaxHealth = 3, 
         
-        -- SAKLAR KONTROL UTAMA
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        EnableAutoUtility = true,  
+        EnableAutoUtility = false,  
         EnableAutoMachineItem = true, 
 
-        Slots = {
-            Slot1 = true,
-            Slot2 = true,
-            Slot3 = true,
-            Slot4 = false            
-        },
+        Slots = { Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false },
         
         ItemCategories = {
             SmallHeal = {"Bandage"},
@@ -33,18 +27,14 @@ local Config = {
                 "SkillCheckCandy", "Pop", "PopBottle", "Chocolate", "ChocolateBox",
                 "Gumball", "Jawbreaker", "BonBon", "ChristmasCookie", "DandyEasterEggs"
             },
-            UtilityAndTools = {
-                "SmokeBomb", "EjectButton", "AirHorn", "Tape"
-            },
-            MachineItems = { 
-                "Stopwatch", "Valve", "JumperCable", "Instructions"
-            }
+            UtilityAndTools = { "SmokeBomb", "EjectButton", "AirHorn", "Tape" },
+            MachineItems = { "Stopwatch", "Valve", "JumperCable", "Instructions" }
         }
     }
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V21 Berjalan! (Menggunakan metode unpack args)")
+print("[SYSTEM] Smart Auto-Use V22 Berjalan! (Buka-bukaan Tanpa Pcall)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
@@ -91,55 +81,59 @@ task.spawn(function()
     while true do
         local char = player.Character
         
-        if char and char:FindFirstChild("Inventory") then
-            -- Evaluasi kondisi cerdas cukup sekali per loop
-            local currentHealth = getCurrentHealth()
-            local missingHealth = 0
-            if currentHealth then 
-                missingHealth = Config.AutoUse.MaxHealth - currentHealth 
-            end
-            local isExtracting = isInteractingUI()
+        if char then
+            local inventory = char:FindFirstChild("Inventory")
+            if inventory then
+                local currentHealth = getCurrentHealth()
+                local missingHealth = 0
+                if currentHealth then 
+                    missingHealth = Config.AutoUse.MaxHealth - currentHealth 
+                end
+                
+                local isExtracting = isInteractingUI()
 
-            for slotName, isActive in pairs(Config.AutoUse.Slots) do
-                if isActive then
-                    local slotItem = char.Inventory:FindFirstChild(slotName)
-                    
-                    if slotItem and slotItem:IsA("StringValue") then
-                        -- Bersihkan teks persis seperti di Debugger yang sukses tadi
-                        local rawName = slotItem.Value
-                        local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
+                for slotName, isActive in pairs(Config.AutoUse.Slots) do
+                    if isActive then
+                        local slotItem = inventory:FindFirstChild(slotName)
                         
-                        if itemName ~= "None" and itemName ~= "" then
-                            local shouldUse = false
+                        if slotItem and slotItem:IsA("StringValue") then
+                            local rawName = slotItem.Value
+                            local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
+                            
+                            if itemName ~= "None" and itemName ~= "" then
+                                local shouldUse = false
 
-                            -- OTAK PINTAR MENYARING ITEM
-                            if table.find(Config.ItemCategories.MachineItems, itemName) then
-                                if Config.AutoUse.EnableAutoMachineItem and isExtracting then shouldUse = true end
+                                -- CHECKER
+                                if table.find(Config.ItemCategories.MachineItems, itemName) then
+                                    if Config.AutoUse.EnableAutoMachineItem and isExtracting then shouldUse = true end
 
-                            elseif table.find(Config.ItemCategories.SmallHeal, itemName) then
-                                if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then shouldUse = true end
+                                elseif table.find(Config.ItemCategories.SmallHeal, itemName) then
+                                    if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then shouldUse = true end
 
-                            elseif table.find(Config.ItemCategories.BigHeal, itemName) then
-                                if Config.AutoUse.EnableAutoHeal and missingHealth >= 2 then shouldUse = true end
+                                elseif table.find(Config.ItemCategories.BigHeal, itemName) then
+                                    if Config.AutoUse.EnableAutoHeal and missingHealth >= 2 then shouldUse = true end
 
-                            elseif table.find(Config.ItemCategories.StaminaAndBuffs, itemName) then
-                                if Config.AutoUse.EnableAutoBuff then shouldUse = true end
+                                elseif table.find(Config.ItemCategories.StaminaAndBuffs, itemName) then
+                                    if Config.AutoUse.EnableAutoBuff then shouldUse = true end
 
-                            elseif table.find(Config.ItemCategories.UtilityAndTools, itemName) then
-                                if Config.AutoUse.EnableAutoUtility then shouldUse = true end
-                            end
+                                elseif table.find(Config.ItemCategories.UtilityAndTools, itemName) then
+                                    if Config.AutoUse.EnableAutoUtility then shouldUse = true end
+                                end
 
-                            -- METODE EKSEKUSI MUTLAK MENGGUNAKAN UNPACK ARGS
-                            if shouldUse then
-                                pcall(function() 
+                                -- EKSEKUSI (TANPA PCALL BIAR KETAHUAN ERRORNYA)
+                                if shouldUse then
+                                    print("⚠️ [EKSEKUSI] Menembak item " .. itemName .. " di " .. slotName .. " ke server!")
+                                    
                                     local args = {
                                         char,
                                         slotItem
                                     }
+                                    
+                                    -- Eksekusi persis gaya referensi
                                     ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(unpack(args))
-                                end)
+                                end
+                                
                             end
-                            
                         end
                     end
                 end
