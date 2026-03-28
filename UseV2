@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V29 - FINAL FIX)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V30 - FINAL)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -31,9 +31,7 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V29 Berjalan!")
-
--- ==================== HELPER FUNCTIONS ====================
+print("[SYSTEM] Smart Auto-Use V30 Berjalan!")
 
 local function getItemName(slotItem)
     if slotItem:IsA("StringValue") then return slotItem.Value end
@@ -52,17 +50,10 @@ local function isItemInCategory(itemName, categoryTable)
     return false
 end
 
--- ==================== MAIN LOOP ====================
-
 task.spawn(function()
-    -- ✅ FIX UTAMA: WaitForChild dipindah ke DALAM task.spawn
-    -- Sehingga tidak memblokir eksekusi script di luar
-    local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
-    print("[SYSTEM] ItemEvent ditemukan, loop dimulai!")
-
     while true do
         local char = player.Character
-        
+
         if char and char:FindFirstChild("Inventory") then
 
             local missingHealth = 0
@@ -99,6 +90,7 @@ task.spawn(function()
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
+
                     if slotItem then
                         local val = getItemName(slotItem)
 
@@ -118,6 +110,8 @@ task.spawn(function()
                             end
 
                             if shouldUse then
+                                -- ✅ FIX: Pakai akses langsung persis seperti Script 1
+                                -- Bukan variable cache, langsung ke ReplicatedStorage
                                 pcall(function()
                                     ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem)
                                 end)
