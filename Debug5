@@ -1,0 +1,83 @@
+-- ==============================================================================
+-- STANDALONE DEBUGGER: AUTO USE ANALYZER
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+print("\n================ DEBUGGER START ================\n")
+
+-- Ambil remote
+local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
+
+-- Tunggu character
+local char = player.Character or player.CharacterAdded:Wait()
+
+if not char:FindFirstChild("Inventory") then
+    warn("❌ Inventory tidak ditemukan!")
+    return
+end
+
+local inventory = char.Inventory
+
+print("✅ Inventory ditemukan:", inventory)
+print("Jumlah slot:", #inventory:GetChildren())
+
+print("\n================ SCANNING ITEMS ================\n")
+
+-- SCAN SEMUA ITEM
+for _, slot in pairs(inventory:GetChildren()) do
+    print("------ SLOT DETECTED ------")
+    print("Slot Name     :", slot.Name)
+    print("Class         :", slot.ClassName)
+
+    -- cek attribute
+    local success, value = pcall(function()
+        return slot.Value
+    end)
+
+    if success then
+        print("Value         :", value)
+    else
+        print("Value         : (tidak ada)")
+    end
+
+    -- cek children
+    local children = slot:GetChildren()
+    if #children > 0 then
+        print("Children      :", #children)
+        for _, child in pairs(children) do
+            print("  ↳", child.Name, "|", child.ClassName)
+            
+            if child:IsA("StringValue") or child:IsA("IntValue") then
+                print("     Value:", child.Value)
+            end
+        end
+    else
+        print("Children      : (kosong)")
+    end
+
+    print("-----------------------------\n")
+end
+
+print("\n================ TEST AUTO USE ================\n")
+
+-- TEST USE SATU PER SATU
+for _, slot in pairs(inventory:GetChildren()) do
+    print("🧪 Mencoba pakai:", slot.Name)
+
+    local success, err = pcall(function()
+        ItemEvent:InvokeServer(char, slot)
+    end)
+
+    if success then
+        print("✅ BERHASIL invoke:", slot.Name)
+    else
+        warn("❌ GAGAL invoke:", slot.Name, "| Error:", err)
+    end
+
+    task.wait(1) -- delay biar keliatan
+end
+
+print("\n================ DEBUGGER END ================\n")
