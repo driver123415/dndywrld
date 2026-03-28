@@ -1,79 +1,98 @@
 -- ==============================================================================
--- STANDALONE DEBUGGER V2 (ANTI EMPTY / WAIT FIX)
+-- SMART AUTO USE (FIX TOTAL - DIRECT SLOT ACCESS)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
-print("\n[DEBUG] STARTING DEBUGGER V2...\n")
+local Config = {
+    AutoUse = {
+        Enable = true,
+        UseInterval = 0.1,
+        MaxHealth = 3,
+
+        EnableAutoHeal = true,
+        EnableAutoBuff = true,
+        EnableAutoUtility = true,
+        EnableAutoMachineItem = true,
+
+        Slots = { "Slot1", "Slot2", "Slot3", "Slot4" },
+
+        ItemCategories = {
+            SmallHeal = {"Bandage"},
+            BigHeal = {"HealthKit"},
+            Buff = {"Candy","Chocolate","Pop"},
+            Utility = {"Smoke","Horn","Tape"},
+            Machine = {"Valve","Cable","Stopwatch"}
+        }
+    }
+}
+
+if not Config.AutoUse.Enable then return end
 
 local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
 
--- TUNGGU CHARACTER
-local char = player.Character or player.CharacterAdded:Wait()
-
--- 🔥 TUNGGU INVENTORY ADA
-local inventory
-repeat
-    char = player.Character
-    inventory = char and char:FindFirstChild("Inventory")
-    task.wait(0.5)
-until inventory
-
-print("✅ Inventory ditemukan!")
-
--- 🔥 TUNGGU ISI INVENTORY (INI YANG PENTING)
-repeat
-    task.wait(0.5)
-until #inventory:GetChildren() > 0
-
-print("✅ Inventory sudah terisi!")
-print("Jumlah slot:", #inventory:GetChildren())
-
-print("\n================ SCAN =================\n")
-
-for _, slot in pairs(inventory:GetChildren()) do
-    print("------ SLOT ------")
-    print("Name :", slot.Name)
-    print("Class:", slot.ClassName)
-
-    -- SAFE VALUE CHECK
-    local val = nil
-    pcall(function()
-        val = slot.Value
-    end)
-
-    print("Value:", val)
-
-    -- CHILD CHECK
-    for _, child in pairs(slot:GetChildren()) do
-        print("  ↳ Child:", child.Name, "|", child.ClassName)
-
-        if child:IsA("StringValue") or child:IsA("IntValue") then
-            print("     Value:", child.Value)
+-- MATCHER
+local function match(name, list)
+    name = string.lower(name or "")
+    for _, v in ipairs(list) do
+        if string.find(name, string.lower(v)) then
+            return true
         end
     end
-
-    print("------------------\n")
+    return false
 end
 
-print("\n================ TEST USE =================\n")
+task.spawn(function()
+    while true do
+        local char = player.Character
 
-for _, slot in pairs(inventory:GetChildren()) do
-    print("🧪 TRY USE:", slot.Name)
+        if char and char:FindFirstChild("Inventory") then
+            local inv = char.Inventory
 
-    local success, err = pcall(function()
-        ItemEvent:InvokeServer(char, slot)
-    end)
+            for _, slotName in ipairs(Config.AutoUse.Slots) do
+                local slot = inv:FindFirstChild(slotName)
 
-    if success then
-        print("✅ SUCCESS:", slot.Name)
-    else
-        warn("❌ FAILED:", slot.Name, err)
+                if slot then
+                    local itemName = slot.Value or slot.Name or ""
+
+                    print("[DEBUG]", slotName, itemName)
+
+                    local use = false
+
+                    if match(itemName, Config.ItemCategories.SmallHeal) then
+                        use = true
+
+                    elseif match(itemName, Config.ItemCategories.BigHeal) then
+                        use = true
+
+                    elseif match(itemName, Config.ItemCategories.Buff) then
+                        use = true
+
+                    elseif match(itemName, Config.ItemCategories.Utility) then
+                        use = true
+
+                    elseif match(itemName, Config.ItemCategories.Machine) then
+                        use = true
+                    end
+
+                    -- 🔥 FALLBACK (INI KUNCI BIAR KAYAK SCRIPT 1)
+                    if not use then
+                        use = true
+                    end
+
+                    if use then
+                        pcall(function()
+                            ItemEvent:InvokeServer(char, slot)
+                        end)
+                    end
+                end
+            end
+        end
+
+        task.wait(Config.AutoUse.UseInterval)
     end
+end)
 
-    task.wait(1)
-end
-
-print("\n[DEBUG] DONE\n")
+print{"test123"}
