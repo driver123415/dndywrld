@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V25 - UNBREAKABLE CORE)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V26 - STRING STRIPPER + REMOTE SPY FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -9,7 +9,7 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.1, -- Sesuai dengan script referensi
+        UseInterval = 0.1, 
         MaxHealth = 3, 
         
         EnableAutoHeal = true,      
@@ -34,15 +34,15 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V25 Berjalan! (Unbreakable Core)")
+print("[SYSTEM] Smart Auto-Use V26 Berjalan! (Pembersih String & Unpack Args)")
 
 task.spawn(function()
     while true do
         local char = player.Character
-        -- KITA PAKAI KERANGKA ASLI REFERENSIMU DI SINI
+        
         if char and char:FindFirstChild("Inventory") then
             
-            -- Variabel pintar (dikarantina biar gak bikin script crash)
+            -- LOGIKA PINTAR: Cek Darah & Ekstrak (Dalam pcall agar anti-crash)
             local missingHealth = 0
             local isExtracting = false
             
@@ -50,13 +50,11 @@ task.spawn(function()
                 local pGui = player:FindFirstChild("PlayerGui")
                 if pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("Menu") then
                     
-                    -- Cek UI Mesin
                     local stopGen = pGui.ScreenGui.Menu:FindFirstChild("StopGenerator")
                     if stopGen and stopGen.Visible then
                         isExtracting = true
                     end
                     
-                    -- Cek Darah
                     local content = pGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
                         and pGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Status")
                         and pGui.ScreenGui.Menu.BottomLeftCorner.Status:FindFirstChild("Bottom")
@@ -79,18 +77,21 @@ task.spawn(function()
                 end
             end)
 
+            -- LOGIKA EKSEKUSI ITEM
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
-                    -- Hapus semua string.match yang bikin ribet, langsung hajar Value-nya
+                    
                     if slotItem and slotItem:IsA("StringValue") then
-                        local val = slotItem.Value
+                        local rawVal = slotItem.Value
                         
-                        -- JIKA VALUE BUKAN NONE
-                        if val ~= "None" and val ~= "" then
+                        -- Cek jangan sampai isinya kosong/None
+                        if rawVal and rawVal ~= "None" and rawVal ~= "" then
+                            -- PEMBERSIH EKSTREM: Buang semua spasi (depan, belakang, tengah)
+                            local val = string.gsub(rawVal, "%s+", "")
                             local shouldUse = false
                             
-                            -- FILTER PINTAR
+                            -- FILTER KATEGORI (Mencocokkan nama yang sudah bersih)
                             if table.find(Config.ItemCategories.MachineItems, val) then
                                 shouldUse = Config.AutoUse.EnableAutoMachineItem and isExtracting
                             elseif table.find(Config.ItemCategories.SmallHeal, val) then
@@ -103,16 +104,13 @@ task.spawn(function()
                                 shouldUse = Config.AutoUse.EnableAutoUtility
                             end
 
-                            -- EKSEKUSI
+                            -- EKSEKUSI (Berdasarkan Remote Spy Aslimu)
                             if shouldUse then
                                 print("[ACTION] 🔥 Menembak server untuk pakai: " .. val)
-                                local success, err = pcall(function() 
-                                    ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem) 
+                                pcall(function() 
+                                    local args = { char, slotItem }
+                                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(unpack(args))
                                 end)
-                                
-                                if not success then
-                                    warn("⚠️ [ERROR] Gagal InvokeServer: " .. tostring(err))
-                                end
                             end
                         end
                     end
