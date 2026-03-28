@@ -1,98 +1,79 @@
 -- ==============================================================================
--- SMART AUTO USE (FIX TOTAL - DIRECT SLOT ACCESS)
+-- STANDALONE DEBUGGER V3 (PATH FINDER + REAL STRUCTURE SCANNER)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
-local Config = {
-    AutoUse = {
-        Enable = true,
-        UseInterval = 0.1,
-        MaxHealth = 3,
+print("\n========== 🔍 DEBUGGER START ==========\n")
 
-        EnableAutoHeal = true,
-        EnableAutoBuff = true,
-        EnableAutoUtility = true,
-        EnableAutoMachineItem = true,
+-- tunggu character
+local char = player.Character or player.CharacterAdded:Wait()
 
-        Slots = { "Slot1", "Slot2", "Slot3", "Slot4" },
+-- fungsi print tree
+local function scan(obj, depth)
+    depth = depth or 0
+    if depth > 4 then return end -- batas biar gak spam
 
-        ItemCategories = {
-            SmallHeal = {"Bandage"},
-            BigHeal = {"HealthKit"},
-            Buff = {"Candy","Chocolate","Pop"},
-            Utility = {"Smoke","Horn","Tape"},
-            Machine = {"Valve","Cable","Stopwatch"}
-        }
-    }
-}
+    for _, v in pairs(obj:GetChildren()) do
+        local prefix = string.rep("  ", depth)
+        print(prefix .. "↳ " .. v.Name .. " | " .. v.ClassName)
 
-if not Config.AutoUse.Enable then return end
-
-local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
-
--- MATCHER
-local function match(name, list)
-    name = string.lower(name or "")
-    for _, v in ipairs(list) do
-        if string.find(name, string.lower(v)) then
-            return true
+        -- tandai kemungkinan inventory
+        local lname = string.lower(v.Name)
+        if string.find(lname, "inv") or string.find(lname, "slot") or string.find(lname, "item") then
+            print(prefix .. "  ⚠️ POSSIBLE TARGET ↑")
         end
+
+        -- coba cek Value (kalau ada)
+        pcall(function()
+            if v.Value ~= nil then
+                print(prefix .. "  ➤ Value:", v.Value)
+            end
+        end)
+
+        -- lanjut scan dalam
+        scan(v, depth + 1)
     end
-    return false
 end
 
-task.spawn(function()
-    while true do
-        local char = player.Character
+-- ==================== SCAN CHARACTER ====================
+print("\n===== 📦 SCAN CHARACTER =====\n")
+scan(char)
 
-        if char and char:FindFirstChild("Inventory") then
-            local inv = char.Inventory
+-- ==================== SCAN PLAYER ====================
+print("\n===== 👤 SCAN PLAYER =====\n")
+scan(player)
 
-            for _, slotName in ipairs(Config.AutoUse.Slots) do
-                local slot = inv:FindFirstChild(slotName)
+-- ==================== SCAN BACKPACK ====================
+local backpack = player:FindFirstChild("Backpack")
+if backpack then
+    print("\n===== 🎒 SCAN BACKPACK =====\n")
+    scan(backpack)
+end
 
-                if slot then
-                    local itemName = slot.Value or slot.Name or ""
+-- ==================== QUICK SLOT TEST ====================
+print("\n===== 🧪 QUICK SLOT TEST =====\n")
 
-                    print("[DEBUG]", slotName, itemName)
+local function trySlots(container)
+    if not container then return end
 
-                    local use = false
+    for i = 1, 6 do
+        local name = "Slot" .. i
+        local slot = container:FindFirstChild(name)
 
-                    if match(itemName, Config.ItemCategories.SmallHeal) then
-                        use = true
+        if slot then
+            print("✅ FOUND:", container.Name .. "." .. name, "|", slot.ClassName)
 
-                    elseif match(itemName, Config.ItemCategories.BigHeal) then
-                        use = true
-
-                    elseif match(itemName, Config.ItemCategories.Buff) then
-                        use = true
-
-                    elseif match(itemName, Config.ItemCategories.Utility) then
-                        use = true
-
-                    elseif match(itemName, Config.ItemCategories.Machine) then
-                        use = true
-                    end
-
-                    -- 🔥 FALLBACK (INI KUNCI BIAR KAYAK SCRIPT 1)
-                    if not use then
-                        use = true
-                    end
-
-                    if use then
-                        pcall(function()
-                            ItemEvent:InvokeServer(char, slot)
-                        end)
-                    end
-                end
-            end
+            pcall(function()
+                print("   ➤ Value:", slot.Value)
+            end)
         end
-
-        task.wait(Config.AutoUse.UseInterval)
     end
-end)
+end
 
-print("test123")
+trySlots(char)
+trySlots(player)
+trySlots(backpack)
+
+print("\n========== ✅ DEBUGGER END ==========\n")
