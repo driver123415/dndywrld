@@ -1,123 +1,84 @@
-print("TESTA")
--- ==============================================================================
--- SMART AUTO USE - BERBASIS SCRIPT 1 (YANG SUDAH TERBUKTI JALAN)
--- ==============================================================================
-
+print("TESTA1")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
-local Config = {
-    AutoUse = {
-        Enable = true,
-        UseInterval = 0.1,
-        MaxHealth = 3,
-        EnableAutoHeal = true,
-        EnableAutoBuff = true,
-        EnableAutoUtility = true,
-        EnableAutoMachineItem = true,
-        Slots = { Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false },
-        ItemCategories = {
-            SmallHeal      = {"Bandage"},
-            BigHeal        = {"HealthKit"},
-            StaminaAndBuffs = {
-                "ProteinBar","SpeedCandy","StaminaCandy","ExtractionSpeedCandy","StealthCandy",
-                "SkillCheckCandy","Pop","PopBottle","Chocolate","ChocolateBox",
-                "Gumball","Jawbreaker","BonBon","ChristmasCookie","DandyEasterEggs"
-            },
-            UtilityAndTools = {"SmokeBomb","EjectButton","AirHorn","Tape"},
-            MachineItems    = {"Stopwatch","Valve","JumperCable","Instructions"}
-        }
-    }
-}
+-- KATEGORI ITEM
+local Heal    = {"Bandage", "HealthKit"}
+local Buff    = {"ProteinBar","SpeedCandy","StaminaCandy","ExtractionSpeedCandy","StealthCandy",
+                 "SkillCheckCandy","Pop","PopBottle","Chocolate","ChocolateBox",
+                 "Gumball","Jawbreaker","BonBon","ChristmasCookie","DandyEasterEggs"}
+local Utility = {"SmokeBomb","EjectButton","AirHorn","Tape"}
+local Machine = {"Stopwatch","Valve","JumperCable","Instructions"}
 
-if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use Berjalan!")
+-- SAKLAR
+local EnableHeal    = true
+local EnableBuff    = true
+local EnableUtility = true
+local EnableMachine = true  -- hanya aktif saat di mesin
+local MaxHealth     = 3     -- total HP maksimal
 
--- Helper cek kategori
-local function inCategory(name, list)
-    if not name or name == "" then return false end
-    local low = string.lower(name)
+local function inList(val, list)
+    local low = string.lower(val)
     for _, v in ipairs(list) do
         if string.find(low, string.lower(v), 1, true) then return true end
     end
     return false
 end
 
+print("[SYSTEM] Smart Auto-Use Berjalan!")
+
 task.spawn(function()
     while true do
         local char = player.Character
-
-        -- ✅ SAMA PERSIS DENGAN SCRIPT 1
         if char and char:FindFirstChild("Inventory") then
 
-            -- Baca health & extracting state
-            local missingHealth = 0
-            local isExtracting  = false
+            -- Baca HP
+            local missingHP    = 0
+            local isExtracting = false
             pcall(function()
-                local pGui = player.PlayerGui
-                local menu = pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("Menu")
-                if not menu then return end
-
+                local menu = player.PlayerGui.ScreenGui.Menu
                 local stopGen = menu:FindFirstChild("StopGenerator")
                 if stopGen and stopGen.Visible then isExtracting = true end
 
-                local bar = menu:FindFirstChild("BottomLeftCorner")
-                for _, path in ipairs({"Status","Bottom","StaminaBin","InfoBin","HealthBin","Bar","Content"}) do
-                    bar = bar and bar:FindFirstChild(path)
+                local bar = menu.BottomLeftCorner.Status.Bottom
+                    .StaminaBin.InfoBin.HealthBin.Bar.Content
+                local hp = 0
+                for i = 1, MaxHealth do
+                    local heart = bar:FindFirstChild("Heart"..i)
+                    if heart and heart.Pulse.Visible then hp += 1 end
                 end
-
-                if bar then
-                    local hp = 0
-                    for i = 1, Config.AutoUse.MaxHealth do
-                        local heart = bar:FindFirstChild("Heart"..i)
-                        if heart and heart:FindFirstChild("Pulse") and heart.Pulse.Visible then
-                            hp += 1
-                        end
-                    end
-                    missingHealth = Config.AutoUse.MaxHealth - hp
-                end
+                missingHP = MaxHealth - hp
             end)
 
-            for slotName, isActive in pairs(Config.AutoUse.Slots) do
+            -- Loop slot — SAMA PERSIS SCRIPT 1
+            for slotName, isActive in pairs({Slot1=true, Slot2=true, Slot3=true, Slot4=false}) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
-
-                    -- ✅ KONDISI SAMA DENGAN SCRIPT 1
                     if slotItem then
                         local val = slotItem.Value or ""
-                        local skip = (val == "" or string.find(string.lower(val), "none", 1, true))
 
-                        local shouldUse = false
-                        if not skip then
-                            if inCategory(val, Config.ItemCategories.MachineItems) then
-                                shouldUse = Config.AutoUse.EnableAutoMachineItem and isExtracting
-                            elseif inCategory(val, Config.ItemCategories.SmallHeal) then
-                                shouldUse = Config.AutoUse.EnableAutoHeal and missingHealth >= 1
-                            elseif inCategory(val, Config.ItemCategories.BigHeal) then
-                                shouldUse = Config.AutoUse.EnableAutoHeal and missingHealth >= 2
-                            elseif inCategory(val, Config.ItemCategories.StaminaAndBuffs) then
-                                shouldUse = Config.AutoUse.EnableAutoBuff
-                            elseif inCategory(val, Config.ItemCategories.UtilityAndTools) then
-                                shouldUse = Config.AutoUse.EnableAutoUtility
-                            else
-                                -- Tidak dikenal → pakai saja (fallback seperti Script 1)
-                                shouldUse = true
+                        if val ~= "" and val ~= "None" then
+                            local use = false
+
+                            if   inList(val, Machine) then use = EnableMachine and isExtracting
+                            elseif inList(val, Heal)    then use = EnableHeal and (missingHP >= 1)
+                            elseif inList(val, Buff)    then use = EnableBuff
+                            elseif inList(val, Utility) then use = EnableUtility
+                            else                             use = true  -- item tidak dikenal → pakai saja
                             end
-                        end
 
-                        -- ✅ FIRE EVENT SAMA PERSIS DENGAN SCRIPT 1
-                        if shouldUse then
-                            pcall(function()
-                                ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem)
-                            end)
+                            -- FIRE — SAMA PERSIS SCRIPT 1
+                            if use then
+                                pcall(function()
+                                    ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem)
+                                end)
+                            end
                         end
                     end
                 end
             end
         end
-
-        -- ✅ SAMA PERSIS DENGAN SCRIPT 1
-        task.wait(Config.AutoUse.UseInterval)
+        task.wait(0.1)
     end
 end)
