@@ -95,4 +95,4 @@ task.spawn(function()
     end
 end)
 
-print{"test123"}
+print("test123")
