@@ -1,25 +1,28 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V20 - FLOOR UPDATE DEBUGGER)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V21 - UNPACK ARGS FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.2,          
+        UseInterval = 0.1, -- Kecepatan sesuai referensi aslimu          
         MaxHealth = 3, 
         
+        -- SAKLAR KONTROL UTAMA
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
-        EnableAutoUtility = false,  
+        EnableAutoUtility = true,  
         EnableAutoMachineItem = true, 
 
         Slots = {
-            Slot1 = true, Slot2 = true, Slot3 = true, Slot4 = false            
+            Slot1 = true,
+            Slot2 = true,
+            Slot3 = true,
+            Slot4 = false            
         },
         
         ItemCategories = {
@@ -41,7 +44,7 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V20 Berjalan! (Dengan Floor-Update Debugger)")
+print("[SYSTEM] Smart Auto-Use V21 Berjalan! (Menggunakan metode unpack args)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
@@ -82,68 +85,36 @@ local function isInteractingUI()
     return false
 end
 
--- Deteksi Lantai/Room Saat Ini
-local function getMap()
-    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
-end
-
 -- ==================== MAIN LOGIC ====================
-
-local currentMapModel = getMap()
 
 task.spawn(function()
     while true do
-        local char = player.Character or player.CharacterAdded:Wait()
-        local inventory = char:WaitForChild("Inventory", 5) 
+        local char = player.Character
         
-        -- Cek apakah kita pindah lantai
-        local newMapModel = getMap()
-        if currentMapModel ~= newMapModel then
-            currentMapModel = newMapModel
-            
-            -- [DEBUGGER AKTIF HANYA SAAT PINDAH LANTAI]
-            print("\n==============================================")
-            print("[DEBUG] 🏢 Update Lantai Baru!")
-            if inventory then
-                for i = 1, 3 do
-                    local sName = "Slot" .. tostring(i)
-                    local sItem = inventory:FindFirstChild(sName)
-                    if sItem and sItem:IsA("StringValue") then
-                        local iName = string.match(sItem.Value, "^%s*(.-)%s*$") or sItem.Value
-                        if iName ~= "None" and iName ~= "" then
-                            print("  -> " .. sName .. " : Terdeteksi Item [" .. iName .. "]")
-                        else
-                            print("  -> " .. sName .. " : Kosong (None)")
-                        end
-                    end
-                end
-            else
-                print("  -> Inventory belum siap saat absen lantai.")
-            end
-            print("==============================================\n")
-        end
-
-        if char and inventory then
+        if char and char:FindFirstChild("Inventory") then
+            -- Evaluasi kondisi cerdas cukup sekali per loop
             local currentHealth = getCurrentHealth()
             local missingHealth = 0
             if currentHealth then 
                 missingHealth = Config.AutoUse.MaxHealth - currentHealth 
             end
+            local isExtracting = isInteractingUI()
 
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
-                    local slotItem = inventory:WaitForChild(slotName, 1)
+                    local slotItem = char.Inventory:FindFirstChild(slotName)
                     
                     if slotItem and slotItem:IsA("StringValue") then
+                        -- Bersihkan teks persis seperti di Debugger yang sukses tadi
                         local rawName = slotItem.Value
                         local itemName = string.match(rawName, "^%s*(.-)%s*$") or rawName
                         
-                        -- LOGIKA EKSEKUSI
                         if itemName ~= "None" and itemName ~= "" then
                             local shouldUse = false
 
+                            -- OTAK PINTAR MENYARING ITEM
                             if table.find(Config.ItemCategories.MachineItems, itemName) then
-                                if Config.AutoUse.EnableAutoMachineItem and isInteractingUI() then shouldUse = true end
+                                if Config.AutoUse.EnableAutoMachineItem and isExtracting then shouldUse = true end
 
                             elseif table.find(Config.ItemCategories.SmallHeal, itemName) then
                                 if Config.AutoUse.EnableAutoHeal and missingHealth >= 1 then shouldUse = true end
@@ -158,11 +129,17 @@ task.spawn(function()
                                 if Config.AutoUse.EnableAutoUtility then shouldUse = true end
                             end
 
+                            -- METODE EKSEKUSI MUTLAK MENGGUNAKAN UNPACK ARGS
                             if shouldUse then
                                 pcall(function() 
-                                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(char, slotItem)
+                                    local args = {
+                                        char,
+                                        slotItem
+                                    }
+                                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(unpack(args))
                                 end)
                             end
+                            
                         end
                     end
                 end
