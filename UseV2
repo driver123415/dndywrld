@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V23 - TRACE ROUTE EDITION)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V24 - ANTI-CRASH & REMOTE SPY FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -9,7 +9,7 @@ local player = Players.LocalPlayer
 local Config = {
     AutoUse = {
         Enable = true,              
-        UseInterval = 0.2,          
+        UseInterval = 0.1,          
         MaxHealth = 3, 
         
         EnableAutoHeal = true,      
@@ -34,22 +34,32 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V23 Berjalan! (Sistem Pelacak Jejak Aktif)")
+print("[SYSTEM] Smart Auto-Use V24 Berjalan! (Sistem Anti-Crash & Remote Spy Terpasang)")
 
 -- ==================== HELPER FUNCTIONS ====================
 
+-- [BARU] Fungsi pelacak UI anti-crash (kebal error biarpun UI belum load)
+local function safeFind(parent, pathArray)
+    local current = parent
+    for _, name in ipairs(pathArray) do
+        if current then
+            current = current:FindFirstChild(name)
+        else
+            return nil
+        end
+    end
+    return current
+end
+
 local function getCurrentHealth()
-    local PlayerGui = player:FindFirstChild("PlayerGui")
-    local contentFolder = PlayerGui and PlayerGui:FindFirstChild("ScreenGui")
-        and PlayerGui.ScreenGui:FindFirstChild("Menu")
-        and PlayerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Status")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status:FindFirstChild("Bottom")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom:FindFirstChild("StaminaBin")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin:FindFirstChild("InfoBin")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin:FindFirstChild("HealthBin")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin:FindFirstChild("Bar")
-        and PlayerGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar:FindFirstChild("Content")
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then return nil end
+    
+    -- Menggunakan safeFind agar tidak mati mendadak
+    local contentFolder = safeFind(playerGui, {
+        "ScreenGui", "Menu", "BottomLeftCorner", "Status", "Bottom", 
+        "StaminaBin", "InfoBin", "HealthBin", "Bar", "Content"
+    })
 
     if not contentFolder then return nil end
 
@@ -65,19 +75,15 @@ end
 
 local function isInteractingUI()
     local playerGui = player:FindFirstChild("PlayerGui")
-    if playerGui then
-        local screenGui = playerGui:FindFirstChild("ScreenGui")
-        if screenGui and screenGui:FindFirstChild("Menu") then
-            local stopGen = screenGui.Menu:FindFirstChild("StopGenerator")
-            return stopGen and stopGen.Visible or false
-        end
-    end
-    return false
+    if not playerGui then return false end
+    
+    local stopGen = safeFind(playerGui, {"ScreenGui", "Menu", "StopGenerator"})
+    return stopGen and stopGen.Visible or false
 end
 
 -- ==================== MAIN LOGIC ====================
 
-local lastPrintedItem = {} -- Mencegah F9 spam berkali-kali
+local lastPrintedItem = {}
 
 task.spawn(function()
     while true do
@@ -85,6 +91,7 @@ task.spawn(function()
         
         if char then
             local inventory = char:FindFirstChild("Inventory")
+            
             if inventory then
                 local currentHealth = getCurrentHealth()
                 local missingHealth = 0
@@ -106,7 +113,7 @@ task.spawn(function()
                                 local shouldUse = false
                                 local detectedCategory = "TIDAK DIKETAHUI"
 
-                                -- CEK KATEGORI
+                                -- FILTER KATEGORI
                                 if table.find(Config.ItemCategories.MachineItems, itemName) then
                                     detectedCategory = "MachineItems"
                                     if Config.AutoUse.EnableAutoMachineItem and isExtracting then shouldUse = true end
@@ -128,19 +135,18 @@ task.spawn(function()
                                     if Config.AutoUse.EnableAutoUtility then shouldUse = true end
                                 end
 
-                                -- PRINT TRACE ROUTE (HANYA SEKALI TIAP ITEM BARU MASUK)
+                                -- TRACE ROUTE (Biar ketahuan proses mikirnya)
                                 if lastPrintedItem[slotName] ~= itemName then
                                     print("--------------------------------------------------")
-                                    print("🔍 [TRACE] " .. slotName .. " terisi: " .. itemName)
-                                    print("📂 [TRACE] Masuk kategori: " .. detectedCategory)
-                                    print("❤️ [TRACE] Missing Health: " .. tostring(missingHealth) .. " | Is Extracting: " .. tostring(isExtracting))
-                                    print("✅ [TRACE] Keputusan shouldUse: " .. tostring(shouldUse))
+                                    print("🔍 [TRACE] " .. slotName .. " mendeteksi: " .. itemName)
+                                    print("📂 [TRACE] Kategori: " .. detectedCategory)
+                                    print("❤️ [TRACE] Kurang Darah: " .. tostring(missingHealth) .. " | Ekstrak Mesin: " .. tostring(isExtracting))
+                                    print("✅ [TRACE] Eksekusi (shouldUse): " .. tostring(shouldUse))
                                     print("--------------------------------------------------")
-                                    
                                     lastPrintedItem[slotName] = itemName
                                 end
 
-                                -- EKSEKUSI
+                                -- EKSEKUSI (Berdasarkan Data Remote Spy Aslimu)
                                 if shouldUse then
                                     pcall(function() 
                                         local args = { char, slotItem }
@@ -148,7 +154,6 @@ task.spawn(function()
                                     end)
                                 end
                             else
-                                -- Reset tracker kalau slot kembali kosong
                                 lastPrintedItem[slotName] = nil
                             end
                         end
