@@ -1,83 +1,79 @@
 -- ==============================================================================
--- STANDALONE DEBUGGER: AUTO USE ANALYZER
+-- STANDALONE DEBUGGER V2 (ANTI EMPTY / WAIT FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 
-print("\n================ DEBUGGER START ================\n")
+print("\n[DEBUG] STARTING DEBUGGER V2...\n")
 
--- Ambil remote
 local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
 
--- Tunggu character
+-- TUNGGU CHARACTER
 local char = player.Character or player.CharacterAdded:Wait()
 
-if not char:FindFirstChild("Inventory") then
-    warn("❌ Inventory tidak ditemukan!")
-    return
-end
+-- 🔥 TUNGGU INVENTORY ADA
+local inventory
+repeat
+    char = player.Character
+    inventory = char and char:FindFirstChild("Inventory")
+    task.wait(0.5)
+until inventory
 
-local inventory = char.Inventory
+print("✅ Inventory ditemukan!")
 
-print("✅ Inventory ditemukan:", inventory)
+-- 🔥 TUNGGU ISI INVENTORY (INI YANG PENTING)
+repeat
+    task.wait(0.5)
+until #inventory:GetChildren() > 0
+
+print("✅ Inventory sudah terisi!")
 print("Jumlah slot:", #inventory:GetChildren())
 
-print("\n================ SCANNING ITEMS ================\n")
+print("\n================ SCAN =================\n")
 
--- SCAN SEMUA ITEM
 for _, slot in pairs(inventory:GetChildren()) do
-    print("------ SLOT DETECTED ------")
-    print("Slot Name     :", slot.Name)
-    print("Class         :", slot.ClassName)
+    print("------ SLOT ------")
+    print("Name :", slot.Name)
+    print("Class:", slot.ClassName)
 
-    -- cek attribute
-    local success, value = pcall(function()
-        return slot.Value
+    -- SAFE VALUE CHECK
+    local val = nil
+    pcall(function()
+        val = slot.Value
     end)
 
-    if success then
-        print("Value         :", value)
-    else
-        print("Value         : (tidak ada)")
-    end
+    print("Value:", val)
 
-    -- cek children
-    local children = slot:GetChildren()
-    if #children > 0 then
-        print("Children      :", #children)
-        for _, child in pairs(children) do
-            print("  ↳", child.Name, "|", child.ClassName)
-            
-            if child:IsA("StringValue") or child:IsA("IntValue") then
-                print("     Value:", child.Value)
-            end
+    -- CHILD CHECK
+    for _, child in pairs(slot:GetChildren()) do
+        print("  ↳ Child:", child.Name, "|", child.ClassName)
+
+        if child:IsA("StringValue") or child:IsA("IntValue") then
+            print("     Value:", child.Value)
         end
-    else
-        print("Children      : (kosong)")
     end
 
-    print("-----------------------------\n")
+    print("------------------\n")
 end
 
-print("\n================ TEST AUTO USE ================\n")
+print("\n================ TEST USE =================\n")
 
--- TEST USE SATU PER SATU
 for _, slot in pairs(inventory:GetChildren()) do
-    print("🧪 Mencoba pakai:", slot.Name)
+    print("🧪 TRY USE:", slot.Name)
 
     local success, err = pcall(function()
         ItemEvent:InvokeServer(char, slot)
     end)
 
     if success then
-        print("✅ BERHASIL invoke:", slot.Name)
+        print("✅ SUCCESS:", slot.Name)
     else
-        warn("❌ GAGAL invoke:", slot.Name, "| Error:", err)
+        warn("❌ FAILED:", slot.Name, err)
     end
 
-    task.wait(1) -- delay biar keliatan
+    task.wait(1)
 end
 
-print("\n================ DEBUGGER END ================\n")
+print("\n[DEBUG] DONE\n")
