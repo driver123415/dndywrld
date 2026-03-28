@@ -1,0 +1,79 @@
+-- ==============================================================================
+-- STANDALONE SCRIPT: INVENTORY DEBUGGER GUI
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local player = Players.LocalPlayer
+
+-- Coba taruh di CoreGui biar aman dari reset, kalau gagal taruh di PlayerGui
+local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+
+-- Bikin ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InventoryDebuggerGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = guiContainer
+
+-- Bikin Tombol
+local debugBtn = Instance.new("TextButton")
+debugBtn.Name = "DebugButton"
+debugBtn.Size = UDim2.new(0, 180, 0, 45)
+debugBtn.Position = UDim2.new(0.5, -90, 0, 20) -- Muncul di tengah atas
+debugBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+debugBtn.BorderColor3 = Color3.fromRGB(255, 255, 255)
+debugBtn.BorderSizePixel = 2
+debugBtn.TextColor3 = Color3.fromRGB(0, 255, 0)
+debugBtn.Font = Enum.Font.GothamBold
+debugBtn.TextSize = 14
+debugBtn.Text = "🔍 CEK INVENTORY (F9)"
+debugBtn.Active = true
+debugBtn.Draggable = true -- Bikin GUI bisa digeser/drag
+debugBtn.Parent = screenGui
+
+print("[SYSTEM] Debugger GUI berhasil dimuat! Silakan pencet tombol di layar.")
+
+-- Fungsi saat tombol dipencet
+debugBtn.MouseButton1Click:Connect(function()
+    print("\n==============================================")
+    print("[DEBUG] 🔍 MEMERIKSA INVENTORY SAAT INI...")
+    
+    local char = player.Character
+    if not char then
+        print("[ERROR] Karakter tidak ditemukan!")
+        print("==============================================\n")
+        return
+    end
+    
+    local inventory = char:FindFirstChild("Inventory")
+    if not inventory then
+        print("[ERROR] Folder 'Inventory' tidak ditemukan di dalam Karakter!")
+        print("==============================================\n")
+        return
+    end
+    
+    -- Cek Slot 1 sampai 3
+    for i = 1, 3 do
+        local slotName = "Slot" .. tostring(i)
+        local slotItem = inventory:FindFirstChild(slotName)
+        
+        if slotItem then
+            if slotItem:IsA("StringValue") then
+                local rawVal = slotItem.Value
+                local cleanVal = string.match(rawVal, "^%s*(.-)%s*$") or rawVal -- Bersihin spasi
+                
+                if cleanVal ~= "None" and cleanVal ~= "" then
+                    print("  ✅ " .. slotName .. " : Terdeteksi Item -> [" .. cleanVal .. "]")
+                else
+                    print("  ❌ " .. slotName .. " : Kosong (None)")
+                end
+            else
+                print("  ⚠️ " .. slotName .. " : Ketemu, tapi BUKAN StringValue (Tipe: " .. slotItem.ClassName .. ")")
+            end
+        else
+            print("  ⚠️ " .. slotName .. " : Objek Slot tidak ditemukan di folder Inventory!")
+        end
+    end
+    
+    print("==============================================\n")
+end)
