@@ -1,5 +1,5 @@
 -- ==============================================================================
--- STANDALONE SCRIPT: SMART AUTO USE ITEM (V26 - STRING STRIPPER + REMOTE SPY FIX)
+-- STANDALONE SCRIPT: SMART AUTO USE ITEM (V27 - OMNI STRING MATCHER FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -12,6 +12,7 @@ local Config = {
         UseInterval = 0.1, 
         MaxHealth = 3, 
         
+        -- SAKLAR FITUR (TIDAK ADA YANG DIHAPUS)
         EnableAutoHeal = true,      
         EnableAutoBuff = true,      
         EnableAutoUtility = true,  
@@ -34,7 +35,28 @@ local Config = {
 }
 
 if not Config.AutoUse.Enable then return end
-print("[SYSTEM] Smart Auto-Use V26 Berjalan! (Pembersih String & Unpack Args)")
+print("[SYSTEM] Smart Auto-Use V27 Berjalan! (Omni-Matcher Anti Karakter Gaib)")
+
+-- Siapkan Remote Event di awal agar tidak delay/yield saat loop berjalan
+local ItemEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent")
+
+-- ==================== HELPER FUNCTIONS ====================
+
+-- [BARU] Fungsi Pencocok Super Agresif (Mengabaikan karakter gaib/spasi)
+local function isItemInCategory(itemName, categoryTable)
+    if not itemName then return false end
+    local lowerItemName = string.lower(itemName)
+    
+    for _, catItem in ipairs(categoryTable) do
+        -- Jika nama kategori ADA DI DALAM nama item, maka sah!
+        if string.find(lowerItemName, string.lower(catItem)) then
+            return true
+        end
+    end
+    return false
+end
+
+-- ==================== MAIN LOGIC ====================
 
 task.spawn(function()
     while true do
@@ -42,7 +64,7 @@ task.spawn(function()
         
         if char and char:FindFirstChild("Inventory") then
             
-            -- LOGIKA PINTAR: Cek Darah & Ekstrak (Dalam pcall agar anti-crash)
+            -- OTAK PINTAR (Diisolasi pakai pcall agar anti-crash kalau UI belum load)
             local missingHealth = 0
             local isExtracting = false
             
@@ -77,39 +99,36 @@ task.spawn(function()
                 end
             end)
 
-            -- LOGIKA EKSEKUSI ITEM
+            -- PROSES INVENTORY
             for slotName, isActive in pairs(Config.AutoUse.Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
                     
                     if slotItem and slotItem:IsA("StringValue") then
-                        local rawVal = slotItem.Value
+                        local val = slotItem.Value
                         
-                        -- Cek jangan sampai isinya kosong/None
-                        if rawVal and rawVal ~= "None" and rawVal ~= "" then
-                            -- PEMBERSIH EKSTREM: Buang semua spasi (depan, belakang, tengah)
-                            local val = string.gsub(rawVal, "%s+", "")
+                        -- Pastikan tidak kosong dan bukan "None"
+                        if val and string.find(string.lower(val), "none") == nil and val ~= "" then
                             local shouldUse = false
                             
-                            -- FILTER KATEGORI (Mencocokkan nama yang sudah bersih)
-                            if table.find(Config.ItemCategories.MachineItems, val) then
+                            -- PENCARIAN AGRESIF MENGGUNAKAN OMNI-MATCHER
+                            if isItemInCategory(val, Config.ItemCategories.MachineItems) then
                                 shouldUse = Config.AutoUse.EnableAutoMachineItem and isExtracting
-                            elseif table.find(Config.ItemCategories.SmallHeal, val) then
+                            elseif isItemInCategory(val, Config.ItemCategories.SmallHeal) then
                                 shouldUse = Config.AutoUse.EnableAutoHeal and (missingHealth >= 1)
-                            elseif table.find(Config.ItemCategories.BigHeal, val) then
+                            elseif isItemInCategory(val, Config.ItemCategories.BigHeal) then
                                 shouldUse = Config.AutoUse.EnableAutoHeal and (missingHealth >= 2)
-                            elseif table.find(Config.ItemCategories.StaminaAndBuffs, val) then
+                            elseif isItemInCategory(val, Config.ItemCategories.StaminaAndBuffs) then
                                 shouldUse = Config.AutoUse.EnableAutoBuff
-                            elseif table.find(Config.ItemCategories.UtilityAndTools, val) then
+                            elseif isItemInCategory(val, Config.ItemCategories.UtilityAndTools) then
                                 shouldUse = Config.AutoUse.EnableAutoUtility
                             end
 
-                            -- EKSEKUSI (Berdasarkan Remote Spy Aslimu)
+                            -- EKSEKUSI (Fotokopi 100% dari Remote Spy aslimu)
                             if shouldUse then
-                                print("[ACTION] 🔥 Menembak server untuk pakai: " .. val)
                                 pcall(function() 
                                     local args = { char, slotItem }
-                                    ReplicatedStorage:WaitForChild("Events"):WaitForChild("ItemEvent"):InvokeServer(unpack(args))
+                                    ItemEvent:InvokeServer(unpack(args))
                                 end)
                             end
                         end
