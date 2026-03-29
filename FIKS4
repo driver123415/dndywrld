@@ -24,7 +24,8 @@ local scripts = {
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck",--PlayerCheck 3
     "https://raw.githubusercontent.com/EarthC123/FjoneScript/refs/heads/main/NoxiousAutoFarmFix.lua",--coba ANTI MONSTER JATOH TANAH    
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up   
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Buy",--beli lah
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Buy",--beli lah
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/BuyV2",--beli lah
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Use",--
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV2",--ini work gk spam banget
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV3",--
