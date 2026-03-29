@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 16: FAILSAFE TIMEOUT & SMART HEALING SWEEP (1 GEN LEFT)
+-- MAIN SCRIPT REVISION 20: UI TRUTH ABSOLUTE (FIX GHOST GENERATOR PREMATURE EXIT)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -28,7 +28,6 @@ local isItemFarmingActive = false
 local Config = {
     AutoStartFarming = true, 
     
-    -- [FITUR BARU] ANTI-BENGONG (Maksimal detik stuck sblm auto-refresh)
     failsafegenerator = 60, 
     
     Pickup = {
@@ -37,10 +36,7 @@ local Config = {
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
-        
-        -- [FITUR BARU] SMART HEALING (Diambil saat sisa 1 mesin & tas kosong)
         SecondPriorityList = {"Bandage", "HealthKit"}, 
-        
         IgnoreList = {"Pop", "FakeCapsule"}
     },
     ItemESP = { Enable = true },
@@ -126,7 +122,6 @@ local function getSafePlaceCFrame()
             end
         end
     end
-    
     return nil
 end
 
@@ -191,7 +186,7 @@ local function isThreatened(targetPosition, radius)
     return false
 end
 
--- ==================== MACHINE PROGRESS & INVENTORY READERS ====================
+-- ==================== PROGRESS & INVENTORY CHECKERS ====================
 local function getMachineProgress()
     local pGui = player:FindFirstChild("PlayerGui")
     if pGui then
@@ -279,7 +274,6 @@ end
 
 -- ==================== ITEM AUTO-FARM ====================
 local isItemAuraActive = false
-local unpickableItems = setmetatable({}, {__mode = "k"}) 
 
 local function isIgnored(itemName)
     local nameLower = string.lower(itemName)
@@ -318,7 +312,7 @@ local function applyItemESP()
                 
                 if isIgnored(item.Name) or item:GetAttribute("BlacklistLimbo") then highlight.FillColor = Color3.fromRGB(255, 0, 0)
                 elseif isPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 255, 0)
-                elseif isSecondPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 100, 255) -- Warna Pink buat Healing
+                elseif isSecondPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 100, 255) 
                 else highlight.FillColor = Color3.fromRGB(0, 255, 0) end
                 
                 local billboard = Instance.new("BillboardGui")
@@ -419,7 +413,7 @@ local function executePickup()
         local priorityItems, normalItems = {}, {}
         for _, item in ipairs(itemsFolder:GetChildren()) do
             if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
-                if isPriority(item.Name) then table.insert(priorityItems, item)
+                if isPriority(item.Name) or isSecondPriority(item.Name) then table.insert(priorityItems, item)
                 else table.insert(normalItems, item) end
             end
         end
@@ -428,8 +422,6 @@ local function executePickup()
             hasCleanedAll = true
             break
         end
-
-        local itemsToProcess = (#priorityItems > 0) and priorityItems or normalItems
 
         table.sort(itemsToProcess, function(a, b)
             return (rootPart.Position - a:GetPivot().Position).Magnitude < (rootPart.Position - b:GetPivot().Position).Magnitude
@@ -442,7 +434,7 @@ local function executePickup()
                     print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item, ngungsi ke Safe Place...")
                     local safePos = getSafePlaceCFrame()
                     if safePos then teleportplr(safePos)
-                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end 
                     task.wait(1)
                     break
                 end
@@ -490,9 +482,9 @@ local function executePickup()
                 
                 if item.Parent then
                     if isPriority(item.Name) then
-                        print("[SYSTEM] Item Priority " .. item.Name .. " mencoba diambil ulang. Bypass Blacklist aktif.")
+                        print("[SYSTEM] Item Priority " .. item.Name .. " masih mencoba diambil. Bypass Blacklist aktif.")
                     else
-                        print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas Penuh). Dimasukkan ke Blacklist Permanen Lantai Ini.")
+                        print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas Penuh / Gagal). Dimasukkan ke Blacklist Permanen Lantai Ini.")
                         item:SetAttribute("BlacklistLimbo", true)
                         local highlight = item:FindFirstChild("ItemESP")
                         if highlight then highlight.FillColor = Color3.fromRGB(255, 0, 0) end
@@ -756,7 +748,6 @@ local function startAutoFarming()
                     local genFolder = map:FindFirstChild("Generators")
                     if genFolder then
                         
-                        local needSync = isTrinketActive()
                         local targetGen = nil
                         local uncompletedCount = 0
                         local anyEmptyGen = nil
@@ -784,9 +775,20 @@ local function startAutoFarming()
                         
                         targetGen = anyEmptyGen 
                         
-                        if uncompletedCount == 0 then
+                        -- [REVISI 20]: Absolute Truth Checker (Memeriksa progres mutlak dari UI)
+                        local curGenUI, totGenUI = getMachineProgress()
+                        local isFloorActuallyDone = false
+                        
+                        if curGenUI ~= -1 and totGenUI ~= -1 then
+                            isFloorActuallyDone = (curGenUI >= totGenUI)
+                        else
+                            -- Fallback kalau UI gagal dibaca
+                            isFloorActuallyDone = (uncompletedCount == 0)
+                        end
+                        
+                        if isFloorActuallyDone then
                             if not inElevatorStandby then
-                                print("[INFO] Semua Mesin Selesai! Menuju Real Elevator...")
+                                print("[INFO] Semua Mesin Selesai (Verified)! Menuju Real Elevator...")
                                 inElevatorStandby = true
                             end
                             
@@ -809,6 +811,8 @@ local function startAutoFarming()
                                 moveToPositionGen(targetCFrame, true)
                                 
                                 local isContested = false
+                                local monsterEvade = false
+                                local needSync = isTrinketActive()
                                 
                                 if needSync then
                                     local minD = Config.Teleport.SyncDelayMin
@@ -820,24 +824,33 @@ local function startAutoFarming()
                                     local elapsed = 0
                                     while elapsed < syncDelay do
                                         if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
-                                            isContested = true
+                                            monsterEvade = true
                                             break
                                         end
                                         task.wait(0.1)
                                         elapsed = elapsed + 0.1
                                     end
                                     
-                                    if not isContested and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                    if not monsterEvade and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                         isContested = true
                                     end
                                 else
-                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) or isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                                        monsterEvade = true
+                                    elseif isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                         isContested = true
                                     end
                                 end
                                 
-                                if isContested then
-                                    print("[SAFETY] Mesin direbut pemain lain atau tidak aman. Batal ekstrak.")
+                                if monsterEvade then
+                                    print("[SAFETY] Monster terdeteksi saat mendarat! Evade Instan!")
+                                    rootPart.Anchored = false
+                                    local safePos = getSafePlaceCFrame()
+                                    if safePos then teleportplr(safePos)
+                                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                                    task.wait(1.5)
+                                elseif isContested then
+                                    print("[SAFETY] Mesin direbut pemain lain. Batal ekstrak.")
                                     rootPart.Anchored = false
                                 else
                                     local hasStartedInteracting = false
@@ -910,7 +923,8 @@ local function startAutoFarming()
                             end
                             
                         else
-                            print("[INFO] Semua mesin ditempati orang atau tidak aman. Ngungsi ke DandyShop/SafePlace...")
+                            local progressText = (curGenUI ~= -1) and (" ("..curGenUI.."/"..totGenUI..")") or ""
+                            print("[INFO] Mesin belum selesai" .. progressText .. " tapi area tidak aman/hilang. Ngungsi ke DandyShop...")
                             rootPart.Anchored = false
                             local safePos = getSafePlaceCFrame()
                             if safePos then teleportplr(safePos) end
@@ -938,12 +952,10 @@ task.spawn(function()
 
         local curGen, totGen = getMachineProgress()
         
-        -- Reset status sapu bersih di lantai baru
         if curGen == 0 then
             hasSweptHeals = false 
         end
         
-        -- [FAILSAFE WATCHER]
         if not isItemFarmingActive then
             if curGen ~= lastGenCount then
                 lastGenCount = curGen
@@ -955,16 +967,16 @@ task.spawn(function()
                 forceStop()
                 if rootPart then rootPart.Anchored = false end
                 local safePos = getSafePlaceCFrame()
-                if safePos then teleportplr(safePos) end
+                if safePos then teleportplr(safePos) 
+                else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
                 
                 lastProgressTick = tick() 
                 task.wait(2)
             end
         else
-            lastProgressTick = tick() -- Jangan hitung timeout kalau lagi sibuk mungut barang
+            lastProgressTick = tick() 
         end
 
-        -- [SMART HEAL SWEEP] Jika sisa 1 mesin dan belum sapu bersih
         if curGen > 0 and totGen > 0 and curGen == (totGen - 1) and not hasSweptHeals then
             if getEmptyInventorySlots() > 0 then
                 local unblacklistedAny = false
@@ -973,10 +985,10 @@ task.spawn(function()
                 if itemsFolder then
                     for _, item in ipairs(itemsFolder:GetChildren()) do
                         if isSecondPriority(item.Name) and item:GetAttribute("BlacklistLimbo") then
-                            item:SetAttribute("BlacklistLimbo", nil) -- Cabut blacklist!
+                            item:SetAttribute("BlacklistLimbo", nil) 
                             
                             local highlight = item:FindFirstChild("ItemESP")
-                            if highlight then highlight.FillColor = Color3.fromRGB(255, 100, 255) end -- Ubah jadi pink
+                            if highlight then highlight.FillColor = Color3.fromRGB(255, 100, 255) end 
                             
                             unblacklistedAny = true
                         end
@@ -1034,7 +1046,7 @@ task.spawn(function()
                     end
                     
                     isItemFarmingActive = false
-                    lastProgressTick = tick() -- Reset failsafe sesudah memungut item
+                    lastProgressTick = tick() 
                 end
             end
         end
