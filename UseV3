@@ -1,5 +1,5 @@
 -- ==============================================================================
--- SMART AUTO USE - FINAL COMPLETE
+-- SMART AUTO USE - FINAL COMPLETE (ANTI SPAM FIX)
 -- ==============================================================================
 
 local Players = game:GetService("Players")
@@ -30,8 +30,8 @@ local Buff      = {
     "BonBon","ChristmasCookie","DandyEasterEggs"
 }
 local Utility   = {"SmokeBomb","EjectButton","AirHorn","Tape"}
-local Stamina   = {"Pop","PopBottle"}        -- hanya saat run generator
-local Machine   = {"Stopwatch","Valve","JumperCable","Instructions"} -- hanya saat semua jenis generator
+local Stamina   = {"Pop","PopBottle"}
+local Machine   = {"Stopwatch","Valve","JumperCable","Instructions"}
 -- =========================================================
 
 print("[SYSTEM] Smart Auto-Use Berjalan! MaxHealth=" .. Config.MaxHealth)
@@ -99,8 +99,8 @@ task.spawn(function()
 
             local currentHP    = Config.MaxHealth
             local missingHP    = 0
-            local isRunning    = false  -- khusus run generator (Pop/PopBottle)
-            local isExtracting = false  -- semua jenis generator (Machine items)
+            local isRunning    = false
+            local isExtracting = false
 
             pcall(function()
                 local menu = PlayerGui.ScreenGui.Menu
@@ -136,15 +136,22 @@ task.spawn(function()
             if hpLabel then
                 hpLabel.Text = "❤ HP: " .. currentHP .. "/" .. Config.MaxHealth
                 if currentHP <= 1 then
-                    hpLabel.TextColor3 = Color3.fromRGB(255, 50, 50)    -- merah = kritis
+                    hpLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
                 elseif missingHP >= 1 then
-                    hpLabel.TextColor3 = Color3.fromRGB(255, 180, 0)    -- kuning = kurang
+                    hpLabel.TextColor3 = Color3.fromRGB(255, 180, 0)
                 else
-                    hpLabel.TextColor3 = Color3.fromRGB(100, 255, 100)  -- hijau = penuh
+                    hpLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
                 end
             end
 
-            -- Loop slot
+            -- ✅ FIX: Flag per kategori, bukan 1 flag global
+            -- Sehingga 1 Bandage tidak menghalangi 1 Machine dipakai di tick yang sama
+            local usedHeal    = false
+            local usedBuff    = false
+            local usedUtility = false
+            local usedStamina = false
+            local usedMachine = false
+
             for slotName, isActive in pairs(Config.Slots) do
                 if isActive then
                     local slotItem = char.Inventory:FindFirstChild(slotName)
@@ -154,27 +161,29 @@ task.spawn(function()
                         if val ~= "" and val ~= "None" then
                             local use = false
 
-                            if inList(val, Machine) then
-                                -- Semua jenis generator
+                            if inList(val, Machine) and not usedMachine then
                                 use = Config.EnableMachine and isExtracting
+                                if use then usedMachine = true end
 
-                            elseif inList(val, Stamina) then
-                                -- Khusus run generator saja
+                            elseif inList(val, Stamina) and not usedStamina then
                                 use = Config.EnableStamina and isRunning
+                                if use then usedStamina = true end
 
-                            elseif inList(val, SmallHeal) then
-                                -- Bandage: pakai kalau ada nyawa yang hilang
+                            elseif inList(val, SmallHeal) and not usedHeal then
                                 use = Config.EnableHeal and (missingHP >= 1)
+                                if use then usedHeal = true end
 
-                            elseif inList(val, BigHeal) then
-                                -- HealthKit: pakai kalau nyawa kritis sisa 1
+                            elseif inList(val, BigHeal) and not usedHeal then
                                 use = Config.EnableHeal and (currentHP <= 1)
+                                if use then usedHeal = true end
 
-                            elseif inList(val, Buff) then
+                            elseif inList(val, Buff) and not usedBuff then
                                 use = Config.EnableBuff
+                                if use then usedBuff = true end
 
-                            elseif inList(val, Utility) then
+                            elseif inList(val, Utility) and not usedUtility then
                                 use = Config.EnableUtility
+                                if use then usedUtility = true end
                             end
 
                             if use then
