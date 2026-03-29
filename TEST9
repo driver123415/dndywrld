@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 20: UI TRUTH ABSOLUTE (FIX GHOST GENERATOR PREMATURE EXIT)
+-- MAIN SCRIPT REVISION 20: PICKUP TYPO FIX (RESTORED MISSING VARIABLE)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -28,7 +28,7 @@ local isItemFarmingActive = false
 local Config = {
     AutoStartFarming = true, 
     
-    failsafegenerator = 60, 
+    failsafegenerator = 60, -- Detik maksimal stuck sebelum auto-refresh
     
     Pickup = {
         Enable = true,              
@@ -36,7 +36,7 @@ local Config = {
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
-        SecondPriorityList = {"Bandage", "HealthKit"}, 
+        SecondPriorityList = {"Bandage", "HealthKit"}, -- Item Healing
         IgnoreList = {"Pop", "FakeCapsule"}
     },
     ItemESP = { Enable = true },
@@ -60,9 +60,11 @@ local Config = {
         DelayNext = 1.0,        
         UndergroundOffset = 11.5,
         
+        -- LETHAL MONSTERS
         LethalRadius = 60,
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
         
+        -- LOOSE MONSTERS 
         LooseRadius = 15,
         LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster", "ConnieMonster", "GourdyMonster" } 
     },
@@ -423,6 +425,9 @@ local function executePickup()
             break
         end
 
+        -- [REVISI 20]: MENGEMBALIKAN BARIS VARIABEL YANG HILANG (TYPO FIX)
+        local itemsToProcess = (#priorityItems > 0) and priorityItems or normalItems
+
         table.sort(itemsToProcess, function(a, b)
             return (rootPart.Position - a:GetPivot().Position).Magnitude < (rootPart.Position - b:GetPivot().Position).Magnitude
         end)
@@ -775,20 +780,9 @@ local function startAutoFarming()
                         
                         targetGen = anyEmptyGen 
                         
-                        -- [REVISI 20]: Absolute Truth Checker (Memeriksa progres mutlak dari UI)
-                        local curGenUI, totGenUI = getMachineProgress()
-                        local isFloorActuallyDone = false
-                        
-                        if curGenUI ~= -1 and totGenUI ~= -1 then
-                            isFloorActuallyDone = (curGenUI >= totGenUI)
-                        else
-                            -- Fallback kalau UI gagal dibaca
-                            isFloorActuallyDone = (uncompletedCount == 0)
-                        end
-                        
-                        if isFloorActuallyDone then
+                        if uncompletedCount == 0 then
                             if not inElevatorStandby then
-                                print("[INFO] Semua Mesin Selesai (Verified)! Menuju Real Elevator...")
+                                print("[INFO] Semua Mesin Selesai! Menuju Real Elevator...")
                                 inElevatorStandby = true
                             end
                             
@@ -923,8 +917,7 @@ local function startAutoFarming()
                             end
                             
                         else
-                            local progressText = (curGenUI ~= -1) and (" ("..curGenUI.."/"..totGenUI..")") or ""
-                            print("[INFO] Mesin belum selesai" .. progressText .. " tapi area tidak aman/hilang. Ngungsi ke DandyShop...")
+                            print("[INFO] Semua mesin ditempati orang atau tidak aman. Ngungsi ke DandyShop/SafePlace...")
                             rootPart.Anchored = false
                             local safePos = getSafePlaceCFrame()
                             if safePos then teleportplr(safePos) end
