@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 15: DANDYSHOP SAFEPLACE + LETHAL MONSTERS + NO CAMPING WORK---------
+-- MAIN SCRIPT REVISION 19: THE PERFECTED MASTER (SMART HEAL, 0-EVADE, FAILSAFE)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -28,12 +28,15 @@ local isItemFarmingActive = false
 local Config = {
     AutoStartFarming = true, 
     
+    failsafegenerator = 60, -- Detik maksimal stuck sebelum auto-refresh
+    
     Pickup = {
         Enable = true,              
         MovementMode = "Instant",   
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
+        SecondPriorityList = {"Bandage", "HealthKit"}, -- Item Healing
         IgnoreList = {"Pop", "FakeCapsule"}
     },
     ItemESP = { Enable = true },
@@ -57,11 +60,11 @@ local Config = {
         DelayNext = 1.0,        
         UndergroundOffset = 11.5,
         
-        -- [REVISI 15] LETHAL MONSTERS (One-Hit Kill)
+        -- LETHAL MONSTERS
         LethalRadius = 60,
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
         
-        -- [REVISI 15] LOOSE MONSTERS (Pasif)
+        -- LOOSE MONSTERS 
         LooseRadius = 15,
         LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster", "ConnieMonster", "GourdyMonster" } 
     },
@@ -91,7 +94,6 @@ local function getModelCenter(model)
     return totalPos / #parts
 end
 
--- [REVISI 15] LOKASI SAFE PLACE BARU (DandyShop RootPart)
 local function getSafePlaceCFrame()
     local elevators = Workspace:FindFirstChild("Elevators")
     if elevators then
@@ -103,7 +105,6 @@ local function getSafePlaceCFrame()
                     if dandyShop then
                         local root = dandyShop:FindFirstChild("RootPart")
                         if root then
-                            -- Teleport sedikit di atas RootPart agar tidak nyangkut lantai
                             return root.CFrame * CFrame.new(0, 3, 0)
                         end
                     end
@@ -112,7 +113,6 @@ local function getSafePlaceCFrame()
         end
     end
     
-    -- Fallback ke Fake Elevator jika DandyShop tidak ditemukan (misal di awal map)
     local map = getMap()
     if map then
         local freeArea = map:FindFirstChild("FreeArea")
@@ -124,7 +124,6 @@ local function getSafePlaceCFrame()
             end
         end
     end
-    
     return nil
 end
 
@@ -143,7 +142,6 @@ local function forceStop()
     end
 end
 
--- [REVISI 15] DETEKSI ANCAMAN (LETHAL & LOOSE)
 local function isThreatened(targetPosition, radius)
     local map = getMap()
     if map then
@@ -157,7 +155,6 @@ local function isThreatened(targetPosition, radius)
                 if monster:IsA("Model") and monster.PrimaryPart then
                     local distance = (monster.PrimaryPart.Position - targetPosition).Magnitude
                     
-                    -- Cek Lethal Monster (Dandy / Dyle)
                     local isLethal = false
                     for _, lethalName in ipairs(Config.Teleport.AvoidmoreradiusMonsters) do
                         if monster.Name == lethalName then
@@ -168,10 +165,9 @@ local function isThreatened(targetPosition, radius)
                     
                     if isLethal then
                         if distance <= Config.Teleport.LethalRadius then return true end
-                        continue -- Lanjut ke monster berikutnya, abaikan cek Loose
+                        continue 
                     end
                     
-                    -- Cek Loose Monster (Pasif)
                     local isLooseMonster = false
                     for _, looseName in ipairs(Config.Teleport.LooseMonsters) do
                         if monster.Name == looseName then
@@ -190,6 +186,46 @@ local function isThreatened(targetPosition, radius)
         end
     end
     return false
+end
+
+-- ==================== PROGRESS & INVENTORY CHECKERS ====================
+local function getMachineProgress()
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        local specGui = pGui:FindFirstChild("SpectatorGui")
+        if specGui then
+            local info = specGui:FindFirstChild("InfoFrame")
+            if info then
+                local genFrame = info:FindFirstChild("GeneratorFrame")
+                if genFrame then
+                    local msg = genFrame:FindFirstChild("Message")
+                    if msg and msg:IsA("TextLabel") then
+                        local cur, tot = string.match(msg.Text, "Machines Completed: (%d+)/(%d+)")
+                        if cur and tot then
+                            return tonumber(cur), tonumber(tot)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return -1, -1
+end
+
+local function getEmptyInventorySlots()
+    local char = player.Character
+    if not char then return 0 end
+    local inv = char:FindFirstChild("Inventory")
+    if not inv then return 0 end
+    
+    local emptyCount = 0
+    for i = 1, 4 do
+        local slot = inv:FindFirstChild("Slot" .. i)
+        if slot and (slot.Value == "" or slot.Value == "None") then
+            emptyCount = emptyCount + 1
+        end
+    end
+    return emptyCount
 end
 
 -- ==================== MONSTER ESP ====================
@@ -240,7 +276,6 @@ end
 
 -- ==================== ITEM AUTO-FARM ====================
 local isItemAuraActive = false
-local unpickableItems = setmetatable({}, {__mode = "k"}) 
 
 local function isIgnored(itemName)
     local nameLower = string.lower(itemName)
@@ -258,6 +293,14 @@ local function isPriority(itemName)
     return false
 end
 
+local function isSecondPriority(itemName)
+    local nameLower = string.lower(itemName)
+    for _, healName in ipairs(Config.Pickup.SecondPriorityList) do
+        if string.find(nameLower, string.lower(healName), 1, true) then return true end
+    end
+    return false
+end
+
 local function applyItemESP()
     if not Config.ItemESP.Enable then return end
     local map = getMap()
@@ -271,6 +314,7 @@ local function applyItemESP()
                 
                 if isIgnored(item.Name) or item:GetAttribute("BlacklistLimbo") then highlight.FillColor = Color3.fromRGB(255, 0, 0)
                 elseif isPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 255, 0)
+                elseif isSecondPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 100, 255) 
                 else highlight.FillColor = Color3.fromRGB(0, 255, 0) end
                 
                 local billboard = Instance.new("BillboardGui")
@@ -371,7 +415,7 @@ local function executePickup()
         local priorityItems, normalItems = {}, {}
         for _, item in ipairs(itemsFolder:GetChildren()) do
             if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
-                if isPriority(item.Name) then table.insert(priorityItems, item)
+                if isPriority(item.Name) or isSecondPriority(item.Name) then table.insert(priorityItems, item)
                 else table.insert(normalItems, item) end
             end
         end
@@ -380,8 +424,6 @@ local function executePickup()
             hasCleanedAll = true
             break
         end
-
-        local itemsToProcess = (#priorityItems > 0) and priorityItems or normalItems
 
         table.sort(itemsToProcess, function(a, b)
             return (rootPart.Position - a:GetPivot().Position).Magnitude < (rootPart.Position - b:GetPivot().Position).Magnitude
@@ -394,7 +436,7 @@ local function executePickup()
                     print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item, ngungsi ke Safe Place...")
                     local safePos = getSafePlaceCFrame()
                     if safePos then teleportplr(safePos)
-                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end 
                     task.wait(1)
                     break
                 end
@@ -444,7 +486,8 @@ local function executePickup()
                     if isPriority(item.Name) then
                         print("[SYSTEM] Item Priority " .. item.Name .. " masih mencoba diambil. Bypass Blacklist aktif.")
                     else
-                        print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas Penuh). Dimasukkan ke Blacklist Permanen Lantai Ini.")
+                        -- SECOND PRIORITY (HEAL) BUKAN KEBAL. Kalau gagal = Blacklist Ulang!
+                        print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas Penuh / Gagal). Dimasukkan ke Blacklist Permanen Lantai Ini.")
                         item:SetAttribute("BlacklistLimbo", true)
                         local highlight = item:FindFirstChild("ItemESP")
                         if highlight then highlight.FillColor = Color3.fromRGB(255, 0, 0) end
@@ -521,7 +564,6 @@ local function updateSafeRadiusVisual()
     end
 end
 
--- [REVISI 15] Hapus Tie-Breaker Abjad. Kalau ada pemain lain = Mesin Penuh/Tidak Kosong.
 local function isMachineOccupied(generator, radius)
     local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
     if inGamePlayers then
@@ -725,7 +767,6 @@ local function startAutoFarming()
                                         uncompletedCount = uncompletedCount + 1
                                         if not connie then
                                             if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) then
-                                                -- [REVISI 15] Hanya pilih mesin yang 100% tidak diduduki pemain lain
                                                 if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                     if not anyEmptyGen then anyEmptyGen = gen end
                                                 end
@@ -736,7 +777,6 @@ local function startAutoFarming()
                             end
                         end
                         
-                        -- Target selalu mesin KOSONG
                         targetGen = anyEmptyGen 
                         
                         if uncompletedCount == 0 then
@@ -764,6 +804,7 @@ local function startAutoFarming()
                                 moveToPositionGen(targetCFrame, true)
                                 
                                 local isContested = false
+                                local monsterEvade = false
                                 
                                 if needSync then
                                     local minD = Config.Teleport.SyncDelayMin
@@ -775,28 +816,35 @@ local function startAutoFarming()
                                     local elapsed = 0
                                     while elapsed < syncDelay do
                                         if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
-                                            isContested = true
+                                            monsterEvade = true
                                             break
                                         end
                                         task.wait(0.1)
                                         elapsed = elapsed + 0.1
                                     end
                                     
-                                    if not isContested and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                    if not monsterEvade and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                         isContested = true
                                     end
                                 else
-                                    -- Walau trinket Inactive, tetap pastikan aman saat baru mendarat
-                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) or isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                                        monsterEvade = true
+                                    elseif isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                         isContested = true
                                     end
                                 end
                                 
-                                if isContested then
-                                    print("[SAFETY] Mesin direbut pemain lain atau tidak aman. Batal ekstrak.")
+                                if monsterEvade then
+                                    print("[SAFETY] Monster terdeteksi saat mendarat! Evade Instan!")
+                                    rootPart.Anchored = false
+                                    local safePos = getSafePlaceCFrame()
+                                    if safePos then teleportplr(safePos)
+                                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                                    task.wait(1.5)
+                                elseif isContested then
+                                    print("[SAFETY] Mesin direbut pemain lain. Batal ekstrak.")
                                     rootPart.Anchored = false
                                 else
-                                    -- Area 100% Aman & Kosong! Eksekusi!
                                     local hasStartedInteracting = false
                                     local instantNext = false
                                     local failTimer = 0 
@@ -815,7 +863,6 @@ local function startAutoFarming()
                                             break 
                                         end
                                         
-                                        -- [REVISI 15]: Evade Instan
                                         if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
                                             forceStop()
                                             rootPart.Anchored = false
@@ -828,7 +875,6 @@ local function startAutoFarming()
                                             break
                                         end
                                         
-                                        -- Kalau saat ekstrak ada pemain lain nyelonong masuk, kita ngalah cabut aja
                                         if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
                                             print("[SAFETY] Pemain lain mendekat saat ekstrak. Ngalah cabut.")
                                             forceStop()
@@ -869,7 +915,6 @@ local function startAutoFarming()
                             end
                             
                         else
-                            -- NGUNGSI JIKA SEMUA MESIN PENUH
                             print("[INFO] Semua mesin ditempati orang atau tidak aman. Ngungsi ke DandyShop/SafePlace...")
                             rootPart.Anchored = false
                             local safePos = getSafePlaceCFrame()
@@ -884,10 +929,70 @@ local function startAutoFarming()
     end)
 end
 
--- ==================== MASTER WATCHER ====================
+-- ==================== MASTER WATCHER & FAILSAFE ====================
+local hasSweptHeals = false
+local lastGenCount = -1
+local lastProgressTick = tick()
+
 task.spawn(function()
     while task.wait(0.2) do 
-        if not isMasterFarming then continue end
+        if not isMasterFarming then 
+            lastProgressTick = tick()
+            continue 
+        end
+
+        local curGen, totGen = getMachineProgress()
+        
+        if curGen == 0 then
+            hasSweptHeals = false 
+        end
+        
+        -- [FAILSAFE WATCHER]
+        if not isItemFarmingActive then
+            if curGen ~= lastGenCount then
+                lastGenCount = curGen
+                lastProgressTick = tick() 
+            end
+            
+            if tick() - lastProgressTick >= Config.failsafegenerator then
+                print("[FAILSAFE] Script stuck/bengong selama " .. Config.failsafegenerator .. " detik! Melakukan Auto-Refresh...")
+                forceStop()
+                if rootPart then rootPart.Anchored = false end
+                local safePos = getSafePlaceCFrame()
+                if safePos then teleportplr(safePos) 
+                else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                
+                lastProgressTick = tick() 
+                task.wait(2)
+            end
+        else
+            lastProgressTick = tick() 
+        end
+
+        -- [SMART HEAL SWEEP]: Sisa 1 Mesin & Tas Kosong
+        if curGen > 0 and totGen > 0 and curGen == (totGen - 1) and not hasSweptHeals then
+            if getEmptyInventorySlots() > 0 then
+                local unblacklistedAny = false
+                local map = getMap()
+                local itemsFolder = map and map:FindFirstChild("Items")
+                if itemsFolder then
+                    for _, item in ipairs(itemsFolder:GetChildren()) do
+                        if isSecondPriority(item.Name) and item:GetAttribute("BlacklistLimbo") then
+                            item:SetAttribute("BlacklistLimbo", nil) 
+                            
+                            local highlight = item:FindFirstChild("ItemESP")
+                            if highlight then highlight.FillColor = Color3.fromRGB(255, 100, 255) end 
+                            
+                            unblacklistedAny = true
+                        end
+                    end
+                end
+                if unblacklistedAny then
+                    print("[SMART PICKUP] Sisa 1 Mesin & Tas Kosong! Menghapus Blacklist Healing Item...")
+                end
+            end
+            hasSweptHeals = true
+        end
 
         local map = getMap()
         if map then
@@ -908,6 +1013,7 @@ task.spawn(function()
                     
                     while isInteractingUI() and isMasterFarming do
                         task.wait(0.2)
+                        lastProgressTick = tick()
                     end
                     
                     isItemFarmingActive = true 
@@ -933,6 +1039,7 @@ task.spawn(function()
                     end
                     
                     isItemFarmingActive = false
+                    lastProgressTick = tick() 
                 end
             end
         end
