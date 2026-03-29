@@ -41,7 +41,7 @@ local Config = {
         -- [FITUR BARU] SMART HEALING (Diambil saat sisa 1 mesin & tas kosong)
         SecondPriorityList = {"Bandage", "HealthKit"}, 
         
-        IgnoreList = {"FakeCapsule"}
+        IgnoreList = {"Pop", "FakeCapsule"}
     },
     ItemESP = { Enable = true },
     
