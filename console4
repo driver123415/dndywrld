@@ -1,4 +1,4 @@
---NEW CONSOLE MOBILE (Scrollbar Fixed + 2 Copy All Buttons)
+--NEW CONSOLE MOBILE (Scrollbar Click & Drag Fixed + 2 Copy Buttons)
 local screen = Instance.new("ScreenGui")
 screen.IgnoreGuiInset = false
 screen.ResetOnSpawn = true
@@ -45,9 +45,18 @@ local uigradient = Instance.new("UIGradient")
 uigradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(0.0862745, 0, 0.72549)), ColorSequenceKeypoint.new(1, Color3.new(0.294118, 0.380392, 0.435294))})
 uigradient.Parent = uistroke
 
+--// Area Drag Khusus (Mencegah pencurian klik dari Scrollbar)
+local dragArea = Instance.new("TextButton")
+dragArea.Name = "DragArea"
+dragArea.Size = UDim2.new(1, -335, 0, 40) -- Area drag di sisi kiri atas saja
+dragArea.Position = UDim2.new(0, 0, 0, 0)
+dragArea.BackgroundTransparency = 1
+dragArea.Text = ""
+dragArea.Parent = console
+
 --// Judul Console (Tengah Atas)
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -335, 0, 30) -- Dikurangi agar tidak menabrak 4 tombol di kanan
+titleLabel.Size = UDim2.new(1, -335, 0, 30)
 titleLabel.Position = UDim2.new(0, 10, 0, 10)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "CONSOLE"
@@ -143,9 +152,9 @@ resizeHandle.Parent = console
 --// Scrolling Frame untuk Logs
 local console_2 = Instance.new("ScrollingFrame")
 console_2.CanvasSize = UDim2.new(0, 0, 0, 0)
-console_2.AutomaticCanvasSize = Enum.AutomaticSize.None -- DIMATIKAN AGAR SCROLLBAR BISA DITARIK MANUAL
+console_2.AutomaticCanvasSize = Enum.AutomaticSize.None
 console_2.ScrollBarImageColor3 = Color3.new(0.137255, 0.211765, 0.266667)
-console_2.ScrollBarThickness = 12 -- Dipertebal sedikit agar lebih mudah diklik
+console_2.ScrollBarThickness = 12
 console_2.Active = true
 console_2.BackgroundColor3 = Color3.new(0.101961, 0.101961, 0.101961)
 console_2.BackgroundTransparency = 1
@@ -225,11 +234,11 @@ cpCorner.CornerRadius = UDim.new(0, 4)
 cpCorner.Parent = copyBtn
 
 
---// Dragging Logic (Geser GUI)
+--// Dragging Logic (Geser GUI) - DIPERBARUI MENGGUNAKAN DRAG AREA
 local UIS = game:GetService("UserInputService")
 local dragging, dragInput, dragStart, startPos
 
-console.InputBegan:Connect(function(input)
+dragArea.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		dragStart = input.Position
@@ -240,7 +249,7 @@ console.InputBegan:Connect(function(input)
 	end
 end)
 
-console.InputChanged:Connect(function(input)
+dragArea.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 		dragInput = input
 	end
@@ -290,7 +299,6 @@ end)
 
 --// Event Auto-Scroll yang Mencegah Bug Scrollbar (Update Manual)
 uilist_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	-- MANUAL UPDATE CANVAS AGAR BISA DITARIK
 	console_2.CanvasSize = UDim2.new(0, 0, 0, uilist_layout.AbsoluteContentSize.Y + 20)
 	
 	if autoScrollEnabled then
