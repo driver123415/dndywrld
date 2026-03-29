@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 15: DANDYSHOP SAFEPLACE + LETHAL MONSTERS + NO CAMPING
+-- MAIN SCRIPT REVISION 15: DANDYSHOP SAFEPLACE + LETHAL MONSTERS + NO CAMPING WORK---------
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -34,7 +34,7 @@ local Config = {
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
-        IgnoreList = {"FakeCapsule"}
+        IgnoreList = {"Pop", "FakeCapsule"}
     },
     ItemESP = { Enable = true },
     
