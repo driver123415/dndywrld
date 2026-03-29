@@ -11,17 +11,18 @@ local function executeScripts(scripts)
 end
 
 local scripts = {
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey2"
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey3",--multiiiiiiiii
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",--solo
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST7",--coba   
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST8",--coba   
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST6",--coba    
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST5",--coba    
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V2",--PlayerCheck 3
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V2",--
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck",--PlayerCheck 3
     "https://raw.githubusercontent.com/EarthC123/FjoneScript/refs/heads/main/NoxiousAutoFarmFix.lua",--coba ANTI MONSTER JATOH TANAH    
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV2",--
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up   
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Buy",--beli lah
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
