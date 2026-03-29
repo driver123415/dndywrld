@@ -1,4 +1,4 @@
---NEW CONSOLE MOBILE (Fixed Scroll + Copy All)
+--NEW CONSOLE MOBILE (Scrollbar Fixed + 2 Copy All Buttons)
 local screen = Instance.new("ScreenGui")
 screen.IgnoreGuiInset = false
 screen.ResetOnSpawn = true
@@ -28,7 +28,7 @@ console.BackgroundColor3 = Color3.new(0.0784314, 0.121569, 0.152941)
 console.Position = UDim2.new(0.358, 0, 0.264, 0)
 console.Size = UDim2.new(0.4, 0, 0.5, 0)
 console.Visible = true
-console.Active = true -- Diperlukan untuk drag
+console.Active = true
 console.Name = "Console"
 console.Parent = screen
 
@@ -47,7 +47,7 @@ uigradient.Parent = uistroke
 
 --// Judul Console (Tengah Atas)
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -245, 0, 30) -- Dikurangi agar tidak menabrak 3 tombol di kanan
+titleLabel.Size = UDim2.new(1, -335, 0, 30) -- Dikurangi agar tidak menabrak 4 tombol di kanan
 titleLabel.Position = UDim2.new(0, 10, 0, 10)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "CONSOLE"
@@ -76,8 +76,8 @@ minCorner.Parent = minimizeBtn
 local autoScrollEnabled = true
 local autoScrollBtn = Instance.new("TextButton")
 autoScrollBtn.Size = UDim2.new(0, 100, 0, 30)
-autoScrollBtn.Position = UDim2.new(1, -145, 0, 10) -- Di sebelah kiri minimize
-autoScrollBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34) -- Hijau (ON)
+autoScrollBtn.Position = UDim2.new(1, -145, 0, 10)
+autoScrollBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34)
 autoScrollBtn.TextColor3 = Color3.new(1, 1, 1)
 autoScrollBtn.Font = Enum.Font.SourceSansBold
 autoScrollBtn.TextSize = 14
@@ -88,20 +88,35 @@ local asCorner = Instance.new("UICorner")
 asCorner.CornerRadius = UDim.new(0, 6)
 asCorner.Parent = autoScrollBtn
 
---// Tombol Copy All
-local copyAllBtn = Instance.new("TextButton")
-copyAllBtn.Size = UDim2.new(0, 80, 0, 30)
-copyAllBtn.Position = UDim2.new(1, -235, 0, 10) -- Di sebelah kiri AutoScroll
-copyAllBtn.BackgroundColor3 = Color3.new(0.149, 0.388, 0.678) -- Biru
-copyAllBtn.TextColor3 = Color3.new(1, 1, 1)
-copyAllBtn.Font = Enum.Font.SourceSansBold
-copyAllBtn.TextSize = 14
-copyAllBtn.Text = "Copy All"
-copyAllBtn.Parent = console
+--// Tombol Copy Logs (Tanpa Line)
+local copyLogsBtn = Instance.new("TextButton")
+copyLogsBtn.Size = UDim2.new(0, 80, 0, 30)
+copyLogsBtn.Position = UDim2.new(1, -235, 0, 10)
+copyLogsBtn.BackgroundColor3 = Color3.new(0.149, 0.388, 0.678) -- Biru
+copyLogsBtn.TextColor3 = Color3.new(1, 1, 1)
+copyLogsBtn.Font = Enum.Font.SourceSansBold
+copyLogsBtn.TextSize = 14
+copyLogsBtn.Text = "Copy Logs"
+copyLogsBtn.Parent = console
 
-local caCorner = Instance.new("UICorner")
-caCorner.CornerRadius = UDim.new(0, 6)
-caCorner.Parent = copyAllBtn
+local clCorner = Instance.new("UICorner")
+clCorner.CornerRadius = UDim.new(0, 6)
+clCorner.Parent = copyLogsBtn
+
+--// Tombol Copy Full (Dengan Line)
+local copyFullBtn = Instance.new("TextButton")
+copyFullBtn.Size = UDim2.new(0, 80, 0, 30)
+copyFullBtn.Position = UDim2.new(1, -325, 0, 10)
+copyFullBtn.BackgroundColor3 = Color3.new(0.482, 0.294, 0.811) -- Ungu
+copyFullBtn.TextColor3 = Color3.new(1, 1, 1)
+copyFullBtn.Font = Enum.Font.SourceSansBold
+copyFullBtn.TextSize = 14
+copyFullBtn.Text = "Copy Full"
+copyFullBtn.Parent = console
+
+local cfCorner = Instance.new("UICorner")
+cfCorner.CornerRadius = UDim.new(0, 6)
+cfCorner.Parent = copyFullBtn
 
 --// Logic Minimize & Unminimize
 minimizeBtn.MouseButton1Click:Connect(function()
@@ -127,10 +142,10 @@ resizeHandle.Parent = console
 
 --// Scrolling Frame untuk Logs
 local console_2 = Instance.new("ScrollingFrame")
-console_2.CanvasSize = UDim2.new(0, 0, 0, 0) -- Set ke 0, biarkan AutomaticSize yang bekerja
-console_2.AutomaticCanvasSize = Enum.AutomaticSize.Y -- PERBAIKAN SCROLL WHEEL MOUSE
+console_2.CanvasSize = UDim2.new(0, 0, 0, 0)
+console_2.AutomaticCanvasSize = Enum.AutomaticSize.None -- DIMATIKAN AGAR SCROLLBAR BISA DITARIK MANUAL
 console_2.ScrollBarImageColor3 = Color3.new(0.137255, 0.211765, 0.266667)
-console_2.ScrollBarThickness = 8
+console_2.ScrollBarThickness = 12 -- Dipertebal sedikit agar lebih mudah diklik
 console_2.Active = true
 console_2.BackgroundColor3 = Color3.new(0.101961, 0.101961, 0.101961)
 console_2.BackgroundTransparency = 1
@@ -265,47 +280,68 @@ autoScrollBtn.MouseButton1Click:Connect(function()
 	autoScrollEnabled = not autoScrollEnabled
 	if autoScrollEnabled then
 		autoScrollBtn.Text = "AutoScroll: ON"
-		autoScrollBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34) -- Hijau
-		-- Langsung scroll ke bawah saat dinyalakan
-		console_2.CanvasPosition = Vector2.new(0, uilist_layout.AbsoluteContentSize.Y)
+		autoScrollBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34)
+		console_2.CanvasPosition = Vector2.new(0, console_2.CanvasSize.Y.Offset)
 	else
 		autoScrollBtn.Text = "AutoScroll: OFF"
-		autoScrollBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2) -- Merah
+		autoScrollBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
 	end
 end)
 
---// Event Auto-Scroll yang Bersih (Mencegah Bug Layar Bergeser)
+--// Event Auto-Scroll yang Mencegah Bug Scrollbar (Update Manual)
 uilist_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	-- MANUAL UPDATE CANVAS AGAR BISA DITARIK
+	console_2.CanvasSize = UDim2.new(0, 0, 0, uilist_layout.AbsoluteContentSize.Y + 20)
+	
 	if autoScrollEnabled then
-		-- Hanya akan turun ke bawah jika AutoScroll ON
-		console_2.CanvasPosition = Vector2.new(0, uilist_layout.AbsoluteContentSize.Y)
+		console_2.CanvasPosition = Vector2.new(0, console_2.CanvasSize.Y.Offset)
 	end
 end)
 
---// Logic Copy All
-copyAllBtn.MouseButton1Click:Connect(function()
-	local allLogs = {}
-	-- Loop untuk mengambil semua teks dari log yang ada
+--// Fungsi Bantu Mengambil Log Terurut
+local function getSortedLogs()
+	local sortedLogs = {}
 	for _, child in ipairs(logs:GetChildren()) do
 		if child:IsA("Frame") and child.Name ~= "Example" then
-			local logText = child:FindFirstChild("LogLabel")
-			if logText then
-				table.insert(allLogs, logText.Text)
-			end
+			table.insert(sortedLogs, child)
+		end
+	end
+	table.sort(sortedLogs, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
+	return sortedLogs
+end
+
+--// Logic Copy Logs (Murni)
+copyLogsBtn.MouseButton1Click:Connect(function()
+	local allLogs = {}
+	for _, child in ipairs(getSortedLogs()) do
+		local logText = child:FindFirstChild("LogLabel")
+		if logText then table.insert(allLogs, logText.Text) end
+	end
+	
+	if setclipboard then
+		setclipboard(table.concat(allLogs, "\n"))
+		local oldTxt = copyLogsBtn.Text
+		copyLogsBtn.Text = "Copied!"
+		task.delay(1, function() copyLogsBtn.Text = oldTxt end)
+	end
+end)
+
+--// Logic Copy Full (Termasuk Line Number)
+copyFullBtn.MouseButton1Click:Connect(function()
+	local allLogs = {}
+	for _, child in ipairs(getSortedLogs()) do
+		local lineText = child:FindFirstChild("LineLabel")
+		local logText = child:FindFirstChild("LogLabel")
+		if lineText and logText then 
+			table.insert(allLogs, lineText.Text .. logText.Text) 
 		end
 	end
 	
-	-- Gabungkan dan masukkan ke clipboard
 	if setclipboard then
-		local combinedText = table.concat(allLogs, "\n")
-		setclipboard(combinedText)
-		
-		-- Efek visual kecil agar tahu sudah tercopy
-		local originalText = copyAllBtn.Text
-		copyAllBtn.Text = "Copied!"
-		task.delay(1, function()
-			copyAllBtn.Text = originalText
-		end)
+		setclipboard(table.concat(allLogs, "\n"))
+		local oldTxt = copyFullBtn.Text
+		copyFullBtn.Text = "Copied!"
+		task.delay(1, function() copyFullBtn.Text = oldTxt end)
 	end
 end)
 
@@ -336,7 +372,6 @@ task.spawn(function()
 			line.Text = tostring(LineCount) .. " - "
 			txt.Text = tostring(msgText)
 			
-			-- Fungsi Copy individual
 			copyBtn.MouseButton1Click:Connect(function()
 				if setclipboard then
 					setclipboard(tostring(msgText))
@@ -348,7 +383,6 @@ task.spawn(function()
 		end
 
 		NewFrame.Parent = Logs
-		-- (Penghitungan CanvasSize manual dihapus dari sini agar scroll wheel normal)
 	end
 
 	local function tableToString(tbl)
