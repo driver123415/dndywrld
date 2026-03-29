@@ -54,20 +54,20 @@ local Config = {
         "Pop"
     },
     
-    -- [REVISI] Jeda pindah ke barang SELANJUTNYA (Dinaikkan agar server tidak membatalkan transaksi)
+    -- Jeda aman agar server tidak menolak transaksi karena dianggap spamming
     BuyDelay = 1.5,
 
     -- ⏳ [BARU] Sistem Auto-Retry jika gagal beli
     MaxRetries = 3,       
-    RetryDelay = 0.8,     -- Jeda yang lebih manusiawi antar percobaan pencet tombol
+    RetryDelay = 0.8,     
 
     -- ⏳ Waktu tunggu animasi meja toko Dandy naik
-    StoreLoadDelay = 3.5
+    StoreLoadDelay = 2.5
 }
 -- ==========================================
 
 print("==================================================")
-print(" ⚡ AUTO BUY DANDY SHOP (ANCHORED FIX V8) AKTIF ⚡")
+print(" ⚡ AUTO BUY DANDY SHOP (SMART POSITIONING V9) AKTIF ⚡")
 print("==================================================")
 
 local isShopping = false
@@ -149,19 +149,33 @@ local function executeBuy(dandyStore)
         if humanoidRootPart then
             print("[AUTO BUY] Animasi meja selesai. Mengeksekusi " .. #availableItems .. " barang prioritas...")
             
+            -- Simpan posisi aman player saat ini (biasanya di tengah ruang lift)
+            local safeRoomPos = humanoidRootPart.Position
+            
             for _, itemData in ipairs(availableItems) do
                 print("⚡ [PROSES] Mengamankan: " .. itemData.Name)
                 
-                -- ========================================================
-                -- 🛡️ [ANTI JATUH] MENGGUNAKAN ANCHORED (BEKU)
-                -- ========================================================
                 humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-                humanoidRootPart.Anchored = true -- Bekukan karakter agar tidak terlempar fisika
+                humanoidRootPart.Anchored = true 
                 
-                -- Posisikan karakter 3 stud DI DEPAN barang (Z + 3), bukan menembus meja
-                humanoidRootPart.CFrame = itemData.PartCFrame * CFrame.new(0, -1, 3)
+                -- ========================================================
+                -- 🎯 [SMART POSITIONING] ANTI-SALAH ARAH
+                -- ========================================================
+                local promptPos = itemData.PartCFrame.Position
                 
-                -- Jeda agak lama agar server mendaftarkan posisimu dengan sah
+                -- Cari arah dari barang ke tempat player berdiri di ruangan (mengabaikan rotasi barang)
+                local directionToPlayer = (safeRoomPos - promptPos) * Vector3.new(1, 0, 1)
+                if directionToPlayer.Magnitude < 0.1 then directionToPlayer = Vector3.new(0, 0, 1) end
+                directionToPlayer = directionToPlayer.Unit
+                
+                -- Taruh player persis 3 stud dari barang, searah dengan ruang kosong, sejajar dengan lantai asli
+                local targetPos = promptPos + (directionToPlayer * 2.5)
+                targetPos = Vector3.new(targetPos.X, safeRoomPos.Y, targetPos.Z)
+                
+                -- Teleport dan paksa karakter menghadap lurus ke arah barang
+                humanoidRootPart.CFrame = CFrame.lookAt(targetPos, Vector3.new(promptPos.X, safeRoomPos.Y, promptPos.Z))
+                -- ========================================================
+                
                 task.wait(0.5) 
                 
                 local successBuy = false
@@ -178,7 +192,6 @@ local function executeBuy(dandyStore)
                     print("   🔄 Memencet tombol... (Percobaan " .. attempt .. "/" .. Config.MaxRetries .. ")")
                     interactWithPrompt(itemData.PromptObj)
                     
-                    -- Tunggu server memproses
                     task.wait(Config.RetryDelay)
                 end
                 
@@ -186,12 +199,9 @@ local function executeBuy(dandyStore)
                     print("   ⚠️ [GAGAL] Menyerah pada " .. itemData.Name .. " (Koin tidak cukup atau lag).")
                 end
                 
-                -- ========================================================
-                -- Jeda santai sebelum pindah ke barang selanjutnya
                 task.wait(Config.BuyDelay) 
             end
             
-            -- Buka kembali bekunya setelah semua barang selesai diborong
             humanoidRootPart.Anchored = false 
             print("[AUTO BUY] Sapu bersih selesai!")
         end
