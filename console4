@@ -1,4 +1,4 @@
---NEW CONSOLE MOBILE (Emulator Friendly: Header Drag & Jump Nav)
+--NEW CONSOLE MOBILE (Stable Base + Hold-to-Scroll + 2 Copy Buttons)
 local screen = Instance.new("ScreenGui")
 screen.IgnoreGuiInset = false
 screen.ResetOnSpawn = true
@@ -26,9 +26,9 @@ obCorner.Parent = openBtn
 local console = Instance.new("Frame")
 console.BackgroundColor3 = Color3.new(0.078, 0.121, 0.152)
 console.Position = UDim2.new(0.358, 0, 0.264, 0)
-console.Size = UDim2.new(0.45, 0, 0.55, 0) -- Sedikit dilebarkan
+console.Size = UDim2.new(0.45, 0, 0.5, 0)
 console.Visible = true
-console.ClipsDescendants = true -- Agar Header tidak keluar dari corner
+console.Active = true
 console.Name = "Console"
 console.Parent = screen
 
@@ -45,37 +45,28 @@ local uigradient = Instance.new("UIGradient")
 uigradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(0.086, 0, 0.725)), ColorSequenceKeypoint.new(1, Color3.new(0.294, 0.380, 0.435))})
 uigradient.Parent = uistroke
 
---// HEADER (Satu-satunya area untuk Drag)
-local header = Instance.new("Frame")
-header.Name = "HeaderDragArea"
-header.Size = UDim2.new(1, 0, 0, 45)
-header.BackgroundColor3 = Color3.new(0.05, 0.08, 0.1) -- Lebih gelap agar terlihat sebagai handle
-header.BorderSizePixel = 0
-header.Active = true
-header.Parent = console
-
---// Judul Console
+--// Judul Console (Tengah Atas)
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -345, 1, 0)
-titleLabel.Position = UDim2.new(0, 15, 0, 0)
+titleLabel.Size = UDim2.new(1, -340, 0, 30)
+titleLabel.Position = UDim2.new(0, 10, 0, 10)
 titleLabel.BackgroundTransparency = 1
 titleLabel.Text = "CONSOLE"
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
 titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextSize = 22
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = header
+titleLabel.Parent = console
 
 --// Tombol Minimize (-)
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -40, 0, 7)
+minimizeBtn.Position = UDim2.new(1, -35, 0, 10)
 minimizeBtn.BackgroundColor3 = Color3.new(0.8, 0.2, 0.2)
 minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
 minimizeBtn.Font = Enum.Font.SourceSansBold
 minimizeBtn.Text = "-"
 minimizeBtn.TextScaled = true
-minimizeBtn.Parent = header
+minimizeBtn.Parent = console
 
 local minCorner = Instance.new("UICorner")
 minCorner.CornerRadius = UDim.new(1, 0)
@@ -85,13 +76,13 @@ minCorner.Parent = minimizeBtn
 local autoScrollEnabled = true
 local autoScrollBtn = Instance.new("TextButton")
 autoScrollBtn.Size = UDim2.new(0, 100, 0, 30)
-autoScrollBtn.Position = UDim2.new(1, -150, 0, 7)
+autoScrollBtn.Position = UDim2.new(1, -145, 0, 10)
 autoScrollBtn.BackgroundColor3 = Color3.new(0.18, 0.55, 0.34)
 autoScrollBtn.TextColor3 = Color3.new(1, 1, 1)
 autoScrollBtn.Font = Enum.Font.SourceSansBold
 autoScrollBtn.TextSize = 14
 autoScrollBtn.Text = "AutoScroll: ON"
-autoScrollBtn.Parent = header
+autoScrollBtn.Parent = console
 
 local asCorner = Instance.new("UICorner")
 asCorner.CornerRadius = UDim.new(0, 6)
@@ -100,13 +91,13 @@ asCorner.Parent = autoScrollBtn
 --// Tombol Copy Logs (Tanpa Line)
 local copyLogsBtn = Instance.new("TextButton")
 copyLogsBtn.Size = UDim2.new(0, 75, 0, 30)
-copyLogsBtn.Position = UDim2.new(1, -235, 0, 7)
+copyLogsBtn.Position = UDim2.new(1, -230, 0, 10)
 copyLogsBtn.BackgroundColor3 = Color3.new(0.149, 0.388, 0.678)
 copyLogsBtn.TextColor3 = Color3.new(1, 1, 1)
 copyLogsBtn.Font = Enum.Font.SourceSansBold
 copyLogsBtn.TextSize = 14
 copyLogsBtn.Text = "Copy Logs"
-copyLogsBtn.Parent = header
+copyLogsBtn.Parent = console
 
 local clCorner = Instance.new("UICorner")
 clCorner.CornerRadius = UDim.new(0, 6)
@@ -115,13 +106,13 @@ clCorner.Parent = copyLogsBtn
 --// Tombol Copy Full (Dengan Line)
 local copyFullBtn = Instance.new("TextButton")
 copyFullBtn.Size = UDim2.new(0, 75, 0, 30)
-copyFullBtn.Position = UDim2.new(1, -320, 0, 7)
+copyFullBtn.Position = UDim2.new(1, -315, 0, 10)
 copyFullBtn.BackgroundColor3 = Color3.new(0.482, 0.294, 0.811)
 copyFullBtn.TextColor3 = Color3.new(1, 1, 1)
 copyFullBtn.Font = Enum.Font.SourceSansBold
 copyFullBtn.TextSize = 14
 copyFullBtn.Text = "Copy Full"
-copyFullBtn.Parent = header
+copyFullBtn.Parent = console
 
 local cfCorner = Instance.new("UICorner")
 cfCorner.CornerRadius = UDim.new(0, 6)
@@ -132,50 +123,106 @@ local console_2 = Instance.new("ScrollingFrame")
 console_2.CanvasSize = UDim2.new(0, 0, 0, 0)
 console_2.AutomaticCanvasSize = Enum.AutomaticSize.None
 console_2.ScrollBarImageColor3 = Color3.new(0.137, 0.211, 0.266)
-console_2.ScrollBarThickness = 10
+console_2.ScrollBarThickness = 8
 console_2.Active = true
 console_2.BackgroundColor3 = Color3.new(0.101, 0.101, 0.101)
 console_2.BackgroundTransparency = 1
 console_2.BorderSizePixel = 0
-console_2.Position = UDim2.new(0, 10, 0, 55) -- Di bawah Header
-console_2.Size = UDim2.new(1, -55, 1, -65) -- Disisakan ruang di kanan untuk tombol Jump
+console_2.Position = UDim2.new(0.02, 0, 0.15, 0)
+console_2.Size = UDim2.new(0.96, -35, 0.82, 0) -- Diberi ruang kosong di kanan untuk panah scroll
 console_2.Visible = true
 console_2.Name = "ConsoleList"
 console_2.Parent = console
 
+--// FITUR BARU: TOMBOL HOLD-TO-SCROLL (Solusi untuk Emulator)
+local scrollUpBtn = Instance.new("TextButton")
+scrollUpBtn.Size = UDim2.new(0, 30, 0, 30)
+scrollUpBtn.Position = UDim2.new(1, -35, 0.15, 0)
+scrollUpBtn.BackgroundColor3 = Color3.new(0.2, 0.25, 0.3)
+scrollUpBtn.TextColor3 = Color3.new(1, 1, 1)
+scrollUpBtn.Text = "▲"
+scrollUpBtn.Parent = console
+
+local suCorner = Instance.new("UICorner")
+suCorner.CornerRadius = UDim.new(0, 6)
+suCorner.Parent = scrollUpBtn
+
+local scrollDownBtn = Instance.new("TextButton")
+scrollDownBtn.Size = UDim2.new(0, 30, 0, 30)
+scrollDownBtn.Position = UDim2.new(1, -35, 0.97, -30)
+scrollDownBtn.BackgroundColor3 = Color3.new(0.2, 0.25, 0.3)
+scrollDownBtn.TextColor3 = Color3.new(1, 1, 1)
+scrollDownBtn.Text = "▼"
+scrollDownBtn.Parent = console
+
+local sdCorner = Instance.new("UICorner")
+sdCorner.CornerRadius = UDim.new(0, 6)
+sdCorner.Parent = scrollDownBtn
+
+local isScrollingUp, isScrollingDown = false, false
+
+scrollUpBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isScrollingUp = true
+		while isScrollingUp do
+			console_2.CanvasPosition = Vector2.new(0, math.max(0, console_2.CanvasPosition.Y - 15)) -- Scroll pelan ke atas
+			task.wait(0.01)
+		end
+	end
+end)
+scrollUpBtn.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isScrollingUp = false
+	end
+end)
+
+scrollDownBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isScrollingDown = true
+		while isScrollingDown do
+			console_2.CanvasPosition = Vector2.new(0, console_2.CanvasPosition.Y + 15) -- Scroll pelan ke bawah
+			task.wait(0.01)
+		end
+	end
+end)
+scrollDownBtn.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		isScrollingDown = false
+	end
+end)
+
+
+--// LOG TEMPLATE & LAYOUT
 local logs = Instance.new("Folder")
 logs.Name = "Logs"
 logs.Parent = console_2
 
 local uilist_layout = Instance.new("UIListLayout")
-uilist_layout.Padding = UDim.new(0, 8)
+uilist_layout.Padding = UDim.new(0, 10)
 uilist_layout.SortOrder = Enum.SortOrder.LayoutOrder
 uilist_layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 uilist_layout.Parent = logs
 
---// Template Frame Log (Example)
 local example = Instance.new("Frame")
 example.BackgroundColor3 = Color3.new(1, 1, 1)
 example.BackgroundTransparency = 1
-example.Size = UDim2.new(1, -10, 0, 30)
+example.Size = UDim2.new(1, -15, 0, 30)
 example.Visible = false
 example.Name = "Example"
 example.Parent = logs
 
--- Label Baris ("1 - ")
 local lineLabel = Instance.new("TextLabel")
 lineLabel.Font = Enum.Font.Code
 lineLabel.Text = "1 - "
 lineLabel.TextColor3 = Color3.new(0.282, 0.282, 0.282)
 lineLabel.TextSize = 14
-lineLabel.BackgroundColor3 = Color3.new(1, 1, 1)
 lineLabel.BackgroundTransparency = 1
 lineLabel.Position = UDim2.new(0, 5, 0, 0)
 lineLabel.Size = UDim2.new(0, 30, 1, 0)
 lineLabel.TextXAlignment = Enum.TextXAlignment.Left
+lineLabel.Name = "LineLabel"
 lineLabel.Parent = example
 
--- Label Teks Log Utama
 local logLabel = Instance.new("TextLabel")
 logLabel.Font = Enum.Font.Cartoon
 logLabel.Text = "Log: Hello"
@@ -187,9 +234,9 @@ logLabel.Size = UDim2.new(1, -100, 1, 0)
 logLabel.TextXAlignment = Enum.TextXAlignment.Left
 logLabel.TextYAlignment = Enum.TextYAlignment.Center
 logLabel.TextWrapped = true
+logLabel.Name = "LogLabel"
 logLabel.Parent = example
 
---// Tombol Copy di dalam log (Individual)
 local copyBtn = Instance.new("TextButton")
 copyBtn.Size = UDim2.new(0, 50, 0, 22)
 copyBtn.Position = UDim2.new(1, -55, 0.5, -11)
@@ -198,75 +245,18 @@ copyBtn.TextColor3 = Color3.new(1, 1, 1)
 copyBtn.Font = Enum.Font.SourceSansBold
 copyBtn.TextSize = 13
 copyBtn.Text = "Copy"
+copyBtn.Name = "CopyBtn"
 copyBtn.Parent = example
-
 local cpCorner = Instance.new("UICorner")
 cpCorner.CornerRadius = UDim.new(0, 4)
 cpCorner.Parent = copyBtn
 
---// Tombol JUMP TO TOP & BOTTOM (Fitur Baru)
-local jumpTopBtn = Instance.new("TextButton")
-jumpTopBtn.Size = UDim2.new(0, 30, 0, 30)
-jumpTopBtn.Position = UDim2.new(1, -40, 1, -80)
-jumpTopBtn.BackgroundColor3 = Color3.new(0.2, 0.25, 0.3)
-jumpTopBtn.TextColor3 = Color3.new(1, 1, 1)
-jumpTopBtn.Font = Enum.Font.SourceSansBold
-jumpTopBtn.TextSize = 16
-jumpTopBtn.Text = "▲"
-jumpTopBtn.Parent = console
 
-local jtCorner = Instance.new("UICorner")
-jtCorner.CornerRadius = UDim.new(1, 0)
-jtCorner.Parent = jumpTopBtn
-
-local jumpBotBtn = Instance.new("TextButton")
-jumpBotBtn.Size = UDim2.new(0, 30, 0, 30)
-jumpBotBtn.Position = UDim2.new(1, -40, 1, -40)
-jumpBotBtn.BackgroundColor3 = Color3.new(0.2, 0.25, 0.3)
-jumpBotBtn.TextColor3 = Color3.new(1, 1, 1)
-jumpBotBtn.Font = Enum.Font.SourceSansBold
-jumpBotBtn.TextSize = 16
-jumpBotBtn.Text = "▼"
-jumpBotBtn.Parent = console
-
-local jbCorner = Instance.new("UICorner")
-jbCorner.CornerRadius = UDim.new(1, 0)
-jbCorner.Parent = jumpBotBtn
-
-jumpTopBtn.MouseButton1Click:Connect(function()
-	console_2.CanvasPosition = Vector2.new(0, 0)
-end)
-
-jumpBotBtn.MouseButton1Click:Connect(function()
-	console_2.CanvasPosition = Vector2.new(0, uilist_layout.AbsoluteContentSize.Y)
-end)
-
---// Logic Minimize & Unminimize
-minimizeBtn.MouseButton1Click:Connect(function()
-	console.Visible = false
-	openBtn.Visible = true
-end)
-
-openBtn.MouseButton1Click:Connect(function()
-	console.Visible = true
-	openBtn.Visible = false
-end)
-
---// Resize Handle (Pojok kanan bawah)
-local resizeHandle = Instance.new("TextButton")
-resizeHandle.Size = UDim2.new(0, 20, 0, 20)
-resizeHandle.Position = UDim2.new(1, -20, 1, -20)
-resizeHandle.BackgroundTransparency = 1
-resizeHandle.Text = "⌟"
-resizeHandle.TextColor3 = Color3.new(1, 1, 1)
-resizeHandle.TextSize = 20
-resizeHandle.Parent = console
-
---// Dragging Logic (DIPINDAH KE HEADER SAJA)
+--// DRAG LOGIC (Seluruh Area Console)
 local UIS = game:GetService("UserInputService")
 local dragging, dragInput, dragStart, startPos
 
-header.InputBegan:Connect(function(input)
+console.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
 		dragStart = input.Position
@@ -277,7 +267,7 @@ header.InputBegan:Connect(function(input)
 	end
 end)
 
-header.InputChanged:Connect(function(input)
+console.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 		dragInput = input
 	end
@@ -290,9 +280,18 @@ UIS.InputChanged:Connect(function(input)
 	end
 end)
 
---// Resizing Logic
-local resizing, resizeStart, startSize
 
+--// RESIZE LOGIC
+local resizeHandle = Instance.new("TextButton")
+resizeHandle.Size = UDim2.new(0, 20, 0, 20)
+resizeHandle.Position = UDim2.new(1, -20, 1, -20)
+resizeHandle.BackgroundTransparency = 1
+resizeHandle.Text = "⌟"
+resizeHandle.TextColor3 = Color3.new(1, 1, 1)
+resizeHandle.TextSize = 20
+resizeHandle.Parent = console
+
+local resizing, resizeStart, startSize
 resizeHandle.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		resizing = true
@@ -311,7 +310,19 @@ UIS.InputChanged:Connect(function(input)
 	end
 end)
 
---// Logic Toggle Auto-Scroll
+
+--// MINIMIZE & UNMINIMIZE
+minimizeBtn.MouseButton1Click:Connect(function()
+	console.Visible = false
+	openBtn.Visible = true
+end)
+openBtn.MouseButton1Click:Connect(function()
+	console.Visible = true
+	openBtn.Visible = false
+end)
+
+
+--// AUTO SCROLL TOGGLE
 autoScrollBtn.MouseButton1Click:Connect(function()
 	autoScrollEnabled = not autoScrollEnabled
 	if autoScrollEnabled then
@@ -324,7 +335,6 @@ autoScrollBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
---// Auto-Scroll Update
 uilist_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	console_2.CanvasSize = UDim2.new(0, 0, 0, uilist_layout.AbsoluteContentSize.Y + 20)
 	if autoScrollEnabled then
@@ -332,7 +342,8 @@ uilist_layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	end
 end)
 
---// Copy Logics
+
+--// COPY ALL FUNCTIONS
 local function getSortedLogs()
 	local sortedLogs = {}
 	for _, child in ipairs(logs:GetChildren()) do
@@ -375,20 +386,20 @@ copyFullBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
---// Hook & Core Script
+
+--// CORE HOOK & PRINTING (DIPERBAIKI)
 task.spawn(function()
 	local Logs = logs
 	local ExampleFrame = example
 	local LineCount = 0
 
-	local CreateMessage = function(...)
+	local CreateMessage = function(msgText)
 		LineCount += 1
 		if LineCount >= 250 then
 			local oldLog = Logs:FindFirstChild("Line: " .. tostring(LineCount - 250))
 			if oldLog then oldLog:Destroy() end
 		end
 		
-		local msgText = ...
 		local NewFrame = ExampleFrame:Clone()
 		NewFrame.Name = "Line: " .. tostring(LineCount)
 		NewFrame.LayoutOrder = LineCount
@@ -415,33 +426,21 @@ task.spawn(function()
 		NewFrame.Parent = Logs
 	end
 
-	local function tableToString(tbl)
-		local result = {}
-		local function traverseTable(t, indent)
-			for k, v in pairs(t) do
-				if type(v) == "table" then
-					result[#result + 1] = indent .. tostring(k) .. ": {"
-					traverseTable(v, indent .. "  ")
-					result[#result + 1] = indent .. "}"
-				else
-					result[#result + 1] = indent .. tostring(k) .. ": " .. tostring(v)
-				end
-			end
-		end
-		traverseTable(tbl, "")
-		return table.concat(result, "\n")
-	end
-
 	local prt
 	prt = hookfunction(print, function(...)
-		local args = ...
-		if type(args) == "table" then
-			args = tableToString(args)
-		elseif type(args) == "function" then
-			args = getupvalues(args)
+		-- Menangkap semua argument agar tidak nyangkut/kosong
+		local args = {...}
+		local strArgs = {}
+		for _, v in ipairs(args) do
+			table.insert(strArgs, tostring(v))
 		end
-		local message = tostring(args)
-		CreateMessage(message)
-		return warn(message)
+		local message = table.concat(strArgs, " ")
+		
+		-- Dilempar ke spawn agar tidak mengganggu thread bawaan Roblox
+		task.spawn(function()
+			CreateMessage(message)
+		end)
+		
+		return prt(...)
 	end)
 end)
