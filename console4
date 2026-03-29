@@ -1,4 +1,4 @@
---NEW CONSOLE MOBILE (Stable Base + Hold-to-Scroll + 2 Copy Buttons)
+--NEW CONSOLE MOBILE (Anti-Bounce Scroll + Smooth Hold Arrows)
 local screen = Instance.new("ScreenGui")
 screen.IgnoreGuiInset = false
 screen.ResetOnSpawn = true
@@ -45,7 +45,7 @@ local uigradient = Instance.new("UIGradient")
 uigradient.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Color3.new(0.086, 0, 0.725)), ColorSequenceKeypoint.new(1, Color3.new(0.294, 0.380, 0.435))})
 uigradient.Parent = uistroke
 
---// Judul Console (Tengah Atas)
+--// Judul Console
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -340, 0, 30)
 titleLabel.Position = UDim2.new(0, 10, 0, 10)
@@ -129,12 +129,12 @@ console_2.BackgroundColor3 = Color3.new(0.101, 0.101, 0.101)
 console_2.BackgroundTransparency = 1
 console_2.BorderSizePixel = 0
 console_2.Position = UDim2.new(0.02, 0, 0.15, 0)
-console_2.Size = UDim2.new(0.96, -35, 0.82, 0) -- Diberi ruang kosong di kanan untuk panah scroll
+console_2.Size = UDim2.new(0.96, -35, 0.82, 0)
 console_2.Visible = true
 console_2.Name = "ConsoleList"
 console_2.Parent = console
 
---// FITUR BARU: TOMBOL HOLD-TO-SCROLL (Solusi untuk Emulator)
+--// TOMBOL PANAH HOLD-TO-SCROLL (Diperbarui untuk Emulator)
 local scrollUpBtn = Instance.new("TextButton")
 scrollUpBtn.Size = UDim2.new(0, 30, 0, 30)
 scrollUpBtn.Position = UDim2.new(1, -35, 0.15, 0)
@@ -159,35 +159,43 @@ local sdCorner = Instance.new("UICorner")
 sdCorner.CornerRadius = UDim.new(0, 6)
 sdCorner.Parent = scrollDownBtn
 
-local isScrollingUp, isScrollingDown = false, false
+-- Logic Tahan (Hold) untuk Scroll Panah
+local isScrollingUp = false
+local isScrollingDown = false
 
-scrollUpBtn.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		isScrollingUp = true
+local function stopScrolling()
+	isScrollingUp = false
+	isScrollingDown = false
+end
+
+scrollUpBtn.MouseButton1Down:Connect(function()
+	isScrollingUp = true
+	task.spawn(function()
 		while isScrollingUp do
-			console_2.CanvasPosition = Vector2.new(0, math.max(0, console_2.CanvasPosition.Y - 15)) -- Scroll pelan ke atas
-			task.wait(0.01)
+			console_2.CanvasPosition = Vector2.new(0, math.max(0, console_2.CanvasPosition.Y - 25))
+			task.wait(0.02)
 		end
-	end
+	end)
 end)
-scrollUpBtn.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		isScrollingUp = false
-	end
-end)
+scrollUpBtn.MouseButton1Up:Connect(stopScrolling)
+scrollUpBtn.MouseLeave:Connect(stopScrolling)
 
-scrollDownBtn.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		isScrollingDown = true
+scrollDownBtn.MouseButton1Down:Connect(function()
+	isScrollingDown = true
+	task.spawn(function()
 		while isScrollingDown do
-			console_2.CanvasPosition = Vector2.new(0, console_2.CanvasPosition.Y + 15) -- Scroll pelan ke bawah
-			task.wait(0.01)
+			console_2.CanvasPosition = Vector2.new(0, console_2.CanvasPosition.Y + 25)
+			task.wait(0.02)
 		end
-	end
+	end)
 end)
-scrollDownBtn.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		isScrollingDown = false
+scrollDownBtn.MouseButton1Up:Connect(stopScrolling)
+scrollDownBtn.MouseLeave:Connect(stopScrolling)
+
+-- Pengaman tambahan jika jari diangkat di luar layar HP/Emulator
+game:GetService("UserInputService").InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		stopScrolling()
 	end
 end)
 
@@ -387,7 +395,7 @@ copyFullBtn.MouseButton1Click:Connect(function()
 end)
 
 
---// CORE HOOK & PRINTING (DIPERBAIKI)
+--// CORE HOOK & PRINTING
 task.spawn(function()
 	local Logs = logs
 	local ExampleFrame = example
@@ -395,9 +403,18 @@ task.spawn(function()
 
 	local CreateMessage = function(msgText)
 		LineCount += 1
+		
+		-- SISTEM ANTI MEMBAL SAAT AUTOSCROLL OFF
 		if LineCount >= 250 then
 			local oldLog = Logs:FindFirstChild("Line: " .. tostring(LineCount - 250))
-			if oldLog then oldLog:Destroy() end
+			if oldLog then 
+				oldLog:Destroy() 
+				-- Kompensasi posisi agar layar tidak naik/membal
+				if not autoScrollEnabled then
+					-- Tinggi frame (30) + Padding (10) = 40
+					console_2.CanvasPosition = Vector2.new(0, math.max(0, console_2.CanvasPosition.Y - 40))
+				end
+			end
 		end
 		
 		local NewFrame = ExampleFrame:Clone()
@@ -428,7 +445,6 @@ task.spawn(function()
 
 	local prt
 	prt = hookfunction(print, function(...)
-		-- Menangkap semua argument agar tidak nyangkut/kosong
 		local args = {...}
 		local strArgs = {}
 		for _, v in ipairs(args) do
@@ -436,7 +452,6 @@ task.spawn(function()
 		end
 		local message = table.concat(strArgs, " ")
 		
-		-- Dilempar ke spawn agar tidak mengganggu thread bawaan Roblox
 		task.spawn(function()
 			CreateMessage(message)
 		end)
