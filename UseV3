@@ -1,0 +1,192 @@
+-- ==============================================================================
+-- SMART AUTO USE - FINAL COMPLETE
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- ===================== KONFIGURASI =====================
+local Config = {
+    MaxHealth       = 3,      -- Ganti: 3 atau 4 sesuai karakter
+    UseInterval     = 0.1,
+    ShowHPMonitor   = true,   -- GUI HP Monitor: true = tampil, false = sembunyi
+
+    Slots = { Slot1=true, Slot2=true, Slot3=true, Slot4=false },
+
+    EnableHeal      = true,   -- Bandage & HealthKit
+    EnableBuff      = true,   -- Candy, Chocolate, dll
+    EnableUtility   = true,   -- SmokeBomb, AirHorn, dll
+    EnableStamina   = true,   -- Pop, PopBottle (hanya saat run generator)
+    EnableMachine   = true,   -- Stopwatch, Valve, dll (hanya saat semua jenis generator)
+}
+
+-- ===================== KATEGORI ITEM =====================
+local SmallHeal = {"Bandage"}
+local BigHeal   = {"HealthKit"}
+local Buff      = {
+    "ProteinBar","SpeedCandy","StaminaCandy","ExtractionSpeedCandy","StealthCandy",
+    "SkillCheckCandy","Chocolate","ChocolateBox","Gumball","Jawbreaker",
+    "BonBon","ChristmasCookie","DandyEasterEggs"
+}
+local Utility   = {"SmokeBomb","EjectButton","AirHorn","Tape"}
+local Stamina   = {"Pop","PopBottle"}        -- hanya saat run generator
+local Machine   = {"Stopwatch","Valve","JumperCable","Instructions"} -- hanya saat semua jenis generator
+-- =========================================================
+
+print("[SYSTEM] Smart Auto-Use Berjalan! MaxHealth=" .. Config.MaxHealth)
+
+-- ===================== HELPER =====================
+local function inList(val, list)
+    local low = string.lower(val)
+    for _, v in ipairs(list) do
+        if string.find(low, string.lower(v), 1, true) then return true end
+    end
+    return false
+end
+
+-- ===================== GUI HP MONITOR =====================
+local hpLabel = nil
+if Config.ShowHPMonitor then
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "HPMonitor"
+    screenGui.ResetOnSpawn = false
+    screenGui.DisplayOrder = 99
+    screenGui.Parent = player.PlayerGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 160, 0, 60)
+    frame.Position = UDim2.new(1, -170, 0, 10)
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    frame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0.4, 0)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "⚙ Smart Auto-Use"
+    title.TextColor3 = Color3.fromRGB(180, 180, 180)
+    title.TextSize = 11
+    title.Font = Enum.Font.GothamBold
+    title.Parent = frame
+
+    hpLabel = Instance.new("TextLabel")
+    hpLabel.Size = UDim2.new(1, 0, 0.6, 0)
+    hpLabel.Position = UDim2.new(0, 0, 0.4, 0)
+    hpLabel.BackgroundTransparency = 1
+    hpLabel.Text = "❤ HP: --/" .. Config.MaxHealth
+    hpLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    hpLabel.TextSize = 16
+    hpLabel.Font = Enum.Font.GothamBold
+    hpLabel.Parent = frame
+end
+
+-- ===================== MAIN LOOP =====================
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+task.spawn(function()
+    while true do
+        local char = player.Character
+        if char and char:FindFirstChild("Inventory") then
+
+            local currentHP    = Config.MaxHealth
+            local missingHP    = 0
+            local isRunning    = false  -- khusus run generator (Pop/PopBottle)
+            local isExtracting = false  -- semua jenis generator (Machine items)
+
+            pcall(function()
+                local menu = PlayerGui.ScreenGui.Menu
+
+                -- Cek semua jenis generator (Machine items)
+                local stopGen = menu:FindFirstChild("StopGenerator")
+                if stopGen and stopGen.Visible then
+                    isExtracting = true
+                end
+
+                -- Cek khusus run generator (Pop & PopBottle)
+                local promptText = menu:FindFirstChild("SpaceBarPromptText")
+                if promptText and promptText.Text == "Sprint to run faster!" then
+                    isRunning = true
+                end
+
+                -- Baca HP hanya sampai MaxHealth
+                local content = menu.BottomLeftCorner.Status.Bottom
+                    .StaminaBin.InfoBin.HealthBin.Bar.Content
+
+                local hp = 0
+                for i = 1, Config.MaxHealth do
+                    local heart = content:FindFirstChild("Heart"..i)
+                    if heart and heart:FindFirstChild("Pulse") and heart.Pulse.Visible then
+                        hp = i
+                    end
+                end
+                currentHP = hp
+                missingHP = Config.MaxHealth - currentHP
+            end)
+
+            -- Update GUI Monitor
+            if hpLabel then
+                hpLabel.Text = "❤ HP: " .. currentHP .. "/" .. Config.MaxHealth
+                if currentHP <= 1 then
+                    hpLabel.TextColor3 = Color3.fromRGB(255, 50, 50)    -- merah = kritis
+                elseif missingHP >= 1 then
+                    hpLabel.TextColor3 = Color3.fromRGB(255, 180, 0)    -- kuning = kurang
+                else
+                    hpLabel.TextColor3 = Color3.fromRGB(100, 255, 100)  -- hijau = penuh
+                end
+            end
+
+            -- Loop slot
+            for slotName, isActive in pairs(Config.Slots) do
+                if isActive then
+                    local slotItem = char.Inventory:FindFirstChild(slotName)
+                    if slotItem then
+                        local val = slotItem.Value or ""
+
+                        if val ~= "" and val ~= "None" then
+                            local use = false
+
+                            if inList(val, Machine) then
+                                -- Semua jenis generator
+                                use = Config.EnableMachine and isExtracting
+
+                            elseif inList(val, Stamina) then
+                                -- Khusus run generator saja
+                                use = Config.EnableStamina and isRunning
+
+                            elseif inList(val, SmallHeal) then
+                                -- Bandage: pakai kalau ada nyawa yang hilang
+                                use = Config.EnableHeal and (missingHP >= 1)
+
+                            elseif inList(val, BigHeal) then
+                                -- HealthKit: pakai kalau nyawa kritis sisa 1
+                                use = Config.EnableHeal and (currentHP <= 1)
+
+                            elseif inList(val, Buff) then
+                                use = Config.EnableBuff
+
+                            elseif inList(val, Utility) then
+                                use = Config.EnableUtility
+                            end
+
+                            if use then
+                                pcall(function()
+                                    ReplicatedStorage.Events.ItemEvent:InvokeServer(char, slotItem)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(Config.UseInterval)
+    end
+end)
