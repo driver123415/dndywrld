@@ -63,7 +63,7 @@ local Config = {
         LethalRadius = 60,
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
         
-        LooseRadius = 15,
+        LooseRadius = 10,
         LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster", "ConnieMonster", "GourdyMonster" } 
     },
     GenESP = {
