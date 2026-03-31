@@ -1,4 +1,5 @@
---easter
+--easter 25k total
+
 wait (5)
 local args = {
 	"Flyte"
