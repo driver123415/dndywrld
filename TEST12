@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 25: THE GOD MODE (HOVER FIX + PLATFORM RESTORED)
+-- MAIN SCRIPT REVISION 26: THE GOD MODE (5-STUD ENCOUNTER FIX + PLATFORM VISIBLE)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -9,7 +9,7 @@ if game.PlaceId ~= INGAME_PLACE_ID then
     return
 end
 
-print("Master Script (Revision 25) Executed! Ready for Farming.")
+print("Master Script (Revision 26) Executed! Ready for Farming.")
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -66,7 +66,7 @@ local Config = {
         SuperSafeMonsterDetect = true, 
         
         -- [FITUR ENCOUNTER]
-        EncounterMonsterDetect = true, -- Default False, nyalakan sendiri
+        EncounterMonsterDetect = false, -- Default False, nyalakan sendiri
         EncounterBlacklistLethal = false, 
         
         LethalRadius = 60,
@@ -357,7 +357,7 @@ local function applyItemESP()
     end
 end
 
--- ==================== HOVER ENCOUNTER LOGIC (FIXED) ====================
+-- ==================== HOVER ENCOUNTER LOGIC (REVISI 26 - 5 STUD) ====================
 local function executeEncounter()
     if not Config.Teleport.EncounterMonsterDetect then return end
     if getCurrentHealth() <= 1 then 
@@ -391,10 +391,10 @@ local function executeEncounter()
             if not encounteredMonsters[mName] then
                 print("[ENCOUNTER] Menuju target: " .. mName)
                 local height = 80
-                local minHeight = 15 -- Batas bawah biar nggak nempel jidat
+                local minHeight = 5 -- [REVISI 26] Mentok di 5 stud, pantang nempel 0 stud
                 local success = false
                 
-                -- Turun pelan-pelan sampai 15 stud
+                -- Turun pelan-pelan sampai batas minHeight (5 stud)
                 while height >= minHeight and isMasterFarming and getCurrentHealth() > 1 do
                     if not monster.PrimaryPart then break end
                     
@@ -407,17 +407,20 @@ local function executeEncounter()
                     
                     if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
                         if monsterIcon.ImageTransparency < 1 then
-                            print("[ENCOUNTER] Kedip sukses di udara! " .. mName .. " terdaftar.")
+                            print("[ENCOUNTER] Kedip sukses di udara ("..height.." stud)! " .. mName .. " terdaftar.")
                             success = true
                             break
                         end
                     end
                     
+                    if height == minHeight then break end -- Stop turun jika sudah mencapai batas bawah
+                    
                     height = height - 5
+                    if height < minHeight then height = minHeight end 
                     task.wait(0.05)
                 end
                 
-                -- Sistem Nyerah (Give Up) - Nunggu 1.5 detik kalau belum kedip di 15 stud
+                -- Sistem Nyerah (Give Up) - Nunggu 1.5 detik di ketinggian 5 stud
                 if not success and isMasterFarming and monster.PrimaryPart then
                     local waitTime = 0
                     while waitTime < 1.5 and isMasterFarming do
@@ -433,9 +436,9 @@ local function executeEncounter()
                         waitTime = waitTime + 0.1
                     end
                     
-                    -- Kalau tetep bandel nggak kedip, paksa catat aja
+                    -- Kalau UI tetep ngebug setelah ditunggu
                     if not success then
-                        print("[ENCOUNTER] UI Ngebug/Nggak kedip. Maksa nyatet " .. mName .. " (Nyerah).")
+                        print("[ENCOUNTER] UI Ngebug/Nggak kedip di 5 stud. Maksa nyatet " .. mName .. " (Nyerah).")
                     end
                 end
                 
@@ -450,7 +453,7 @@ local function executeEncounter()
     end
 end
 
--- ==================== ITEM PICKUP LOGIC (PLATFORM RESTORED) ====================
+-- ==================== ITEM PICKUP LOGIC (PLATFORM FIXED) ====================
 local isItemAuraActive = false
 
 local function isIgnored(itemName)
@@ -586,14 +589,15 @@ local function executePickup()
 
                 local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
                 
-                -- [REVISI 25] MENGEMBALIKAN PLATFORM PIJAKAN ITEM WARNA HIJAU
+                -- [REVISI 26] FIX POSISI PLATFORM PIJAKAN (Dimunculkan pas di bawah kaki karakter)
                 local platform = Instance.new("Part")
                 platform.Size = Vector3.new(15, 1, 15) 
                 platform.Anchored = true
                 platform.CanCollide = true
                 platform.Transparency = 0.5 
                 platform.Color = Color3.fromRGB(0, 255, 0)
-                platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+                -- Posisi pas di telapak kaki karakter agar tidak nembus tanah
+                platform.CFrame = targetCFrame * CFrame.new(0, -1.5, 0) 
                 platform.Parent = Workspace
                 
                 moveToPositionItem(targetCFrame)
