@@ -65,7 +65,7 @@ local Config = {
         -- [FITUR BARU] SUPER SAFE UI & ENCOUNTER
         SuperSafeMonsterDetect = true, -- Instan kabur via kedipan UI
         EncounterMonsterDetect = false, -- Default False (nyalakan sendiri)
-        EncounterBlacklistLethal = false, -- Jika false, Dandy/Dyle tetap disapa dari udara
+        EncounterBlacklistLethal = false, -- Jika false, Dandy/Dyle tetap disapa dari udara, jika true dandy dan dyle gk disapa sama sekali
         
         LethalRadius = 60,
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
