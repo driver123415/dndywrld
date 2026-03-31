@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 22: SUPER SAFE UI HYBRID & HARD REBOOT FAILSAFE
+-- MAIN SCRIPT REVISION 22: SUPER SAFE UI HYBRID & HARD REBOOT FAILSAFE work tanpa encounter item gk ada deteksi anti monster
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
