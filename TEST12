@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 23: THE GOD MODE MASTERPIECE (ENCOUNTER + HYBRID UI + ITEM RADAR)
+-- MAIN SCRIPT REVISION 24: THE GOD MODE (ENCOUNTER FIX + ELEVATOR LOCK + PRE-CHECK)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -9,7 +9,7 @@ if game.PlaceId ~= INGAME_PLACE_ID then
     return
 end
 
-print("Master Script (Revision 23) Executed! Ready for Farming.")
+print("Master Script (Revision 24) Executed! Ready for Farming.")
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -24,7 +24,7 @@ local rootPart = character:WaitForChild("HumanoidRootPart")
 local isMasterFarming = false     
 local isItemFarmingActive = false 
 local isEncounteringActive = false 
-local encounteredMonsters = {} -- Memory Sesi: Daftar monster yang sudah disapa
+local encounteredMonsters = {} -- Memory Sesi: Buku Tamu
 
 -- ==================== CONFIGURATION ====================
 local Config = {
@@ -62,10 +62,12 @@ local Config = {
         DelayNext = 1.0,        
         UndergroundOffset = 11.5,
         
-        -- [FITUR BARU] SUPER SAFE UI & ENCOUNTER
-        SuperSafeMonsterDetect = true, -- Instan kabur via kedipan UI
-        EncounterMonsterDetect = false, -- Default False (nyalakan sendiri)
-        EncounterBlacklistLethal = false, -- Jika false, Dandy/Dyle tetap disapa dari udara, jika true dandy dan dyle gk disapa sama sekali
+        -- [SUPER SAFE UI]
+        SuperSafeMonsterDetect = true, 
+        
+        -- [FITUR ENCOUNTER]
+        EncounterMonsterDetect = true, -- Default False, nyalakan sendiri
+        EncounterBlacklistLethal = false, 
         
         LethalRadius = 60,
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
@@ -82,7 +84,7 @@ local Config = {
     }
 }
 
--- ==================== SHARED FUNCTIONS ====================
+-- ==================== UTILITY FUNCTIONS ====================
 local function getMap()
     return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
 end
@@ -99,7 +101,6 @@ local function getModelCenter(model)
     return totalPos / #parts
 end
 
--- Pengecek Nyawa Otomatis dari UI Spectator
 local function getCurrentHealth()
     local pGui = player:FindFirstChild("PlayerGui")
     local menu = pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("Menu")
@@ -124,7 +125,7 @@ local function getCurrentHealth()
             return hp
         end
     end
-    return Config.MaxHealth -- Fallback jika UI belum ter-load
+    return Config.MaxHealth
 end
 
 local function getSafePlaceCFrame()
@@ -175,9 +176,9 @@ local function forceStop()
     end
 end
 
--- [REVISI 23] HYBRID RADAR (SUPER SAFE UI + SPATIAL MATH)
+-- ==================== HYBRID RADAR ====================
 local function isThreatened(targetPosition, radius)
-    -- 1. SUPER SAFE UI CHECK (Hanya diprioritaskan saat cek badan sendiri / Evasion)
+    -- 1. SUPER SAFE UI CHECK (Evasi)
     local isEvasionCheck = rootPart and (targetPosition - rootPart.Position).Magnitude <= 5
     if Config.Teleport.SuperSafeMonsterDetect and isEvasionCheck then
         local pGui = player:FindFirstChild("PlayerGui")
@@ -186,12 +187,12 @@ local function isThreatened(targetPosition, radius)
         
         if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
             if monsterIcon.ImageTransparency < 1 then
-                return true -- INSTAN KABUR! UI Berkedip!
+                return true -- INSTAN KABUR! UI Kedip!
             end
         end
     end
 
-    -- 2. SPATIAL MATH CHECK (Untuk Pre-Check Item/Generator jarak jauh)
+    -- 2. SPATIAL MATH CHECK (Pre-Check Jarak Jauh)
     local map = getMap()
     if map then
         local monstersFolder = map:FindFirstChild("Monsters")
@@ -206,10 +207,7 @@ local function isThreatened(targetPosition, radius)
                     
                     local isLethal = false
                     for _, lethalName in ipairs(Config.Teleport.AvoidmoreradiusMonsters) do
-                        if monster.Name == lethalName then
-                            isLethal = true
-                            break
-                        end
+                        if monster.Name == lethalName then isLethal = true; break end
                     end
                     
                     if isLethal then
@@ -219,10 +217,7 @@ local function isThreatened(targetPosition, radius)
                     
                     local isLooseMonster = false
                     for _, looseName in ipairs(Config.Teleport.LooseMonsters) do
-                        if monster.Name == looseName then
-                            isLooseMonster = true
-                            break
-                        end
+                        if monster.Name == looseName then isLooseMonster = true; break end
                     end
                     
                     if isLooseMonster then
@@ -237,7 +232,7 @@ local function isThreatened(targetPosition, radius)
     return false
 end
 
--- ==================== PROGRESS & INVENTORY CHECKERS ====================
+-- ==================== PROGRESS CHECKERS ====================
 local function getMachineProgress()
     local pGui = player:FindFirstChild("PlayerGui")
     if pGui then
@@ -277,7 +272,7 @@ local function getEmptyInventorySlots()
     return emptyCount
 end
 
--- ==================== ESP FUNCTIONS ====================
+-- ==================== ESP ====================
 local function updateMonsterESP()
     if not Config.MonsterESP.Enable then return end
     local map = getMap()
@@ -313,10 +308,7 @@ local function updateMonsterESP()
                     label.TextColor3 = Config.MonsterESP.Color
                     label.TextStrokeTransparency = 0.5
                     label.TextSize = 14
-                else 
-                    label = billboard.Text 
-                end
-                
+                else label = billboard.Text end
                 label.Text = "[MONSTER]\n" .. monster.Name
             end
         end
@@ -335,13 +327,9 @@ local function applyItemESP()
                 highlight.FillTransparency = 0.5
                 
                 local nameLower = string.lower(item.Name)
-                local isIg = false
+                local isIg, isPr, isSp = false, false, false
                 for _, b in ipairs(Config.Pickup.IgnoreList) do if string.find(nameLower, string.lower(b), 1, true) then isIg = true; break end end
-                
-                local isPr = false
                 for _, p in ipairs(Config.Pickup.PriorityList) do if string.find(nameLower, string.lower(p), 1, true) then isPr = true; break end end
-                
-                local isSp = false
                 for _, s in ipairs(Config.Pickup.SecondPriorityList) do if string.find(nameLower, string.lower(s), 1, true) then isSp = true; break end end
                 
                 if isIg or item:GetAttribute("BlacklistLimbo") then highlight.FillColor = Color3.fromRGB(255, 0, 0)
@@ -369,20 +357,24 @@ local function applyItemESP()
     end
 end
 
--- ==================== HOVER ENCOUNTER LOGIC (INDEX OPENER) ====================
+-- ==================== HOVER ENCOUNTER LOGIC ====================
 local function executeEncounter()
     if not Config.Teleport.EncounterMonsterDetect then return end
     if getCurrentHealth() <= 1 then 
-        print("[ENCOUNTER] Nyawa Sisa 1 (Kritis). Melewati Fase Encounter demi keamanan.")
+        print("[ENCOUNTER] Nyawa Sisa 1 (Kritis). Skip demi keamanan.")
         return 
     end
 
     local map = getMap()
     if not map or not map:FindFirstChild("Monsters") then return end
 
+    -- [FIX TRANSIT SAFE PLACE] Amankan diri sebelum mulai operasi udara
+    local safePosInit = getSafePlaceCFrame()
+    if safePosInit then teleportplr(safePosInit) end
+    task.wait(0.5)
+
     for _, monster in pairs(map.Monsters:GetChildren()) do
-        if not isMasterFarming then break end
-        if getCurrentHealth() <= 1 then break end -- Extra safety di tengah jalan
+        if not isMasterFarming or getCurrentHealth() <= 1 then break end 
         
         if monster:IsA("Model") and monster.PrimaryPart then
             local mName = monster.Name
@@ -396,29 +388,23 @@ local function executeEncounter()
                 continue
             end
 
-            -- Cek Buku Tamu (Session Memory)
             if not encounteredMonsters[mName] then
-                print("[ENCOUNTER] Membuka Index: Menyapa " .. mName .. " dari udara...")
+                print("[ENCOUNTER] Menuju target: " .. mName)
                 local height = 80
-                local success = false
                 
-                -- Top-Down Hovering
-                while height >= 10 and isMasterFarming and getCurrentHealth() > 1 do
+                while height >= 0 and isMasterFarming and getCurrentHealth() > 1 do
                     if not monster.PrimaryPart then break end
                     
                     local targetCF = monster.PrimaryPart.CFrame * CFrame.new(0, height, 0)
                     teleportplr(targetCF)
                     rootPart.Anchored = true
                     
-                    -- Intip UI Kedip
                     local pGui = player:FindFirstChild("PlayerGui")
                     local monsterIcon = pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("MonsterIcon")
                     
                     if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
                         if monsterIcon.ImageTransparency < 1 then
-                            print("[ENCOUNTER] Sukses menyapa " .. mName .. "! (Terdaftar di Buku Tamu)")
-                            encounteredMonsters[mName] = true
-                            success = true
+                            print("[ENCOUNTER] Kedip sukses! " .. mName .. " terdaftar.")
                             break
                         end
                     end
@@ -427,18 +413,18 @@ local function executeEncounter()
                     task.wait(0.05)
                 end
                 
-                -- Kembalikan ke langit
+                -- [FIX GIVE UP SYSTEM] Apapun yang terjadi (kedip/tidak), catat ke buku tamu agar tidak infinite loop
+                encounteredMonsters[mName] = true
                 rootPart.Anchored = false
-                if success then
-                    teleportplr(rootPart.CFrame * CFrame.new(0, 80, 0))
-                    task.wait(0.2)
-                end
+                
+                teleportplr(rootPart.CFrame * CFrame.new(0, 80, 0))
+                task.wait(0.2)
             end
         end
     end
 end
 
--- ==================== ITEM AUTO-FARM (WITH PRE-CHECK) ====================
+-- ==================== ITEM PICKUP LOGIC ====================
 local isItemAuraActive = false
 
 local function isIgnored(itemName)
@@ -467,12 +453,9 @@ end
 
 local function interactWithPrompt(prompt)
     if prompt.HoldDuration == 0 then
-        prompt:InputHoldBegin()
-        prompt:InputHoldEnd()
+        prompt:InputHoldBegin(); prompt:InputHoldEnd()
     else
-        prompt:InputHoldBegin()
-        task.wait(prompt.HoldDuration)
-        prompt:InputHoldEnd()
+        prompt:InputHoldBegin(); task.wait(prompt.HoldDuration); prompt:InputHoldEnd()
     end
 end
 
@@ -513,11 +496,9 @@ local function moveToPositionItem(targetCFrame)
         task.wait(0.05)
     else
         local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
-        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
-        local duration = distance / (speed * Config.Pickup.TweenSpeed)
+        local duration = (rootPart.Position - targetCFrame.Position).Magnitude / (speed * Config.Pickup.TweenSpeed)
         if duration <= 0 then duration = 0.1 end
-        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
+        local tween = TweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), { CFrame = targetCFrame })
         tween:Play()
         tween.Completed:Wait()
     end
@@ -543,8 +524,7 @@ local function executePickup()
         local priorityItems, normalItems = {}, {}
         for _, item in ipairs(itemsFolder:GetChildren()) do
             if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
-                
-                -- [REVISI 23] ITEM PRE-CHECK RADAR MATEMATIKA!
+                -- [PRE-CHECK MATH] Cek posisi aman sebelum memungut
                 if not isThreatened(item:GetPivot().Position, Config.Teleport.SafeRadius) then
                     if isPriority(item.Name) or isSecondPriority(item.Name) then 
                         table.insert(priorityItems, item)
@@ -569,9 +549,8 @@ local function executePickup()
         for _, item in ipairs(itemsToProcess) do
             if item and item.Parent and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
                 
-                -- Extra check just in case monster moved
                 if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
-                    print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item, ngungsi ke Safe Place...")
+                    print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item.")
                     local safePos = getSafePlaceCFrame()
                     if safePos then teleportplr(safePos)
                     else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end 
@@ -580,15 +559,6 @@ local function executePickup()
                 end
 
                 local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
-                local platform = Instance.new("Part")
-                platform.Size = Vector3.new(15, 1, 15) 
-                platform.Anchored = true
-                platform.CanCollide = true
-                platform.Transparency = 0.5 
-                platform.Color = Color3.fromRGB(0, 255, 0)
-                platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
-                platform.Parent = Workspace
-                
                 moveToPositionItem(targetCFrame)
                 task.wait(0.15)
                 
@@ -608,8 +578,6 @@ local function executePickup()
                     task.wait(0.1)
                     timeout = timeout - 1
                 end
-                
-                if platform then platform:Destroy() end
 
                 if interrupted then
                     print("[SAFETY - ITEM] Diserang saat memungut item! Kabur ke Safe Place!")
@@ -622,9 +590,9 @@ local function executePickup()
                 
                 if item.Parent then
                     if isPriority(item.Name) then
-                        print("[SYSTEM] Item Priority " .. item.Name .. " masih mencoba diambil. Bypass Blacklist aktif.")
+                        print("[SYSTEM] Item Priority " .. item.Name .. " masih dicoba.")
                     else
-                        print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas Penuh / Gagal). Dimasukkan ke Blacklist Permanen Lantai Ini.")
+                        print("[SYSTEM] Gagal ambil " .. item.Name .. " (Tas Penuh/Gagal). Blacklist sementara.")
                         item:SetAttribute("BlacklistLimbo", true)
                         local highlight = item:FindFirstChild("ItemESP")
                         if highlight then highlight.FillColor = Color3.fromRGB(255, 0, 0) end
@@ -637,7 +605,7 @@ local function executePickup()
     end
 
     isItemAuraActive = false
-    print("[DONE] Pengambilan item aman selesai.")
+    print("[DONE] Pengambilan item selesai.")
 end
 
 
@@ -660,20 +628,12 @@ end
 local function isTrinketActive()
     local playerGui = player:FindFirstChild("PlayerGui")
     if not playerGui then return false end
-    
-    local trinketsUI = playerGui:FindFirstChild("ScreenGui")
-        and playerGui.ScreenGui:FindFirstChild("Menu")
-        and playerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
-        and playerGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Trinkets")
-        
+    local trinketsUI = playerGui:FindFirstChild("ScreenGui") and playerGui.ScreenGui:FindFirstChild("Menu") and playerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner") and playerGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Trinkets")
     if trinketsUI then
         for i = 1, 2 do
             local slot = trinketsUI:FindFirstChild("TrinketSlot" .. i)
-            if slot then
-                local textLabel = slot:FindFirstChild("TextLabel")
-                if textLabel and textLabel.Text == "Active" then
-                    return true
-                end
+            if slot and slot:FindFirstChild("TextLabel") and slot.TextLabel.Text == "Active" then
+                return true
             end
         end
     end
@@ -708,9 +668,7 @@ local function isMachineOccupied(generator, radius)
             if otherPlayer.Name ~= player.Name then
                 local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
                 if otherRoot and generator.PrimaryPart then
-                    if (otherRoot.Position - generator.PrimaryPart.Position).Magnitude <= radius then 
-                        return true
-                    end
+                    if (otherRoot.Position - generator.PrimaryPart.Position).Magnitude <= radius then return true end
                 end
             end
         end
@@ -800,19 +758,33 @@ local function moveToPositionGen(targetCFrame, usePlatform)
         task.wait(0.05) 
     else
         local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
-        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
-        local duration = distance / (speed * Config.Teleport.TweenSpeed)
+        local duration = (rootPart.Position - targetCFrame.Position).Magnitude / (speed * Config.Teleport.TweenSpeed)
         if duration <= 0 then duration = 0.1 end
         local tween = TweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), { CFrame = targetCFrame })
         tween:Play()
         tween.Completed:Wait()
     end
     
-    if usePlatform then
-        rootPart.CFrame = targetCFrame
-        rootPart.Anchored = true 
-    end
+    if usePlatform then rootPart.CFrame = targetCFrame; rootPart.Anchored = true end
     Workspace.Gravity = originalGravity
+end
+
+local function getRealElevatorCFrame()
+    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
+    if elevatorsFolder then
+        for _, obj in ipairs(elevatorsFolder:GetChildren()) do
+            if obj.Name == "Elevator" and obj:IsA("Model") and obj.PrimaryPart then return obj.PrimaryPart.CFrame * CFrame.new(0, 3, 0) end
+        end
+        for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then return obj.CFrame * CFrame.new(0, 1.5, 2) end
+        end
+    end
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") and not string.find(string.lower(obj.Parent and obj.Parent.Name or ""), "fake") then
+            return obj.CFrame * CFrame.new(0, 1.5, 2)
+        end
+    end
+    return nil
 end
 
 local function startAutoFarming()
@@ -832,10 +804,7 @@ local function startAutoFarming()
         while isMasterFarming do
             pcall(function()
                 local events = ReplicatedStorage:FindFirstChild("Events")
-                if events then
-                    local su = events:FindFirstChild("SkillcheckUpdate")
-                    if su then su.OnClientInvoke = function() return true end end
-                end
+                if events and events:FindFirstChild("SkillcheckUpdate") then events.SkillcheckUpdate.OnClientInvoke = function() return true end end
             end)
             task.wait(1)
         end
@@ -871,7 +840,6 @@ local function startAutoFarming()
                                     if not completed then
                                         uncompletedCount = uncompletedCount + 1
                                         if not connie then
-                                            -- Pre-Check Matematika untuk Generator
                                             if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) then
                                                 if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
                                                     if not anyEmptyGen then anyEmptyGen = gen end
@@ -894,9 +862,10 @@ local function startAutoFarming()
                             isFloorActuallyDone = (uncompletedCount == 0)
                         end
                         
+                        -- [FIX ELEVATOR LOCK]
                         if isFloorActuallyDone then
                             if not inElevatorStandby then
-                                print("[INFO] Semua Mesin Selesai (Verified)! Menuju Real Elevator...")
+                                print("[INFO] Semua Mesin Selesai (Verified)! Mencari Lift...")
                                 inElevatorStandby = true
                             end
                             
@@ -908,6 +877,11 @@ local function startAutoFarming()
                                 else
                                     if rootPart.Anchored then rootPart.Anchored = false end
                                 end
+                            else
+                                -- Lift belum ter-load dari server! Nunggu di Safe Place.
+                                local safePos = getSafePlaceCFrame()
+                                if safePos then teleportplr(safePos) end
+                                rootPart.Anchored = false
                             end
                             task.wait(0.5) 
                             
@@ -923,39 +897,24 @@ local function startAutoFarming()
                                 local needSync = isTrinketActive()
                                 
                                 if needSync then
-                                    local minD = Config.Teleport.SyncDelayMin
-                                    local maxD = Config.Teleport.SyncDelayMax
-                                    local syncDelay = minD + (math.random() * (maxD - minD))
-                                    
+                                    local syncDelay = Config.Teleport.SyncDelayMin + (math.random() * (Config.Teleport.SyncDelayMax - Config.Teleport.SyncDelayMin))
                                     print(string.format("[SYNC] Trinket 'Active'! Menunggu %.2f detik...", syncDelay))
-                                    
                                     local elapsed = 0
                                     while elapsed < syncDelay do
-                                        if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
-                                            monsterEvade = true
-                                            break
-                                        end
-                                        task.wait(0.1)
-                                        elapsed = elapsed + 0.1
+                                        if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then monsterEvade = true; break end
+                                        task.wait(0.1); elapsed = elapsed + 0.1
                                     end
-                                    
-                                    if not monsterEvade and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                        isContested = true
-                                    end
+                                    if not monsterEvade and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then isContested = true end
                                 else
-                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
-                                        monsterEvade = true
-                                    elseif isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                        isContested = true
-                                    end
+                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then monsterEvade = true
+                                    elseif isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then isContested = true end
                                 end
                                 
                                 if monsterEvade then
                                     print("[SAFETY] Monster terdeteksi saat mendarat! Evade Instan!")
                                     rootPart.Anchored = false
                                     local safePos = getSafePlaceCFrame()
-                                    if safePos then teleportplr(safePos)
-                                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                                    if safePos then teleportplr(safePos) else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
                                     task.wait(1.5)
                                 elseif isContested then
                                     print("[SAFETY] Mesin direbut pemain lain. Batal ekstrak.")
@@ -967,65 +926,46 @@ local function startAutoFarming()
                                     
                                     while isMasterFarming and targetGen.Parent and not isItemFarmingActive and not isEncounteringActive do
                                         local stats = targetGen:FindFirstChild("Stats")
-                                        if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
-                                            instantNext = true
-                                            break 
-                                        end
+                                        if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then instantNext = true; break end
                                         
                                         if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
-                                            forceStop()
-                                            rootPart.Anchored = false
-                                            
-                                            print("[SAFETY] Evade Instan! Ngungsi ke DandyShop/SafePlace...")
+                                            forceStop(); rootPart.Anchored = false
+                                            print("[SAFETY] Evade Instan! Ngungsi...")
                                             local safePos = getSafePlaceCFrame()
-                                            if safePos then teleportplr(safePos)
-                                            else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
-                                            instantNext = true
-                                            break
+                                            if safePos then teleportplr(safePos) else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                                            instantNext = true; break
                                         end
                                         
                                         if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
-                                            print("[SAFETY] Pemain lain mendekat saat ekstrak. Ngalah cabut.")
-                                            forceStop()
-                                            task.wait(0.1)
-                                            instantNext = true
-                                            break
+                                            print("[SAFETY] Pemain lain mendekat. Ngalah cabut."); forceStop(); task.wait(0.1); instantNext = true; break
                                         end
                                         
                                         rootPart.CFrame = targetCFrame
                                         local currentlyInteracting = isInteractingUI()
                                         if currentlyInteracting then
-                                            hasStartedInteracting = true
-                                            failTimer = 0 
+                                            hasStartedInteracting = true; failTimer = 0 
                                         elseif hasStartedInteracting and not currentlyInteracting then
-                                            forceStop()
-                                            instantNext = true
-                                            break
+                                            forceStop(); instantNext = true; break
                                         else
                                             forceTriggerGenerator(targetGen)
                                             failTimer = failTimer + 1
                                             if failTimer == 10 then
                                                 rootPart.CFrame = targetCFrame * CFrame.new(0, 1.5, 0)
-                                                task.wait(0.1)
-                                                rootPart.CFrame = targetCFrame
+                                                task.wait(0.1); rootPart.CFrame = targetCFrame
                                             elseif failTimer >= 25 then
-                                                forceStop()
-                                                instantNext = true
-                                                break
+                                                forceStop(); instantNext = true; break
                                             end
                                         end
                                         task.wait(0.1)
                                     end
-                                    
                                     rootPart.Anchored = false
-                                    if instantNext then task.wait(0.05)
-                                    else task.wait(Config.Teleport.DelayNext) end
+                                    if instantNext then task.wait(0.05) else task.wait(Config.Teleport.DelayNext) end
                                 end
                             end
-                            
                         else
+                            -- Hanya ke sini jika Lift & Mesin tidak ada sama sekali.
                             local progressText = (curGenUI ~= -1) and (" ("..curGenUI.."/"..totGenUI..")") or ""
-                            print("[INFO] Mesin belum selesai" .. progressText .. " tapi area tidak aman/hilang. Ngungsi ke DandyShop...")
+                            print("[INFO] Ngungsi sementara ke Safe Place" .. progressText .. "...")
                             rootPart.Anchored = false
                             local safePos = getSafePlaceCFrame()
                             if safePos then teleportplr(safePos) end
@@ -1052,10 +992,7 @@ task.spawn(function()
         end
 
         local curGen, totGen = getMachineProgress()
-        
-        if curGen == 0 then
-            hasSweptHeals = false 
-        end
+        if curGen == 0 then hasSweptHeals = false end
         
         -- [HARD REBOOT FAILSAFE]
         if not isItemFarmingActive and not isEncounteringActive then
@@ -1082,7 +1019,6 @@ task.spawn(function()
                 lastProgressTick = tick() 
                 isMasterFarming = true
                 startAutoFarming()
-                
                 continue
             end
         else
@@ -1094,9 +1030,8 @@ task.spawn(function()
             if getEmptyInventorySlots() > 0 then
                 local unblacklistedAny = false
                 local map = getMap()
-                local itemsFolder = map and map:FindFirstChild("Items")
-                if itemsFolder then
-                    for _, item in ipairs(itemsFolder:GetChildren()) do
+                if map and map:FindFirstChild("Items") then
+                    for _, item in ipairs(map.Items:GetChildren()) do
                         if isSecondPriority(item.Name) and item:GetAttribute("BlacklistLimbo") then
                             item:SetAttribute("BlacklistLimbo", nil) 
                             local highlight = item:FindFirstChild("ItemESP")
@@ -1105,9 +1040,7 @@ task.spawn(function()
                         end
                     end
                 end
-                if unblacklistedAny then
-                    print("[SMART PICKUP] Sisa 1 Mesin & Tas Kosong! Menghapus Blacklist Healing Item...")
-                end
+                if unblacklistedAny then print("[SMART PICKUP] Sisa 1 Mesin & Tas Kosong! Menghapus Blacklist Healing Item...") end
             end
             hasSweptHeals = true
         end
@@ -1115,25 +1048,19 @@ task.spawn(function()
         local map = getMap()
         if map then
             -- [WATCHER: ITEM PICKUP TRIGGER]
-            local itemsFolder = map:FindFirstChild("Items")
-            if itemsFolder and not isItemFarmingActive and not isEncounteringActive then
+            if map:FindFirstChild("Items") and not isItemFarmingActive and not isEncounteringActive then
                 local hasValidItems = false
-                for _, item in ipairs(itemsFolder:GetChildren()) do
+                for _, item in ipairs(map.Items:GetChildren()) do
                     if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
-                        -- Math Pre-check (Pastikan item ada di tempat aman)
                         if not isThreatened(item:GetPivot().Position, Config.Teleport.SafeRadius) then
-                            hasValidItems = true
-                            break
+                            hasValidItems = true; break
                         end
                     end
                 end
 
                 if hasValidItems then
                     if isInteractingUI() then
-                        while isInteractingUI() and isMasterFarming do
-                            task.wait(0.2)
-                            lastProgressTick = tick()
-                        end
+                        while isInteractingUI() and isMasterFarming do task.wait(0.2); lastProgressTick = tick() end
                     end
                     
                     isItemFarmingActive = true 
@@ -1164,20 +1091,13 @@ task.spawn(function()
                                 if monster.Name == name then isLethal = true; break end
                             end
                             if isLethal and Config.Teleport.EncounterBlacklistLethal then continue end
-                            
-                            if not encounteredMonsters[monster.Name] then
-                                needsEncounter = true
-                                break
-                            end
+                            if not encounteredMonsters[monster.Name] then needsEncounter = true; break end
                         end
                     end
                     
                     if needsEncounter and getCurrentHealth() > 1 then
                         if isInteractingUI() then
-                            while isInteractingUI() and isMasterFarming do
-                                task.wait(0.2)
-                                lastProgressTick = tick()
-                            end
+                            while isInteractingUI() and isMasterFarming do task.wait(0.2); lastProgressTick = tick() end
                         end
                         
                         isEncounteringActive = true
