@@ -33,11 +33,11 @@ local Config = {
         "EjectButton",            -- Speed & Stealth boost
         "HealthKit",              -- Medkit
         "ExtractionSpeedCandy",   -- Speed ekstraksi +50%
+        "Bandage",                -- Heal kecil
         "SkillCheckCandy",        -- Boost skill check
         "Stopwatch",              -- Permudah zona putih
         "PopBottle",              -- Full stamina
-        "SpeedCandy",             -- Speed boost
-        "Bandage"                 -- Heal kecil
+        "SpeedCandy"              -- Speed boost
     },
 
     -- 🔴 DAFTAR HITAM (Dilarang keras dibeli)
