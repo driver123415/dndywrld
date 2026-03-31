@@ -32,12 +32,13 @@ local Config = {
         "SmokeBomb",              -- Kabur dari kejaran
         "EjectButton",            -- Speed & Stealth boost
         "HealthKit",              -- Medkit
+        "Bandage",                -- Heal kecil
         "ExtractionSpeedCandy",   -- Speed ekstraksi +50%
         "SkillCheckCandy",        -- Boost skill check
         "Stopwatch",              -- Permudah zona putih
         "PopBottle",              -- Full stamina
-        "SpeedCandy",             -- Speed boost
-        "Bandage"                 -- Heal kecil
+        "SpeedCandy"              -- Speed boost
+  
     },
 
     -- 🔴 DAFTAR HITAM (Dilarang keras dibeli)
