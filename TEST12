@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 24: THE GOD MODE (ENCOUNTER FIX + ELEVATOR LOCK + PRE-CHECK)
+-- MAIN SCRIPT REVISION 25: THE GOD MODE (HOVER FIX + PLATFORM RESTORED)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -9,7 +9,7 @@ if game.PlaceId ~= INGAME_PLACE_ID then
     return
 end
 
-print("Master Script (Revision 24) Executed! Ready for Farming.")
+print("Master Script (Revision 25) Executed! Ready for Farming.")
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -66,7 +66,7 @@ local Config = {
         SuperSafeMonsterDetect = true, 
         
         -- [FITUR ENCOUNTER]
-        EncounterMonsterDetect = true, -- Default False, nyalakan sendiri
+        EncounterMonsterDetect = false, -- Default False, nyalakan sendiri
         EncounterBlacklistLethal = false, 
         
         LethalRadius = 60,
@@ -357,7 +357,7 @@ local function applyItemESP()
     end
 end
 
--- ==================== HOVER ENCOUNTER LOGIC ====================
+-- ==================== HOVER ENCOUNTER LOGIC (FIXED) ====================
 local function executeEncounter()
     if not Config.Teleport.EncounterMonsterDetect then return end
     if getCurrentHealth() <= 1 then 
@@ -368,7 +368,7 @@ local function executeEncounter()
     local map = getMap()
     if not map or not map:FindFirstChild("Monsters") then return end
 
-    -- [FIX TRANSIT SAFE PLACE] Amankan diri sebelum mulai operasi udara
+    -- Amankan diri dulu ke transit sebelum mulai operasi udara
     local safePosInit = getSafePlaceCFrame()
     if safePosInit then teleportplr(safePosInit) end
     task.wait(0.5)
@@ -391,8 +391,11 @@ local function executeEncounter()
             if not encounteredMonsters[mName] then
                 print("[ENCOUNTER] Menuju target: " .. mName)
                 local height = 80
+                local minHeight = 15 -- Batas bawah biar nggak nempel jidat
+                local success = false
                 
-                while height >= 0 and isMasterFarming and getCurrentHealth() > 1 do
+                -- Turun pelan-pelan sampai 15 stud
+                while height >= minHeight and isMasterFarming and getCurrentHealth() > 1 do
                     if not monster.PrimaryPart then break end
                     
                     local targetCF = monster.PrimaryPart.CFrame * CFrame.new(0, height, 0)
@@ -404,7 +407,8 @@ local function executeEncounter()
                     
                     if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
                         if monsterIcon.ImageTransparency < 1 then
-                            print("[ENCOUNTER] Kedip sukses! " .. mName .. " terdaftar.")
+                            print("[ENCOUNTER] Kedip sukses di udara! " .. mName .. " terdaftar.")
+                            success = true
                             break
                         end
                     end
@@ -413,7 +417,29 @@ local function executeEncounter()
                     task.wait(0.05)
                 end
                 
-                -- [FIX GIVE UP SYSTEM] Apapun yang terjadi (kedip/tidak), catat ke buku tamu agar tidak infinite loop
+                -- Sistem Nyerah (Give Up) - Nunggu 1.5 detik kalau belum kedip di 15 stud
+                if not success and isMasterFarming and monster.PrimaryPart then
+                    local waitTime = 0
+                    while waitTime < 1.5 and isMasterFarming do
+                        local pGui = player:FindFirstChild("PlayerGui")
+                        local monsterIcon = pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("MonsterIcon")
+                        
+                        if monsterIcon and type(monsterIcon.ImageTransparency) == "number" and monsterIcon.ImageTransparency < 1 then
+                            print("[ENCOUNTER] Kedip sukses setelah ditunggu! " .. mName .. " terdaftar.")
+                            success = true
+                            break
+                        end
+                        task.wait(0.1)
+                        waitTime = waitTime + 0.1
+                    end
+                    
+                    -- Kalau tetep bandel nggak kedip, paksa catat aja
+                    if not success then
+                        print("[ENCOUNTER] UI Ngebug/Nggak kedip. Maksa nyatet " .. mName .. " (Nyerah).")
+                    end
+                end
+                
+                -- Catat ke buku tamu agar tidak infinite loop
                 encounteredMonsters[mName] = true
                 rootPart.Anchored = false
                 
@@ -424,7 +450,7 @@ local function executeEncounter()
     end
 end
 
--- ==================== ITEM PICKUP LOGIC ====================
+-- ==================== ITEM PICKUP LOGIC (PLATFORM RESTORED) ====================
 local isItemAuraActive = false
 
 local function isIgnored(itemName)
@@ -559,6 +585,17 @@ local function executePickup()
                 end
 
                 local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
+                
+                -- [REVISI 25] MENGEMBALIKAN PLATFORM PIJAKAN ITEM WARNA HIJAU
+                local platform = Instance.new("Part")
+                platform.Size = Vector3.new(15, 1, 15) 
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.Transparency = 0.5 
+                platform.Color = Color3.fromRGB(0, 255, 0)
+                platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+                platform.Parent = Workspace
+                
                 moveToPositionItem(targetCFrame)
                 task.wait(0.15)
                 
@@ -578,6 +615,8 @@ local function executePickup()
                     task.wait(0.1)
                     timeout = timeout - 1
                 end
+
+                if platform then platform:Destroy() end
 
                 if interrupted then
                     print("[SAFETY - ITEM] Diserang saat memungut item! Kabur ke Safe Place!")
@@ -862,7 +901,7 @@ local function startAutoFarming()
                             isFloorActuallyDone = (uncompletedCount == 0)
                         end
                         
-                        -- [FIX ELEVATOR LOCK]
+                        -- [ELEVATOR LOCK]
                         if isFloorActuallyDone then
                             if not inElevatorStandby then
                                 print("[INFO] Semua Mesin Selesai (Verified)! Mencari Lift...")
@@ -878,7 +917,6 @@ local function startAutoFarming()
                                     if rootPart.Anchored then rootPart.Anchored = false end
                                 end
                             else
-                                -- Lift belum ter-load dari server! Nunggu di Safe Place.
                                 local safePos = getSafePlaceCFrame()
                                 if safePos then teleportplr(safePos) end
                                 rootPart.Anchored = false
@@ -963,7 +1001,6 @@ local function startAutoFarming()
                                 end
                             end
                         else
-                            -- Hanya ke sini jika Lift & Mesin tidak ada sama sekali.
                             local progressText = (curGenUI ~= -1) and (" ("..curGenUI.."/"..totGenUI..")") or ""
                             print("[INFO] Ngungsi sementara ke Safe Place" .. progressText .. "...")
                             rootPart.Anchored = false
