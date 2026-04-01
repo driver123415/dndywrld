@@ -16,7 +16,7 @@ print("✅ [Auto Elevator] Game ID cocok. Memulai script...")
 -- ⚙️ CONFIGURATION (UBAH DI SINI)
 -- ==========================================
 local Config = {
-    AutoOn = false,            -- true = Langsung jalan saat dieksekusi, false = Nyalakan manual via GUI
+    AutoOn = true,            -- true = Langsung jalan saat dieksekusi, false = Nyalakan manual via GUI
     JoinVoteMatch = true,     -- true = Otomatis nembak VoteMatch ke server setelah masuk elevator
     DefaultGate = 1,           -- Gate awal yang dituju jika tidak diubah di GUI (1, 2, 3...)
     WaitTime = 4               -- Waktu tunggu (detik) untuk ngecek apakah berhasil masuk Gate atau gagal
