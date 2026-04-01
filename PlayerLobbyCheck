@@ -1,0 +1,115 @@
+-- ==========================================
+-- CONFIGURATION
+-- ==========================================
+local Config = {
+    TargetPlaceID = 16116270224, -- ID Game spesifik tempat script boleh berjalan
+    WaitTime = 90 -- Waktu tunggu sebelum pindah server (dalam detik)
+}
+
+-- ==========================================
+-- INITIAL CHECK
+-- ==========================================
+-- Hentikan eksekusi jika Place ID saat ini tidak sesuai dengan target
+if game.PlaceId ~= Config.TargetPlaceID then
+    warn("Script dibatalkan: Place ID saat ini (" .. game.PlaceId .. ") tidak cocok dengan Target (" .. Config.TargetPlaceID .. ").")
+    return
+end
+
+print("Place ID cocok. Memulai hitung mundur " .. Config.WaitTime .. " detik sebelum pindah server...")
+
+-- Menunggu sesuai waktu yang ditentukan di config
+task.wait(Config.WaitTime)
+
+print("Waktu habis! Mencari server baru...")
+
+-- ==========================================
+-- SERVER HOP LOGIC
+-- ==========================================
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+
+local PlaceID = game.PlaceId
+local AllIDs = {}
+local foundAnything = ""
+local actualHour = os.date("!*t").hour
+
+-- Coba membaca file log server yang sudah dikunjungi
+pcall(function()
+    AllIDs = HttpService:JSONDecode(readfile("NotSameServers.json"))
+end)
+
+-- Validasi file (reset jika jam sudah berubah atau file rusak)
+if type(AllIDs) ~= "table" or AllIDs[1] ~= actualHour then
+    AllIDs = {actualHour}
+    pcall(function()
+        writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
+    end)
+end
+
+-- Tambahkan JobId server saat ini ke daftar blacklist agar tidak di-join kembali
+table.insert(AllIDs, game.JobId)
+
+local function TPReturner()
+    local Site
+    local apiURL = 'https://games.roblox.com/v1/games/' .. PlaceID .. '/servers/Public?sortOrder=Asc&limit=100'
+    
+    if foundAnything ~= "" then
+        apiURL = apiURL .. '&cursor=' .. foundAnything
+    end
+
+    -- Mengambil data server dari API Roblox
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(apiURL))
+    end)
+
+    if not success then return end
+    Site = result
+
+    if Site.nextPageCursor and Site.nextPageCursor ~= "null" then
+        foundAnything = Site.nextPageCursor
+    end
+
+    for _, v in pairs(Site.data) do
+        local Possible = true
+        local ID = tostring(v.id)
+
+        -- Pastikan server belum penuh dan bukan server kita saat ini
+        if tonumber(v.playing) < tonumber(v.maxPlayers) and ID ~= game.JobId then
+            -- Cek apakah server ini sudah ada di log JSON kita
+            for _, Existing in pairs(AllIDs) do
+                if ID == tostring(Existing) then
+                    Possible = false
+                    break
+                end
+            end
+
+            -- Jika server valid dan belum pernah dikunjungi, lakukan Teleport
+            if Possible then
+                table.insert(AllIDs, ID)
+                pcall(function()
+                    writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
+                end)
+                
+                print("Ditemukan server baru! Teleporting ke Job ID: " .. ID)
+                TeleportService:TeleportToPlaceInstance(PlaceID, ID, Players.LocalPlayer)
+                task.wait(4) -- Jeda sebentar untuk membiarkan teleportasi memproses
+            end
+        end
+    end
+end
+
+local function Teleport()
+    while task.wait(1) do
+        pcall(function()
+            TPReturner()
+            -- Jika belum menemukan server kosong di halaman pertama, cari di halaman selanjutnya (cursor)
+            if foundAnything ~= "" then
+                TPReturner()
+            end
+        end)
+    end
+end
+
+-- Jalankan fungsi Teleport
+Teleport()
