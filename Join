@@ -1,0 +1,234 @@
+-- ==========================================
+-- 🔒 SECURITY CHECK (PLACE ID VERIFICATION)
+-- ==========================================
+local targetPlaceId = 16116270224
+
+-- Jika Place ID tidak cocok, script langsung berhenti total
+if game.PlaceId ~= targetPlaceId then
+    warn("❌ [Auto Elevator] Script dihentikan: Game ID tidak cocok! (Mendeteksi Place ID: " .. tostring(game.PlaceId) .. ")")
+    return 
+end
+
+print("✅ [Auto Elevator] Game ID cocok. Memulai script...")
+
+-- ==========================================
+-- ⚙️ CONFIGURATION (UBAH DI SINI)
+-- ==========================================
+local Config = {
+    AutoOn = false,            -- true = Langsung jalan saat dieksekusi, false = Nyalakan manual via GUI
+    JoinVoteMatch = false,     -- true = Otomatis nembak VoteMatch ke server setelah masuk elevator
+    DefaultGate = 1,           -- Gate awal yang dituju jika tidak diubah di GUI (1, 2, 3...)
+    WaitTime = 4               -- Waktu tunggu (detik) untuk ngecek apakah berhasil masuk Gate atau gagal
+}
+
+-- ==========================================
+-- 🛡️ ANTI-CHEAT REMOVAL
+-- ==========================================
+pcall(function()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local events = ReplicatedStorage:WaitForChild("Events", 5)
+    if events then
+        local antiCheat = events:FindFirstChild("AntiCheatTrigger")
+        if antiCheat then antiCheat:Destroy() end
+    end
+end)
+
+-- ==========================================
+-- 🔧 SERVICES & VARIABLES
+-- ==========================================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local isRunning = Config.AutoOn
+local currentGateIndex = Config.DefaultGate
+local mainLoopThread = nil
+local maxGates = 3 
+
+-- ==========================================
+-- 👁️ CORE FUNCTIONS
+-- ==========================================
+
+-- Cek apakah tombol leave benar-benar ada dan terlihat (Visible = true)
+local function isLeaveButtonVisible()
+    local gui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not gui then return false end
+    local mainGui = gui:FindFirstChild("MainGui")
+    if not mainGui then return false end
+    local btn = mainGui:FindFirstChild("leaveButton")
+    
+    return btn ~= nil and btn.Visible == true
+end
+
+-- Ambil semua Gate yang ada di Workspace
+local function getAvailableGates()
+    local elevators = workspace:FindFirstChild("Elevators")
+    if not elevators then return {} end
+    
+    local gates = {}
+    for _, child in ipairs(elevators:GetChildren()) do
+        if child.Name == "Gate" then
+            table.insert(gates, child)
+        end
+    end
+    return gates
+end
+
+-- ==========================================
+-- 🖥️ GUI CREATION (DRAGGABLE)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ElevatorAutoGui"
+local guiParent = pcall(function() return gethui() end) and gethui() or LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = guiParent
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 130)
+Frame.Position = UDim2.new(0.5, -100, 0.1, 0)
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.BorderSizePixel = 2
+Frame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Title.Text = "Auto Elevator"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 18
+Title.Parent = Frame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0.9, 0, 0, 30)
+ToggleBtn.Position = UDim2.new(0.05, 0, 0, 40)
+ToggleBtn.BackgroundColor3 = isRunning and Color3.fromRGB(40, 150, 40) or Color3.fromRGB(150, 40, 40)
+ToggleBtn.Text = isRunning and "Status: ON" or "Status: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.SourceSansBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = Frame
+
+local GateBtn = Instance.new("TextButton")
+GateBtn.Size = UDim2.new(0.9, 0, 0, 30)
+GateBtn.Position = UDim2.new(0.05, 0, 0, 80)
+GateBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 150)
+GateBtn.Text = "Target: Gate " .. currentGateIndex
+GateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+GateBtn.Font = Enum.Font.SourceSansBold
+GateBtn.TextSize = 16
+GateBtn.Parent = Frame
+
+-- 🖱️ Drag Logic (Biar UI bisa digeser)
+local dragging, dragInput, dragStart, startPos
+Title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+Title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+RunService.RenderStepped:Connect(function()
+    if dragging and dragInput then
+        local delta = dragInput.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ==========================================
+-- 🔄 MAIN LOGIC & TELEPORT LOOP
+-- ==========================================
+local function startLoop()
+    mainLoopThread = task.spawn(function()
+        while isRunning do
+            if workspace:FindFirstChild("CurrentRoom") then
+                isRunning = false
+                ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+                ToggleBtn.Text = "Status: OFF (In Game)"
+                break
+            end
+
+            local availableGates = getAvailableGates()
+            maxGates = #availableGates
+            
+            if maxGates > 0 then
+                if currentGateIndex > maxGates then currentGateIndex = 1 end
+                GateBtn.Text = "Target: Gate " .. currentGateIndex
+
+                local targetGate = availableGates[currentGateIndex]
+                local targetPart = targetGate:FindFirstChild("Gate") or targetGate
+
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.HumanoidRootPart.CFrame = targetPart.CFrame
+                end
+
+                task.wait(Config.WaitTime)
+
+                if isLeaveButtonVisible() then
+                    print("✅ Berhasil masuk ke Gate " .. currentGateIndex)
+                    
+                    if Config.JoinVoteMatch then
+                        task.wait(1)
+                        pcall(function()
+                            local args = { "VoteMatch" }
+                            local remoteEvent = ReplicatedStorage:WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteEvent")
+                            remoteEvent:FireServer(unpack(args))
+                            print("🗳️ VoteMatch terkirim!")
+                        end)
+                    end
+                    
+                    isRunning = false
+                    ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+                    ToggleBtn.Text = "Status: OFF (Success)"
+                    break
+                else
+                    print("❌ Gagal/Penuh di Gate " .. currentGateIndex .. ". Mencari gate lain...")
+                    currentGateIndex = currentGateIndex + 1
+                    if currentGateIndex > maxGates then currentGateIndex = 1 end
+                    GateBtn.Text = "Target: Gate " .. currentGateIndex
+                end
+            else
+                task.wait(2) 
+            end
+        end
+    end)
+end
+
+-- ==========================================
+-- 🖱️ UI BUTTON EVENTS
+-- ==========================================
+ToggleBtn.MouseButton1Click:Connect(function()
+    isRunning = not isRunning
+    if isRunning then
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+        ToggleBtn.Text = "Status: ON"
+        startLoop()
+    else
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+        ToggleBtn.Text = "Status: OFF"
+    end
+end)
+
+GateBtn.MouseButton1Click:Connect(function()
+    local availableGates = getAvailableGates()
+    maxGates = #availableGates > 0 and #availableGates or 3
+    
+    currentGateIndex = currentGateIndex + 1
+    if currentGateIndex > maxGates then
+        currentGateIndex = 1
+    end
+    GateBtn.Text = "Target: Gate " .. currentGateIndex
+end)
+
+-- Jalankan otomatis jika AutoOn = true
+if isRunning then
+    startLoop()
+end
