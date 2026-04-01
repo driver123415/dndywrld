@@ -28,7 +28,7 @@ local isItemFarmingActive = false
 local Config = {
     AutoStartFarming = true, 
     
-    failsafegenerator = 60, -- Detik maksimal stuck sebelum auto-refresh
+    failsafegenerator = 30, -- Detik maksimal stuck sebelum auto-refresh
     
     Pickup = {
         Enable = true,              
