@@ -66,8 +66,8 @@ local Config = {
         SuperSafeMonsterDetect = true, 
         
         -- [FITUR ENCOUNTER]
-        EncounterMonsterDetect = true, -- Default False, nyalakan sendiri
-        EncounterBlacklistLethal = false, 
+        EncounterMonsterDetect = false, -- Default False, nyalakan sendiri
+        EncounterBlacklistLethal = true, --true = mati
         
         LethalRadius = 60,
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
