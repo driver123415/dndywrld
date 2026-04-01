@@ -1,5 +1,5 @@
 -- ==============================================================================
--- MAIN SCRIPT REVISION 27: PLATFORM LAMA (WORK) + ENCOUNTER MONSTER FIX
+-- MAIN SCRIPT REVISION 28: THE GOD MODE (PLATFORM LAMA + 0 GRAVITY ENCOUNTER)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -9,7 +9,7 @@ if game.PlaceId ~= INGAME_PLACE_ID then
     return
 end
 
-print("Master Script (Revision 27) Executed! Ready for Farming.")
+print("Master Script (Revision 28) Executed! Ready for Farming.")
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -66,7 +66,7 @@ local Config = {
         SuperSafeMonsterDetect = true, 
         
         -- [FITUR ENCOUNTER]
-        EncounterMonsterDetect = true, -- Default False, nyalakan sendiri
+        EncounterMonsterDetect = false, -- Default False, nyalakan sendiri
         EncounterBlacklistLethal = false, 
         
         LethalRadius = 60,
@@ -186,7 +186,7 @@ local function isThreatened(targetPosition, radius)
         local monsterIcon = screenGui and screenGui:FindFirstChild("MonsterIcon")
         
         if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
-            if monsterIcon.ImageTransparency < 0.99 then
+            if monsterIcon.ImageTransparency < 1 then
                 return true -- INSTAN KABUR! UI Kedip!
             end
         end
@@ -358,7 +358,7 @@ local function applyItemESP()
 end
 
 
--- ==================== HOVER ENCOUNTER LOGIC (REVISI 27) ====================
+-- ==================== HOVER ENCOUNTER LOGIC (REVISI 28: 0 GRAVITY) ====================
 local function executeEncounter()
     if not Config.Teleport.EncounterMonsterDetect then return end
     if getCurrentHealth() <= 1 then 
@@ -373,6 +373,8 @@ local function executeEncounter()
     local safePosInit = getSafePlaceCFrame()
     if safePosInit then teleportplr(safePosInit) end
     task.wait(0.5)
+
+    local originalGravity = Workspace.Gravity
 
     for _, monster in pairs(map.Monsters:GetChildren()) do
         if not isMasterFarming or getCurrentHealth() <= 1 then break end 
@@ -395,19 +397,23 @@ local function executeEncounter()
                 local minHeight = 5 -- Jarak mentok 5 stud
                 local success = false
                 
+                -- Mematikan gravitasi agar melayang natural (Unanchored)
+                Workspace.Gravity = 0
+                rootPart.Anchored = false
+                
                 -- Turun bertahap (80 -> 75 -> ... -> 5)
                 while height >= minHeight and isMasterFarming and getCurrentHealth() > 1 do
                     if not monster.PrimaryPart then break end
                     
                     local targetCF = monster.PrimaryPart.CFrame * CFrame.new(0, height, 0)
-                    teleportplr(targetCF)
-                    rootPart.Anchored = true
+                    rootPart.CFrame = targetCF
+                    rootPart.AssemblyLinearVelocity = Vector3.zero
                     
                     local pGui = player:FindFirstChild("PlayerGui")
                     local monsterIcon = pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("MonsterIcon")
                     
                     if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
-                        if monsterIcon.ImageTransparency < 0.99 then
+                        if monsterIcon.ImageTransparency < 1 then
                             print("[ENCOUNTER] Kedip sukses di "..height.." stud! " .. mName .. " terdaftar.")
                             success = true
                             break
@@ -421,14 +427,20 @@ local function executeEncounter()
                     task.wait(0.05)
                 end
                 
-                -- Nunggu 1.5 detik kalau mentok 5 stud blm kedip
+                -- Nunggu 3 detik kalau mentok 5 stud blm kedip (Posisi unanchored, 0 gravity)
                 if not success and isMasterFarming and monster.PrimaryPart then
                     local waitTime = 0
-                    while waitTime < 1.5 and isMasterFarming do
+                    while waitTime < 3.0 and isMasterFarming do
+                        if not monster.PrimaryPart then break end
+                        
+                        -- Pertahankan posisi melayang di atas 5 stud
+                        rootPart.CFrame = monster.PrimaryPart.CFrame * CFrame.new(0, minHeight, 0)
+                        rootPart.AssemblyLinearVelocity = Vector3.zero
+                        
                         local pGui = player:FindFirstChild("PlayerGui")
                         local monsterIcon = pGui and pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("MonsterIcon")
                         
-                        if monsterIcon and type(monsterIcon.ImageTransparency) == "number" and monsterIcon.ImageTransparency < 0.99 then
+                        if monsterIcon and type(monsterIcon.ImageTransparency) == "number" and monsterIcon.ImageTransparency < 1 then
                             print("[ENCOUNTER] Kedip sukses setelah ditunggu! " .. mName .. " terdaftar.")
                             success = true
                             break
@@ -442,16 +454,18 @@ local function executeEncounter()
                     end
                 end
                 
-                -- Catat & Kabur ke atas
+                -- Kembalikan Gravitasi & Catat
+                Workspace.Gravity = originalGravity
                 encounteredMonsters[mName] = true
-                rootPart.Anchored = false
                 
                 teleportplr(rootPart.CFrame * CFrame.new(0, 80, 0))
                 task.wait(0.2)
             end
         end
     end
+    Workspace.Gravity = originalGravity
 end
+
 
 -- ==================== ITEM PICKUP LOGIC (PLATFORM LAMA - 100% WORK) ====================
 local isItemAuraActive = false
@@ -589,7 +603,7 @@ local function executePickup()
                     break
                 end
 
-                -- [RESTORED] PLATFORM HIJAU VERSI LAMA (100% WORK)
+                -- [RESTORED] PLATFORM HIJAU VERSI LAMA (100% WORK) -- Jangan diubah!
                 local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
                 local platform = Instance.new("Part")
                 platform.Size = Vector3.new(15, 1, 15) 
@@ -950,7 +964,6 @@ local function startAutoFarming()
                                     if rootPart.Anchored then rootPart.Anchored = false end
                                 end
                             else
-                                -- Kalo telat render, transit DandyShop
                                 local safePos = getSafePlaceCFrame()
                                 if safePos then teleportplr(safePos) end
                                 rootPart.Anchored = false
