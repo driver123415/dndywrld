@@ -14,7 +14,8 @@ local scripts = {
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey2"
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey3",--multiiiiiiiii
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",--solo
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",--solo
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Join,--solo/multi
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST9",--coba     
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V2",--
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck",--PlayerCheck 3
@@ -24,7 +25,7 @@ local scripts = {
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Buy",--beli lah
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use 
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote",--vote
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote2",--vote
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi"--ready
 }
 
