@@ -3,7 +3,7 @@
 -- ==========================================
 local Config = {
     TargetPlaceID = 16116270224, -- ID Game spesifik tempat script boleh berjalan
-    WaitTime = 90 -- Waktu tunggu sebelum pindah server (dalam detik)
+    WaitTime = 120 -- Waktu tunggu sebelum pindah server (dalam detik)
 }
 
 -- ==========================================
