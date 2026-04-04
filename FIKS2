@@ -21,7 +21,7 @@ local scripts = {
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11",--coba  lebih perfect
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2",--coba  lebih perfect  mati
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V2",--
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck",--PlayerCheck 4
     "https://raw.githubusercontent.com/EarthC123/FjoneScript/refs/heads/main/NoxiousAutoFarmFix.lua",--coba ANTI MONSTER JATOH TANAH    
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV3",--
