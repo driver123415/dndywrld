@@ -37,7 +37,6 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- TOP BAR (Untuk Dragging)
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 30)
 TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -55,7 +54,6 @@ Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- TOMBOL CLOSE
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 30, 0, 30)
 CloseButton.Position = UDim2.new(1, -30, 0, 0)
@@ -66,7 +64,6 @@ CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 14
 CloseButton.Parent = TopBar
 
--- TOMBOL 1: AUTO DUCK COLLECTION
 local BtnAutoDuck = Instance.new("TextButton")
 BtnAutoDuck.Size = UDim2.new(1, -20, 0, 40)
 BtnAutoDuck.Position = UDim2.new(0, 10, 0, 50)
@@ -78,7 +75,6 @@ BtnAutoDuck.Text = "1. Auto Duck Collection (Full Route)"
 BtnAutoDuck.Parent = MainFrame
 Instance.new("UICorner", BtnAutoDuck).CornerRadius = UDim.new(0, 6)
 
--- TOMBOL 2: COLLECT EXTRA ITEMS
 local BtnExtraItems = Instance.new("TextButton")
 BtnExtraItems.Size = UDim2.new(1, -20, 0, 40)
 BtnExtraItems.Position = UDim2.new(0, 10, 0, 105)
@@ -153,9 +149,12 @@ local function touchTeleport(targetCFrame)
 	end
 end
 
+-- ==================================================
+-- LOGIKA AUTO-BUY (DOUBLE CLICK FIX)
+-- ==================================================
 local function autoBuyUGC()
 	local inset = GuiService:GetGuiInset()
-	print("⏳ Menunggu pop-up 'Buy'...")
+	print("⏳ Menunggu pop-up 'Buy' (3.5 detik)...")
 	task.wait(3.5) 
 	
 	local buyBtn = nil
@@ -167,34 +166,26 @@ local function autoBuyUGC()
 	end
 
 	if buyBtn and buyBtn.AbsolutePosition.X > 0 then
+		-- Simpan koordinat tombol Buy
 		local bX = buyBtn.AbsolutePosition.X + (buyBtn.AbsoluteSize.X / 2)
 		local bY = buyBtn.AbsolutePosition.Y + (buyBtn.AbsoluteSize.Y / 2) + inset.Y
+		
+		-- KLIK 1: Tekan tombol Buy
 		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, true, game, 1)
 		task.wait(0.1)
 		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, false, game, 1)
 		print("🎯 Tombol 'Buy' diklik!")
 		
-		task.wait(3) 
-		print("⏳ Menunggu konfirmasi 'OK'...")
+		-- KLIK 2: Tunggu loading lalu tekan di titik yang sama persis untuk tombol OK
+		task.wait(3.5) -- Tunggu proses loading Roblox
+		print("⏳ Menekan 'OK' di titik yang sama...")
 		
-		local okBtn = nil
-		for _, v in ipairs(CoreGui:GetDescendants()) do
-			if (v:IsA("TextButton") or v:IsA("TextLabel")) and (v.Text == "OK" or v.Text == "Ok") then
-				okBtn = v:IsA("TextButton") and v or v.Parent
-				break
-			end
-		end
-		
-		if okBtn then
-			local oX = okBtn.AbsolutePosition.X + (okBtn.AbsoluteSize.X / 2)
-			local oY = okBtn.AbsolutePosition.Y + (okBtn.AbsoluteSize.Y / 2) + inset.Y
-			VirtualInputManager:SendMouseButtonEvent(oX, oY, 0, true, game, 1)
-			task.wait(0.1)
-			VirtualInputManager:SendMouseButtonEvent(oX, oY, 0, false, game, 1)
-			print("✅ Konfirmasi Selesai.")
-		end
+		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, true, game, 1)
+		task.wait(0.1)
+		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, false, game, 1)
+		print("✅ Pop-up ditutup.")
 	else
-		print("⚠️ Pop-up tidak ditemukan.")
+		print("⚠️ Pop-up 'Buy' tidak ditemukan. Lewati...")
 	end
 end
 
@@ -251,7 +242,6 @@ local extraUGCs = {
 BtnAutoDuck.MouseButton1Click:Connect(function()
 	local oriColor = visualClick(BtnAutoDuck, "1. Auto Duck Collection (Full Route)")
 	
-	-- Gunakan task.spawn agar GUI tidak freeze
 	task.spawn(function()
 		print("\n▶️ MEMULAI RUTE DUCK COLLECTION...")
 		for _, d in ipairs(allDucks) do touchTeleport(d[2]) end
@@ -300,7 +290,7 @@ BtnExtraItems.MouseButton1Click:Connect(function()
 				task.wait(1.5)
 				firePromptsNearMe(15)
 				autoBuyUGC()
-				task.wait(1)
+				task.wait(1) -- Jeda aman sebelum pindah ke lokasi berikutnya
 			end
 		end
 		
