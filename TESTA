@@ -132,17 +132,63 @@ if hrp then
 	task.wait(1.5)
 	
 -- ==================================================
--- 4. TELEPORT KE FINAL ITEM & KLAIM (PROXIMITY)
+-- 4. TELEPORT KE FINAL ITEM & KLAIM (PROXIMITY + AUTO BUY UGC)
 -- ==================================================
 	print("4️⃣ Menuju lokasi item final...")
 	local itemCFrame = CFrame.new(-235.199097, 78.6688232, -777.403625, -0.296778828, 1.86118303e-08, 0.95494622, -2.75188246e-08, 1, -2.80422423e-08, -0.95494622, -3.46013422e-08, -0.296778828)
 	
 	hrp.CFrame = itemCFrame
-	task.wait(0.8) 
+	task.wait(1) -- Beri waktu lebih agar proximity ter-load
 	
-	-- Dan proximity terakhir untuk mengklaim "???"
+	-- Memicu Proximity Prompt terakhir ("???")
 	firePromptsNearMe(15)
-	print("✅ Mencoba mengklaim Final Item!")
+	print("✅ Mencoba mengklaim Final Item...")
+
+	-- ===============================================
+	-- LOGIKA AUTO-BUY UGC (BYPASS COREGUI)
+	-- ===============================================
+	print("⏳ Menunggu pop-up Roblox Purchase muncul...")
+	task.wait(2.5) -- Beri waktu agar pop-up "Buy item" selesai *loading* muncul di layar
+
+	local CoreGui = game:GetService("CoreGui")
+	local VirtualInputManager = game:GetService("VirtualInputManager")
+	local buttonClicked = false
+
+	-- Mencari tombol "Buy" di dalam sistem keamanan UI Roblox
+	for _, instance in ipairs(CoreGui:GetDescendants()) do
+		-- Hanya menargetkan tombol yang teksnya persis "Buy"
+		if instance:IsA("TextButton") and instance.Text == "Buy" then
+			print("🦆 Tombol 'Buy' UGC terdeteksi! Mengeksekusi klik...")
+			
+			-- Metode 1: Memaksa trigger klik menggunakan fitur Executor (Sangat Ampuh)
+			if firesignal then
+				firesignal(instance.MouseButton1Click)
+				buttonClicked = true
+			elseif getconnections then
+				for _, connection in pairs(getconnections(instance.MouseButton1Click)) do
+					connection:Fire()
+				end
+				buttonClicked = true
+			else
+				-- Metode 2: Simulasi klik mouse asli ke koordinat layar (Fallback)
+				local clickX = instance.AbsolutePosition.X + (instance.AbsoluteSize.X / 2)
+				local clickY = instance.AbsolutePosition.Y + (instance.AbsoluteSize.Y / 2) + 36 -- +36 menyesuaikan topbar Roblox
+				
+				VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
+				task.wait(0.1)
+				VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
+				buttonClicked = true
+			end
+			break
+		end
+	end
+
+	if buttonClicked then
+		print("🎉 BERHASIL! Item UGC 'Roblox Learn Ducky Head' berhasil diklaim secara otomatis!")
+	else
+		print("⚠️ Gagal mengeklik otomatis. Eksekutor-mu mungkin kurang *support* CoreGui.")
+		print("Silakan klik tombol 'Buy' secara manual di layar. (Gratis kok, 0 Robux!)")
+	end
 else
 	print("❌ Gagal: Karakter tidak ditemukan.")
 end
