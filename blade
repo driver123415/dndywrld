@@ -1,6 +1,7 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1.3 (ANTI-CHOKE & SPAM FIX)
-    Fix: Menggunakan task.spawn agar radar tidak macet saat mengeklik, dan menstabilkan VirtualInputManager.
+    THE ULTIMATE AUTO PARRY V1.4 (DYNAMIC SPEED & ANTI-FREEZE FIX)
+    Fix 1: Karakter tidak lagi bengong/freeze saat duel 1v1 jarak dekat.
+    Fix 2: Radar otomatis melebar jika kecepatan bola sangat ekstrem.
 ]]
 
 local Players = game:GetService("Players")
@@ -17,11 +18,8 @@ local SETTINGS = {
     AutoParry = false,
     Visuals = false,
     PingBasedOffset = 2.5,   
-    DistanceToParry = 1.2,   
-    EmergencyRadius = 18,    
-    ClashDistance = 25,      
-    ClashSpeed = 0.05,       -- DIUBAH: Disesuaikan jadi 0.05 agar Virtual Input tidak nge-bug/macet
-    NormalSpeed = 0.15,      -- DIUBAH: Jeda normal dirapikan
+    BaseDistanceToParry = 1.0, -- Jarak dasar (diubah jadi Base)
+    EmergencyRadius = 15,    
     OptimizerOn = false
 }
 
@@ -32,7 +30,6 @@ local frameCounter = 0
 local VisualPart, VisualMesh
 local MainConnection
 
--- Ambil Data Ping
 local NetworkStats = Stats:FindFirstChild("Network") 
     and Stats.Network:FindFirstChild("ServerStatsItem") 
     and Stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
@@ -71,10 +68,10 @@ local function UpdateVisuals(root, distance, state)
     end
     
     VisualPart.CFrame = root.CFrame * CFrame.new(0, -2.6, 0) * CFrame.Angles(math.rad(90), 0, 0)
-    local targetSize = math.clamp(distance * 0.8, 5, 65)
+    local targetSize = math.clamp(distance * 0.8, 5, 80)
     VisualMesh.Scale = VisualMesh.Scale:Lerp(Vector3.new(targetSize, targetSize, 0.5), 0.5)
 
-    if state == "clash" then
+    if state == "danger" then
         VisualPart.Color = Color3.fromRGB(255, 0, 0)
         VisualPart.Transparency = 0.05
     elseif state == "target" then
@@ -95,7 +92,6 @@ local function ApplyOptimizer()
         local lighting = game:GetService("Lighting")
         lighting.GlobalShadows = false
         lighting.FogEnd = 1e10
-
         for _, v in ipairs(workspace:GetDescendants()) do
             if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
                 v.Enabled = false
@@ -118,33 +114,29 @@ end
 
 local function IsTargeted(ball)
     if not Player.Character then return false end
-    
     if ball and ball:GetAttribute("target") == Player.Name then
         return true
     end
-    
     return Player.Character:GetAttribute("Targeted") == true 
         or Player.Character:FindFirstChild("Highlight") ~= nil
 end
 
--- [UPDATE V1.3] Penggunaan task.spawn agar loop tidak macet
-local function SendClick(isClashing, ball)
+local function SendClick(ball)
     if not SETTINGS.AutoParry or IsParrying then return end
     
     local now = tick()
-    local cd = isClashing and SETTINGS.ClashSpeed or SETTINGS.NormalSpeed
+    local cd = 0.1 -- Cooldown aman agar WASD tidak macet (Anti-Freeze)
     
-    if not isClashing and LastBallHit == ball and (now - LastClick) < 0.2 then return end
+    if LastBallHit == ball and (now - LastClick) < 0.15 then return end
     if (now - LastClick) < cd then return end
     
     IsParrying = true
     LastClick = now
     LastBallHit = ball
     
-    -- Eksekusi klik di background thread (tidak menghentikan radar)
     task.spawn(function()
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-        task.wait(0.015) -- Dibuat sangat singkat agar VIM tidak tumpang tindih
+        task.wait(0.015) 
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
     end)
     
@@ -181,7 +173,7 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Auto Parry v1.3"
+Title.Text = "Ultimate Parry v1.4"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -287,28 +279,39 @@ MainConnection = RunService.PostSimulation:Connect(function()
     local Speed = Velocity.Magnitude
     local Distance = (PlayerPos - BallPos).Magnitude
     
+    local directionToPlayer = (PlayerPos - BallPos).Unit
+    local velocityDirection = Velocity.Unit
+    local dot = directionToPlayer:Dot(velocityDirection)
+
+    -- SMART FILTER: Kalau bola jelas-jelas bergerak MENJAUH, stop script untuk hemat performa dan cegah Freeze
+    if dot < -0.2 then 
+        LastBallHit = nil 
+        if VisualPart and frameCounter % 2 == 0 then UpdateVisuals(Root, Distance, "neutral") end
+        return
+    end
+
     local Targeted = IsTargeted(Ball)
-    local IsClashing = Targeted and Distance <= SETTINGS.ClashDistance
     
     frameCounter = frameCounter + 1
     if VisualPart and frameCounter % 2 == 0 then 
-        UpdateVisuals(Root, Distance, IsClashing and "clash" or (Targeted and "target" or "neutral"))
+        UpdateVisuals(Root, Distance, Targeted and "danger" or "neutral")
     end
 
-    if IsClashing then
-        SendClick(true, Ball)
-    elseif Targeted then
+    if Targeted then
         local Ping = (NetworkStats and NetworkStats.Value / 1000) or 0.04
         local TimeToHit = Distance / math.max(Speed, 1)
         
-        local PredictionThreshold = SETTINGS.DistanceToParry + (Ping * SETTINGS.PingBasedOffset)
+        -- DYNAMIC SCALING: Kecepatan tinggi akan menambah radius parry secara otomatis
+        local SpeedFactor = Speed / 100 
+        local PredictionThreshold = SETTINGS.BaseDistanceToParry + (Ping * SETTINGS.PingBasedOffset) + SpeedFactor
         
         if Speed > 150 then
-            PredictionThreshold = PredictionThreshold * 1.15
+            PredictionThreshold = PredictionThreshold * 1.2
         end
 
+        -- Eksekusi hanya jika bola benar-benar masuk hitungan waktu, bukan asal spam
         if TimeToHit <= PredictionThreshold or Distance <= SETTINGS.EmergencyRadius then
-            SendClick(false, Ball)
+            SendClick(Ball)
         end
     end
 end)
