@@ -1,0 +1,216 @@
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local player = Players.LocalPlayer
+
+-- Menggunakan CoreGui agar aman dari deteksi game (jika executor support), fallback ke PlayerGui
+local parentGui = pcall(function() return CoreGui.Name end) and CoreGui or player:WaitForChild("PlayerGui")
+
+-- Hapus GUI lama jika sudah ada (mencegah duplikat saat re-execute)
+if parentGui:FindFirstChild("CoordTeleportGUI") then
+	parentGui.CoordTeleportGUI:Destroy()
+end
+
+-- ==========================================
+-- MEMBUAT UI ELEMENTS
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CoordTeleportGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = parentGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 130)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -65)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- TOP BAR (Untuk Dragging)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+-- Menutup celah bawah TopBar karena UICorner
+local TopBarHider = Instance.new("Frame")
+TopBarHider.Size = UDim2.new(1, 0, 0, 10)
+TopBarHider.Position = UDim2.new(0, 0, 1, -10)
+TopBarHider.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBarHider.BorderSizePixel = 0
+TopBarHider.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "CFrame Teleporter"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- TOMBOL MINIMIZE
+local MinButton = Instance.new("TextButton")
+MinButton.Size = UDim2.new(0, 30, 0, 30)
+MinButton.Position = UDim2.new(1, -60, 0, 0)
+MinButton.BackgroundTransparency = 1
+MinButton.Text = "-"
+MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinButton.Font = Enum.Font.GothamBold
+MinButton.TextSize = 18
+MinButton.Parent = TopBar
+
+-- TOMBOL CLOSE
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 14
+CloseButton.Parent = TopBar
+
+-- AREA KONTEN (Disembunyikan saat di-minimize)
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+local CoordInput = Instance.new("TextBox")
+CoordInput.Size = UDim2.new(1, -20, 0, 35)
+CoordInput.Position = UDim2.new(0, 10, 0, 15)
+CoordInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CoordInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+CoordInput.Font = Enum.Font.Gotham
+CoordInput.TextSize = 12
+CoordInput.PlaceholderText = "Paste X, Y, Z (atau CFrame) di sini"
+CoordInput.Text = ""
+CoordInput.ClearTextOnFocus = false
+CoordInput.Parent = ContentFrame
+
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 6)
+InputCorner.Parent = CoordInput
+
+local TeleportBtn = Instance.new("TextButton")
+TeleportBtn.Size = UDim2.new(1, -20, 0, 35)
+TeleportBtn.Position = UDim2.new(0, 10, 0, 60)
+TeleportBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportBtn.Font = Enum.Font.GothamBold
+TeleportBtn.TextSize = 14
+TeleportBtn.Text = "Teleport"
+TeleportBtn.Parent = ContentFrame
+
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = TeleportBtn
+
+-- ==========================================
+-- LOGIKA DRAGGING (Geser UI)
+-- ==========================================
+local dragging, dragInput, mousePos, framePos
+
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		mousePos = input.Position
+		framePos = MainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - mousePos
+		MainFrame.Position = UDim2.new(
+			framePos.X.Scale, framePos.X.Offset + delta.X,
+			framePos.Y.Scale, framePos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+-- ==========================================
+-- LOGIKA TOMBOL (Min, Close, Teleport)
+-- ==========================================
+local isMinimized = false
+MinButton.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		MainFrame:TweenSize(UDim2.new(0, 300, 0, 30), "Out", "Quad", 0.3, true)
+		ContentFrame.Visible = false
+	else
+		MainFrame:TweenSize(UDim2.new(0, 300, 0, 130), "Out", "Quad", 0.3, true)
+		ContentFrame.Visible = true
+	end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+end)
+
+TeleportBtn.MouseButton1Click:Connect(function()
+	local inputText = CoordInput.Text
+	
+	-- Menghapus spasi agar mudah diproses
+	inputText = string.gsub(inputText, " ", "")
+	
+	-- Memecah teks berdasarkan koma
+	local coords = string.split(inputText, ",")
+	
+	-- Mengecek apakah setidaknya ada 3 angka (X, Y, Z)
+	if #coords >= 3 then
+		local x = tonumber(coords[1])
+		local y = tonumber(coords[2])
+		local z = tonumber(coords[3])
+		
+		if x and y and z then
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			
+			if hrp then
+				hrp.CFrame = CFrame.new(x, y, z)
+				
+				-- Animasi tombol sukses
+				local oriColor = TeleportBtn.BackgroundColor3
+				TeleportBtn.BackgroundColor3 = Color3.fromRGB(50, 255, 50)
+				TeleportBtn.Text = "Success!"
+				task.wait(1)
+				TeleportBtn.BackgroundColor3 = oriColor
+				TeleportBtn.Text = "Teleport"
+			end
+		else
+			CoordInput.Text = "Format salah! Gunakan angka."
+			task.wait(1.5)
+			CoordInput.Text = ""
+		end
+	else
+		CoordInput.Text = "Butuh X, Y, Z!"
+		task.wait(1.5)
+		CoordInput.Text = ""
+	end
+end)
