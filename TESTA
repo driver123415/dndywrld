@@ -196,6 +196,21 @@ local function autoBuyUGC()
 end
 
 -- ==================================================
+-- FUNGSI VISUAL TOMBOL
+-- ==================================================
+local function visualClick(btn, oriText)
+	local oriColor = btn.BackgroundColor3
+	btn.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+	btn.Text = "Processing..."
+	return oriColor
+end
+
+local function resetBtn(btn, oriColor, oriText)
+	btn.BackgroundColor3 = oriColor
+	btn.Text = oriText
+end
+
+-- ==================================================
 -- DATABASE LOKASI
 -- ==================================================
 local allDucks = {
@@ -284,7 +299,7 @@ BtnExtraItems.MouseButton1Click:Connect(function()
 				task.wait(1.5)
 				firePromptsNearMe(15)
 				autoBuyUGC()
-				task.wait(1) -- Jeda aman sebelum pindah ke lokasi berikutnya
+				task.wait(1)
 			end
 		end
 		
