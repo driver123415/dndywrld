@@ -1,5 +1,5 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1
+    THE ULTIMATE AUTO PARRY V1.1 (SENSITIVITY UPDATE)
     Fitur: Real-time Ping, Dot Product Math, FPS Optimizer, Smart Visualizer, Custom GUI
 ]]
 
@@ -12,14 +12,14 @@ local CoreGui = game:GetService("CoreGui")
 
 local Player = Players.LocalPlayer
 
--- Konfigurasi Global
+-- Konfigurasi Global (Diperbarui agar lebih sensitif)
 local SETTINGS = {
     AutoParry = false,
     Visuals = false,
-    PingBasedOffset = 1.95, 
-    DistanceToParry = 0.65,
-    EmergencyRadius = 10,
-    ClashDistance = 22,
+    PingBasedOffset = 2.5,   -- Lebih waspada terhadap lag server
+    DistanceToParry = 1.2,   -- Menangkis sedikit lebih awal
+    EmergencyRadius = 18,    -- Kalau bola masuk jarak 18, paksa tangkis
+    ClashDistance = 25,      -- Mulai spam klik dari jarak sedikit lebih jauh
     ClashSpeed = 0.01,
     NormalSpeed = 0.05,
     OptimizerOn = false
@@ -127,7 +127,8 @@ local function SendClick(isClashing, ball)
     local now = tick()
     local cd = isClashing and SETTINGS.ClashSpeed or SETTINGS.NormalSpeed
     
-    if not isClashing and LastBallHit == ball and (now - LastClick) < 0.5 then return end
+    -- Anti-spam diturunkan agar lebih cepat bereaksi ulang
+    if not isClashing and LastBallHit == ball and (now - LastClick) < 0.2 then return end
     if (now - LastClick) < cd then return end
     
     IsParrying = true
@@ -135,7 +136,7 @@ local function SendClick(isClashing, ball)
     LastBallHit = ball
     
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-    task.wait(0.01)
+    task.wait(0.035) -- Durasi ditahan sedikit lebih lama agar terbaca server
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
     
     task.delay(cd, function() IsParrying = false end)
@@ -154,13 +155,12 @@ MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true -- Membuat UI bisa digeser
+MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner", MainFrame)
 UICorner.CornerRadius = UDim.new(0, 8)
 
--- Header Bar
 local Header = Instance.new("Frame", MainFrame)
 Header.Size = UDim2.new(1, 0, 0, 30)
 Header.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
@@ -172,13 +172,12 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Auto Parry"
+Title.Text = "Ultimate Auto Parry v1.1"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Tombol Minimize
 local MinimizeBtn = Instance.new("TextButton", Header)
 MinimizeBtn.Size = UDim2.new(0, 30, 1, 0)
 MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
@@ -187,7 +186,6 @@ MinimizeBtn.Text = "-"
 MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
 MinimizeBtn.TextSize = 20
 
--- Tombol Close
 local CloseBtn = Instance.new("TextButton", Header)
 CloseBtn.Size = UDim2.new(0, 30, 1, 0)
 CloseBtn.Position = UDim2.new(1, -30, 0, 0)
@@ -197,7 +195,6 @@ CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 CloseBtn.TextSize = 16
 CloseBtn.Font = Enum.Font.GothamBold
 
--- Konten Menu
 local Content = Instance.new("Frame", MainFrame)
 Content.Size = UDim2.new(1, 0, 1, -30)
 Content.Position = UDim2.new(0, 0, 0, 30)
@@ -208,7 +205,6 @@ UIListLayout.Padding = UDim.new(0, 10)
 UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
--- Fungsi untuk membuat tombol Toggle
 local function CreateToggle(name, settingKey, action)
     local Btn = Instance.new("TextButton", Content)
     Btn.Size = UDim2.new(0, 200, 0, 35)
@@ -239,7 +235,6 @@ CreateToggle("Auto Parry", "AutoParry")
 CreateToggle("Smart Visualizer", "Visuals", CreateVisualizer)
 CreateToggle("FPS Optimizer", "OptimizerOn", ApplyOptimizer)
 
--- Logika UI (Minimize & Close)
 local IsMinimized = false
 MinimizeBtn.MouseButton1Click:Connect(function()
     IsMinimized = not IsMinimized
@@ -283,7 +278,6 @@ MainConnection = RunService.PostSimulation:Connect(function()
     local Speed = Velocity.Magnitude
     local Distance = (PlayerPos - BallPos).Magnitude
     
-    -- Vektor Dot Product untuk akurasi arah
     local directionToPlayer = (PlayerPos - BallPos).Unit
     local velocityDirection = Velocity.Unit
     local dot = directionToPlayer:Dot(velocityDirection)
@@ -304,7 +298,6 @@ MainConnection = RunService.PostSimulation:Connect(function()
         local Ping = (NetworkStats and NetworkStats.Value / 1000) or 0.04
         local TimeToHit = Distance / math.max(Speed, 1)
         
-        -- Kalkulasi ambang prediksi berbasis Ping (Sangat Akurat)
         local PredictionThreshold = SETTINGS.DistanceToParry + (Ping * SETTINGS.PingBasedOffset)
         
         if Speed > 150 then
