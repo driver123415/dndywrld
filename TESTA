@@ -1,0 +1,116 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Mengambil Remote Events
+local promptInputResult = ReplicatedStorage:WaitForChild("PromptInputResult")
+local cutsceneEvent = ReplicatedStorage:WaitForChild("DuckCutsceneFinished")
+
+print("==================================================")
+print("🦆 MEMULAI PROTOKOL AUTO-FINISH DUCK PUZZLE...")
+print("==================================================")
+
+-- 1. DATABASE JAWABAN PUZZLE PEDESTAL
+-- Ini adalah data yang kamu kumpulkan. Script akan mengirimnya ke server satu per satu.
+local puzzleAnswers = {
+	{"CSG", "contained"},
+	{"OOP", "be"},
+	{"ModuleScripts", "cannot"},
+	{"VoiceChat", "i"},
+	{"Optimization", "understand"},
+	{"DataStores", "i"},
+	{"OutdoorLighting", "i"},
+	{"MovingObjects", "hear"},
+	{"IslandJumperPedestal", "break"},
+	{"UIFundamentals", "i"},
+	{"2D3DAudio", "devforum"},
+	{"LightSources", "to"},
+	{"ProximityPrompts", "go"},
+	{"ScoreBars", "seal"},
+	{"IndoorLighting", "this"},
+	{"SpinningObjectsPedestal", "know"},
+	{"Volcanoes", "you"},
+	{"Waterfalls", "can"},
+	{"UGC", "me"},
+	{"MakeanObby", "but"}
+}
+
+print("1️⃣ Membuka semua Duck di Pedestal (Mengirim Password)...")
+for _, data in ipairs(puzzleAnswers) do
+	local pedestalName = data[1]
+	local password = data[2]
+	
+	-- Menembak jawaban ke server
+	promptInputResult:FireServer(pedestalName, password)
+	print("   ✅ Password dikirim untuk: " .. pedestalName)
+	
+	-- Jeda 0.1 detik agar server tidak menganggap spam
+	task.wait(0.1)
+end
+print("Semua puzzle selesai dijawab!")
+task.wait(1)
+
+-- Fungsi bantuan untuk mengeksekusi ProximityPrompt (Tombol E) di sekitar karakter
+local function firePromptsNearMe(radius)
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		for _, prompt in ipairs(workspace:GetDescendants()) do
+			if prompt:IsA("ProximityPrompt") then
+				local promptPart = prompt.Parent
+				if promptPart and promptPart:IsA("BasePart") then
+					local distance = (hrp.Position - promptPart.Position).Magnitude
+					if distance <= radius then
+						fireproximityprompt(prompt)
+					end
+				end
+			end
+		end
+	end
+end
+
+-- 2. TELEPORT KE NPC & TRIGGER CUTSCENE
+print("\n2️⃣ Menuju NPC RightLowerArm untuk Cutscene Final...")
+local char = player.Character
+local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+if hrp then
+	-- Koordinat NPC yang kamu temukan
+	local npcCFrame = CFrame.new(-243.319672, 66.2359161, -730.588928, 0.129616991, -0.084891215, -0.987923563, 0.0729253292, 0.994446397, -0.0758837909, 0.988878846, -0.0622088276, 0.135087863)
+	
+	-- Pindah ke NPC
+	hrp.CFrame = npcCFrame
+	task.wait(0.5) -- Tunggu server menyadari kita pindah
+	
+	-- Eksekusi interaksi dengan NPC
+	firePromptsNearMe(15) 
+	task.wait(0.5)
+	
+	-- Menembak event cutscene 30 duck
+	cutsceneEvent:FireServer("NPC_FirstTime_All30")
+	print("   ✅ Cutscene berhasil di-trigger!")
+	
+	task.wait(1.5) -- Jeda sebelum teleport terakhir agar tidak *glitch*
+	
+	-- 3. TELEPORT KE FINAL ITEM & KLAIM
+	print("\n3️⃣ Menuju lokasi item final...")
+	
+	-- Koordinat item final yang kamu temukan
+	local itemCFrame = CFrame.new(-235.199097, 78.6688232, -777.403625, -0.296778828, 1.86118303e-08, 0.95494622, -2.75188246e-08, 1, -2.80422423e-08, -0.95494622, -3.46013422e-08, -0.296778828)
+	
+	-- Pindah ke Final Item
+	hrp.CFrame = itemCFrame
+	task.wait(0.5) -- Tunggu *map* ter-load (StreamingEnabled)
+	
+	-- Eksekusi interaksi "???" pada item final
+	firePromptsNearMe(15)
+	
+	print("   ✅ Mencoba mengklaim Final Item!")
+else
+	print("❌ Gagal: Karakter tidak ditemukan.")
+end
+
+print("==================================================")
+print("🏆 SELURUH PROSES SELESAI!")
+print("Silakan cek inventory/badge kamu untuk memastikan itemnya masuk.")
+print("==================================================")
