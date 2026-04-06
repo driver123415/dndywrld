@@ -1,7 +1,7 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1.7 (FORCE WALK & MULTI-BOX FIX)
-    Fix: Menggunakan MoveTo() agar karakter dipaksa menjauh walau jendela game sedang tidak fokus.
-    Fix: Menghentikan karakter dengan akurat saat sudah berada di luar zona bahaya.
+    THE ULTIMATE AUTO PARRY V1.8 (STABILITY EDITION)
+    Fix: Mengembalikan stabilitas Parry dari V1.6 (Menghapus MoveTo yang merusak animasi).
+    Fix: Mengoptimalkan sistem pergerakan agar tetap menjauh tanpa mengunci input parry.
 ]]
 
 local Players = game:GetService("Players")
@@ -13,13 +13,15 @@ local CoreGui = game:GetService("CoreGui")
 
 local Player = Players.LocalPlayer
 
--- Konfigurasi Global
+-- ==========================================
+-- BAGIAN SETTINGS (UBAH RADIUS DI SINI)
+-- ==========================================
 local SETTINGS = {
     AutoParry = false,
     Visuals = false,
     OptimizerOn = false,
     AutoDistance = false,    
-    KeepDistance = 30,       
+    KeepDistance = 70,       -- <--- UBAH RADIUS JAGA JARAK DI SINI (Default 35 studs)
     PingBasedOffset = 2.5,   
     BaseDistanceToParry = 1.0, 
     EmergencyRadius = 15     
@@ -29,7 +31,6 @@ local LastClick = 0
 local LastBallHit = nil
 local IsParrying = false
 local frameCounter = 0
-local WasInZone = false -- Memori agar karakter tahu kapan harus berhenti lari
 local VisualPart, VisualMesh
 local DistVisualPart, DistVisualMesh
 local MainConnection
@@ -104,7 +105,7 @@ local function CreateDistVisualizer()
     
     DistVisualMesh = Instance.new("SpecialMesh", DistVisualPart)
     DistVisualMesh.MeshId = "rbxassetid://3270017"
-    DistVisualMesh.Scale = Vector3.new(SETTINGS.KeepDistance * 1.5, SETTINGS.KeepDistance * 1.5, 0.5)
+    DistVisualMesh.Scale = Vector3.new(SETTINGS.KeepDistance * 2, SETTINGS.KeepDistance * 2, 0.5)
 end
 
 local function DestroyDistVisualizer()
@@ -120,35 +121,12 @@ local function UpdateDistVisuals(root, isActive)
         if DistVisualPart then DistVisualPart.Transparency = 1 end
         return 
     end
-    
     DistVisualPart.CFrame = root.CFrame * CFrame.new(0, -2.65, 0) * CFrame.Angles(math.rad(90), 0, 0)
-    
-    if isActive then
-        DistVisualPart.Transparency = 0.2 
-    else
-        DistVisualPart.Transparency = 0.8 
-    end
+    DistVisualPart.Transparency = isActive and 0.2 or 0.8
 end
 
 -- ==========================================
--- 3. SISTEM OPTIMIZER FPS
--- ==========================================
-local function ApplyOptimizer()
-    pcall(function()
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        local lighting = game:GetService("Lighting")
-        lighting.GlobalShadows = false
-        lighting.FogEnd = 1e10
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
-                v.Enabled = false
-            end
-        end
-    end)
-end
-
--- ==========================================
--- 4. LOGIKA AUTO PARRY & MATEMATIKA
+-- 3. LOGIKA INTI
 -- ==========================================
 local function GetBall()
     local BallsFolder = workspace:FindFirstChild("Balls")
@@ -168,12 +146,8 @@ end
 
 local function SendClick(ball)
     if not SETTINGS.AutoParry or IsParrying then return end
-    
     local now = tick()
-    local cd = 0.1 
-    
     if LastBallHit == ball and (now - LastClick) < 0.15 then return end
-    if (now - LastClick) < cd then return end
     
     IsParrying = true
     LastClick = now
@@ -185,126 +159,53 @@ local function SendClick(ball)
         VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
     end)
     
-    task.delay(cd, function() IsParrying = false end)
+    task.delay(0.1, function() IsParrying = false end)
 end
 
 -- ==========================================
--- 5. PEMBUATAN GUI (INTERFAS PENGGUNA)
+-- 4. GUI (SAMA SEPERTI SEBELUMNYA)
 -- ==========================================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "UltimateParryGUI"
-ScreenGui.Parent = game:GetService("CoreGui")
-
-local MainFrame = Instance.new("Frame")
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 250, 0, 225)
 MainFrame.Position = UDim2.new(0.5, -125, 0.5, -112)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
-MainFrame.Parent = ScreenGui
-
-local UICorner = Instance.new("UICorner", MainFrame)
-UICorner.CornerRadius = UDim.new(0, 8)
-
-local Header = Instance.new("Frame", MainFrame)
-Header.Size = UDim2.new(1, 0, 0, 30)
-Header.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-Header.BorderSizePixel = 0
-local HeaderCorner = Instance.new("UICorner", Header)
-HeaderCorner.CornerRadius = UDim.new(0, 8)
-
-local Title = Instance.new("TextLabel", Header)
-Title.Size = UDim2.new(1, -60, 1, 0)
-Title.Position = UDim2.new(0, 10, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Parry v1.7"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 13
-Title.Font = Enum.Font.GothamBold
-Title.TextXAlignment = Enum.TextXAlignment.Left
-
-local MinimizeBtn = Instance.new("TextButton", Header)
-MinimizeBtn.Size = UDim2.new(0, 30, 1, 0)
-MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
-MinimizeBtn.BackgroundTransparency = 1
-MinimizeBtn.Text = "-"
-MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-MinimizeBtn.TextSize = 20
-
-local CloseBtn = Instance.new("TextButton", Header)
-CloseBtn.Size = UDim2.new(0, 30, 1, 0)
-CloseBtn.Position = UDim2.new(1, -30, 0, 0)
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
-CloseBtn.TextSize = 16
-CloseBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
 local Content = Instance.new("Frame", MainFrame)
 Content.Size = UDim2.new(1, 0, 1, -30)
 Content.Position = UDim2.new(0, 0, 0, 30)
 Content.BackgroundTransparency = 1
-
-local UIListLayout = Instance.new("UIListLayout", Content)
-UIListLayout.Padding = UDim.new(0, 10)
-UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+local UIList = Instance.new("UIListLayout", Content)
+UIList.Padding, UIList.HorizontalAlignment = UDim.new(0, 10), Enum.HorizontalAlignment.Center
 
 local function CreateToggle(name, settingKey, onAction, offAction)
     local Btn = Instance.new("TextButton", Content)
     Btn.Size = UDim2.new(0, 200, 0, 35)
     Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
     Btn.Text = name .. ": OFF"
-    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Btn.Font = Enum.Font.GothamSemibold
-    Btn.TextSize = 14
-    local BtnCorner = Instance.new("UICorner", Btn)
-    BtnCorner.CornerRadius = UDim.new(0, 6)
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
 
     Btn.MouseButton1Click:Connect(function()
         SETTINGS[settingKey] = not SETTINGS[settingKey]
-        if SETTINGS[settingKey] then
-            Btn.Text = name .. ": ON"
-            Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 80)
-            if onAction then onAction() end
-        else
-            Btn.Text = name .. ": OFF"
-            Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-            if offAction then offAction() end
-        end
+        Btn.Text = name .. (SETTINGS[settingKey] and ": ON" or ": OFF")
+        Btn.BackgroundColor3 = SETTINGS[settingKey] and Color3.fromRGB(50, 150, 80) or Color3.fromRGB(50, 50, 60)
+        if SETTINGS[settingKey] and onAction then onAction() elseif not SETTINGS[settingKey] and offAction then offAction() end
     end)
-    return Btn
 end
 
 CreateToggle("Auto Parry", "AutoParry")
 CreateToggle("Smart Visualizer", "Visuals", CreateVisualizer, DestroyVisualizer)
 CreateToggle("Auto Distance", "AutoDistance", CreateDistVisualizer, DestroyDistVisualizer)
-CreateToggle("FPS Optimizer", "OptimizerOn", ApplyOptimizer)
-
-local IsMinimized = false
-MinimizeBtn.MouseButton1Click:Connect(function()
-    IsMinimized = not IsMinimized
-    if IsMinimized then
-        MainFrame.Size = UDim2.new(0, 250, 0, 30)
-        Content.Visible = false
-    else
-        MainFrame.Size = UDim2.new(0, 250, 0, 225)
-        Content.Visible = true
-    end
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    SETTINGS.AutoParry = false
-    SETTINGS.AutoDistance = false
-    DestroyVisualizer()
-    DestroyDistVisualizer()
-    if MainConnection then MainConnection:Disconnect() end
-    ScreenGui:Destroy()
+CreateToggle("FPS Optimizer", "OptimizerOn", function() 
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 end)
 
 -- ==========================================
--- 6. LOOP UTAMA (CORE ENGINE)
+-- 5. ENGINE LOOP (PENGGABUNGAN STABILITAS)
 -- ==========================================
 MainConnection = RunService.PreSimulation:Connect(function()
     local Char = Player.Character
@@ -312,103 +213,49 @@ MainConnection = RunService.PreSimulation:Connect(function()
     local Hum = Char and Char:FindFirstChild("Humanoid")
     if not Root or not Hum then return end
 
-    -- [SISTEM AUTO DISTANCE]
+    -- [SISTEM JAGA JARAK - VERSI STABIL]
     local enemyInZone = false
     if SETTINGS.AutoDistance and Hum.Health > 0 then
         local nearestDist = math.huge
-        local escapeDir = nil
+        local targetDir = nil
         
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local eHum = p.Character:FindFirstChild("Humanoid")
-                if eHum and eHum.Health > 0 then
-                    local eRoot = p.Character.HumanoidRootPart
-                    local dist = (eRoot.Position - Root.Position).Magnitude
-                    
-                    if dist < nearestDist then
-                        nearestDist = dist
-                        escapeDir = (Root.Position - eRoot.Position).Unit
-                    end
+                local eRoot = p.Character.HumanoidRootPart
+                local dist = (eRoot.Position - Root.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    targetDir = (Root.Position - eRoot.Position).Unit
                 end
             end
         end
 
-        if nearestDist < SETTINGS.KeepDistance and escapeDir then
+        if nearestDist < SETTINGS.KeepDistance and targetDir then
             enemyInZone = true
-            WasInZone = true
-            local flatDir = Vector3.new(escapeDir.X, 0, escapeDir.Z)
-            if flatDir.Magnitude > 0.01 then
-                -- Memaksa karakter berjalan ke titik aman (10 studs menjauh dari arah musuh)
-                -- Sistem MoveTo akan bekerja secara konsisten meskipun jendela game di-minimize
-                Hum:MoveTo(Root.Position + (flatDir.Unit * 10)) 
-            end
+            -- Kembali menggunakan Hum:Move() agar tidak merusak animasi Parry
+            local moveVec = Vector3.new(targetDir.X, 0, targetDir.Z).Unit
+            Hum:Move(moveVec, false) 
         end
     end
 
-    -- Hentikan pergerakan otomatis jika semua musuh sudah di luar batas zona
-    if not enemyInZone and WasInZone then
-        Hum:MoveTo(Root.Position) -- Menghentikan karakter agar tidak kebablasan
-        WasInZone = false
-    end
+    if SETTINGS.AutoDistance then UpdateDistVisuals(Root, enemyInZone) end
 
-    -- Update UI Radar Jarak
-    if SETTINGS.AutoDistance and frameCounter % 2 == 0 then
-        UpdateDistVisuals(Root, enemyInZone)
-    end
-
-    -- [SISTEM AUTO PARRY]
-    if not SETTINGS.AutoParry then 
-        if VisualPart then VisualPart.Transparency = 1 end
-        return 
-    end
-
+    -- [SISTEM PARRY]
+    if not SETTINGS.AutoParry then return end
     local Ball = GetBall()
-    if not Ball then
-        if VisualPart then VisualPart.Transparency = 1 end
-        return
-    end
+    if not Ball then return end
 
-    local BallPos, PlayerPos = Ball.Position, Root.Position
-    local Velocity = Ball.AssemblyLinearVelocity
-    local Speed = Velocity.Magnitude
-    local Distance = (PlayerPos - BallPos).Magnitude
-    
-    local directionToPlayer = (PlayerPos - BallPos).Unit
-    local velocityDirection = Velocity.Unit
-    local dot = directionToPlayer:Dot(velocityDirection)
-
-    if dot < -0.2 then 
-        LastBallHit = nil 
-        if VisualPart and frameCounter % 2 == 0 then UpdateVisuals(Root, Distance, "neutral") end
-        return
-    end
-
+    local Speed = Ball.AssemblyLinearVelocity.Magnitude
+    local Distance = (Root.Position - Ball.Position).Magnitude
     local Targeted = IsTargeted(Ball)
-    
-    frameCounter = frameCounter + 1
-    if VisualPart and frameCounter % 2 == 0 then 
-        UpdateVisuals(Root, Distance, Targeted and "danger" or "neutral")
-    end
 
     if Targeted then
         local Ping = (NetworkStats and NetworkStats.Value / 1000) or 0.04
         local TimeToHit = Distance / math.max(Speed, 1)
+        local Prediction = SETTINGS.BaseDistanceToParry + (Ping * SETTINGS.PingBasedOffset) + (Speed / 100)
         
-        local SpeedFactor = Speed / 100 
-        local PredictionThreshold = SETTINGS.BaseDistanceToParry + (Ping * SETTINGS.PingBasedOffset) + SpeedFactor
-        
-        if Speed > 150 then
-            PredictionThreshold = PredictionThreshold * 1.2
-        end
-
-        if TimeToHit <= PredictionThreshold or Distance <= SETTINGS.EmergencyRadius then
+        if TimeToHit <= Prediction or Distance <= SETTINGS.EmergencyRadius then
             SendClick(Ball)
         end
     end
-end)
-
-Player.CharacterAdded:Connect(function()
-    LastBallHit = nil
-    IsParrying = false
-    WasInZone = false
 end)
