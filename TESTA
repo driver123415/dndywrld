@@ -2,58 +2,24 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
--- Mengambil Remote Events
 local promptInputResult = ReplicatedStorage:WaitForChild("PromptInputResult")
 local cutsceneEvent = ReplicatedStorage:WaitForChild("DuckCutsceneFinished")
 
 print("==================================================")
-print("🦆 MEMULAI PROTOKOL AUTO-FINISH DUCK PUZZLE...")
+print("🦆 MEMULAI PROTOKOL AUTO-FINISH DUCK (TOUCH FIX)...")
 print("==================================================")
 
--- 1. DATABASE JAWABAN PUZZLE PEDESTAL
--- Ini adalah data yang kamu kumpulkan. Script akan mengirimnya ke server satu per satu.
-local puzzleAnswers = {
-	{"CSG", "contained"},
-	{"OOP", "be"},
-	{"ModuleScripts", "cannot"},
-	{"VoiceChat", "i"},
-	{"Optimization", "understand"},
-	{"DataStores", "i"},
-	{"OutdoorLighting", "i"},
-	{"MovingObjects", "hear"},
-	{"IslandJumperPedestal", "break"},
-	{"UIFundamentals", "i"},
-	{"2D3DAudio", "devforum"},
-	{"LightSources", "to"},
-	{"ProximityPrompts", "go"},
-	{"ScoreBars", "seal"},
-	{"IndoorLighting", "this"},
-	{"SpinningObjectsPedestal", "know"},
-	{"Volcanoes", "you"},
-	{"Waterfalls", "can"},
-	{"UGC", "me"},
-	{"MakeanObby", "but"}
-}
-
-print("1️⃣ Membuka semua Duck di Pedestal (Mengirim Password)...")
-for _, data in ipairs(puzzleAnswers) do
-	local pedestalName = data[1]
-	local password = data[2]
-	
-	-- Menembak jawaban ke server
-	promptInputResult:FireServer(pedestalName, password)
-	print("   ✅ Password dikirim untuk: " .. pedestalName)
-	
-	-- Jeda 0.1 detik agar server tidak menganggap spam
-	task.wait(0.1)
-end
-print("Semua puzzle selesai dijawab!")
-task.wait(1)
-
--- Fungsi bantuan untuk mengeksekusi ProximityPrompt (Tombol E) di sekitar karakter
-local function firePromptsNearMe(radius)
+local function getHRP()
 	local char = player.Character
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if char then
+		return char:FindFirstChild("HumanoidRootPart")
+	end
+	return nil
+end
+
+-- Fungsi khusus untuk menekan tombol 'E' (Proximity) di sekitar karakter
+local function firePromptsNearMe(radius)
+	local hrp = getHRP()
 	if hrp then
 		for _, prompt in ipairs(workspace:GetDescendants()) do
 			if prompt:IsA("ProximityPrompt") then
@@ -69,48 +35,118 @@ local function firePromptsNearMe(radius)
 	end
 end
 
--- 2. TELEPORT KE NPC & TRIGGER CUTSCENE
-print("\n2️⃣ Menuju NPC RightLowerArm untuk Cutscene Final...")
-local char = player.Character
-local hrp = char and char:FindFirstChild("HumanoidRootPart")
+-- Fungsi untuk memastikan sentuhan fisik (Touch) terdeteksi server
+local function touchTeleport(targetCFrame)
+	local hrp = getHRP()
+	if hrp then
+		-- Teleport ke titik pas
+		hrp.CFrame = targetCFrame
+		task.wait(0.3)
+		
+		-- Jiggle: Gerakkan karakter sedikit ke atas lalu biarkan jatuh
+		-- Ini memaksa physics engine Roblox mendeteksi event .Touched
+		hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0)
+		task.wait(0.3)
+	end
+end
 
+-- ==================================================
+-- 1. DATABASE 10 DUCK GRATIS (Tanpa Password)
+-- ==================================================
+local freeDucks = {
+	{"Duck_01", CFrame.new(19.5500641, 65.194191, -545.32135, -0.994764447, 0.0368720219, -0.0953106731, 0.0334633887, 0.998750448, 0.037118163, 0.0965601951, 0.0337344147, -0.994755387)},
+	{"Duck_02", CFrame.new(-380.417389, 55.0314407, -859.367493, 0.000854372978, 0.000183247001, 0.999999642, -0.00030527261, 0.99999994, -0.00018298623, -0.999999642, -0.000305116148, 0.000854432583)},
+	{"Duck_03", CFrame.new(-34.8758507, 120.210716, -750.615601, -0.262852669, 0.000169561303, -0.964836061, 0.000379186589, 0.99999994, 7.24383281e-05, 0.964835942, -0.000346812274, -0.262852788)},
+	{"Duck_04", CFrame.new(-104.640755, 40.8837166, -425.458527, -0.493898749, 0.000136967486, -0.86951977, 0.000310661737, 0.99999994, -1.89390412e-05, 0.86951977, -0.000279480417, -0.493898749)},
+	{"Duck_05", CFrame.new(80.5091553, 136.929749, -860.729248, 0.000854372978, 0.000183247001, 0.999999642, -0.00030527261, 0.99999994, -0.00018298623, -0.999999642, -0.000305116148, 0.000854432583)},
+	{"Duck_06", CFrame.new(214.795792, 73.5120087, -771.931396, -0.547461867, 0.000145668775, -0.836830616, 0.000309914496, 0.99999994, -2.867679e-05, 0.836830616, -0.0002750454, -0.547461867)},
+	{"Duck_07", CFrame.new(-319.933502, 109.686165, -437.97702, 0.000854372978, 0.000183247001, 0.999999642, -0.00030527261, 0.99999994, -0.00018298623, -0.999999642, -0.000305116148, 0.000854432583)},
+	{"Duck_08", CFrame.new(97.7089767, 99.8047104, -733.997437, -0.546969295, 0.000145587808, -0.837153018, 0.000309922994, 0.99999994, -2.85855494e-05, 0.837153018, -0.000275088329, -0.546969295)},
+	{"Duck_10", CFrame.new(431.889374, 154.84198, -277.105011, 0.000854372978, 0.000183247001, 0.999999642, -0.00030527261, 0.99999994, -0.00018298623, -0.999999642, -0.000305116148, 0.000854432583)},
+	{"Duck_11", CFrame.new(267.506348, 111.13633, -517.077332, 0.51707536, 0.000140708871, 0.855939984, -0.000310379342, 0.99999994, 2.31098966e-05, -0.855939984, -0.000277615589, 0.51707536)}
+}
+
+print("1️⃣ Mengambil 10 Duck Gratis (Menyentuh objek)...")
+for _, duck in ipairs(freeDucks) do
+	print("   -> Teleport & Menyentuh: " .. duck[1])
+	touchTeleport(duck[2])
+end
+print("✅ Selesai mengambil Duck gratis!\n")
+
+-- ==================================================
+-- 2. DATABASE 20 DUCK PEDESTAL (Password + CFrame)
+-- ==================================================
+local pedestalDucks = {
+	{"CSG", "contained", CFrame.new(-295.188873, 112.899704, -630.343994, -0.97252202, 0.0249951389, 0.231468692, 0.012367988, 0.998362958, -0.0558439046, -0.232485563, -0.0514465459, -0.97123903)},
+	{"OOP", "be", CFrame.new(-244.914917, 126.710068, -553.813416, -0.999845982, 0.000174917586, 0.0176090021, 0.000170357249, 0.999999881, -0.000260476198, -0.017609043, -0.000257436041, -0.999845982)},
+	{"ModuleScripts", "cannot", CFrame.new(-309.33786, 126.711906, -550.403748, -0.999308646, 0.00017743159, 0.0371983536, 0.000167796796, 0.999999881, -0.000262132846, -0.0371983945, -0.000255709718, -0.999308646)},
+	{"VoiceChat", "i", CFrame.new(-374.172455, 126.722633, -549.263, -0.999813914, 0.000170132334, -0.0193352662, 0.000175139736, 0.99999994, -0.000257284933, 0.0193352196, -0.000260623201, -0.999813974)},
+	{"Optimization", "understand", CFrame.new(-338.983154, 126.801903, -479.855042, 0.999878526, 0.000174661764, -0.0156237958, -0.000170615822, 0.99999994, 0.000260307075, 0.0156238405, -0.000257609237, 0.999878645)},
+	{"DataStores", "i", CFrame.new(-269.983948, 129.789291, -482.672028, 0.999024689, -0.00369764003, -0.0440146327, 0.00372424442, 0.999992907, 0.000522401533, 0.0440123901, -0.000685812091, 0.999031484)},
+	{"OutdoorLighting", "i", CFrame.new(134.283737, 70.7733002, -614.743164, -0.712980747, -0.000917642901, 0.701184034, -0.00451474125, 0.999984443, -0.00328201009, -0.701170027, -0.00550566707, -0.712973714)},
+	{"MovingObjects", "hear", CFrame.new(177.005615, 69.5251236, -667.626709, 0.146888405, -0.00237442809, 0.989150882, -0.00145927491, 0.99999553, 0.00261716545, -0.98915261, -0.00182787166, 0.146884307)},
+	{"IslandJumperPedestal", "break", CFrame.new(179.585403, 70.7202911, -510.972168, 0.89656508, 0.000162583878, -0.442913443, -5.5364635e-06, 0.99999994, 0.000355872035, 0.442913502, -0.000316609774, 0.89656508)},
+	{"UIFundamentals", "i", CFrame.new(233.48468, 70.1961975, -585.662109, -0.989584625, 0.0259781647, 0.14159295, 0.0184322316, 0.998351932, -0.0543468595, -0.142771438, -0.0511708781, -0.988432705)},
+	{"2D3DAudio", "devforum", CFrame.new(429.809845, 71.2321091, -538.56427, -0.823597789, 0.037357159, 0.565943897, 0.00548808975, 0.998306692, -0.0579102822, -0.567149043, -0.044588767, -0.822408259)},
+	{"LightSources", "to", CFrame.new(476.690979, 70.7720108, -496.358673, -0.272512764, 0.0456352942, 0.96107012, -0.0171443783, 0.998485565, -0.052273307, -0.962000132, -0.0307220444, -0.271317661)},
+	{"ProximityPrompts", "go", CFrame.new(460.169861, 70.5654068, -420.979492, 0.670047343, 0.0386461206, 0.741312802, -0.0285587311, 0.999246538, -0.0262795482, -0.741769791, -0.00356240082, 0.670646191)},
+	{"ScoreBars", "seal", CFrame.new(395.199799, 70.6514816, -399.82785, 0.969407856, 0.00988442451, -0.245258868, -0.0106737772, 0.99994117, -0.00188937271, 0.245225772, 0.00444940478, 0.969456494)},
+	{"IndoorLighting", "this", CFrame.new(342.888428, 70.7176132, -429.131897, 0.812714279, 0.000187842976, -0.582663357, 2.34811196e-05, 0.999999881, 0.000355139724, 0.582663298, -0.000302308181, 0.812714398)},
+	{"SpinningObjectsPedestal", "know", CFrame.new(296.88562, 69.678894, -631.401184, -0.908782959, -0.00141792966, 0.417268395, -0.0017866306, 0.999998271, -0.000493040541, -0.417266935, -0.00119356974, -0.908783913)},
+	{"Volcanoes", "you", CFrame.new(302.91394, 71.8266983, -777.011963, -0.555256307, -0.0205782503, 0.831425369, -0.0162644535, 0.999771357, 0.0138829444, -0.831520975, -0.0058140792, -0.555464029)},
+	{"Waterfalls", "can", CFrame.new(199.305771, 85.4618454, -774.37323, 0.756457567, -0.00241057295, 0.654039443, 0.000663460116, 0.99999553, 0.00291830488, -0.654043436, -0.00177364179, 0.756455779)},
+	{"UGC", "me", CFrame.new(31.6809273, 83.3518219, -850.315552, 0.645308673, -0.00240754173, -0.763918936, 0.00291647296, 0.99999547, -0.000687911408, 0.763917148, -0.00178403128, 0.645312905)},
+	{"MakeanObby", "but", CFrame.new(-183.775513, 115.986252, -490.655731, 0.557425797, 0.000355383498, -0.830227494, 5.06852411e-05, 0.999999821, 0.00046208725, 0.830227554, -0.000299659179, 0.557425737)}
+}
+
+print("2️⃣ Membuka & Mengambil 20 Duck dari Pedestal...")
+for _, data in ipairs(pedestalDucks) do
+	local pedestalName = data[1]
+	local password = data[2]
+	local duckCFrame = data[3]
+	
+	promptInputResult:FireServer(pedestalName, password)
+	task.wait(0.2) 
+	
+	print("   -> Buka, Teleport, & Menyentuh: " .. pedestalName)
+	touchTeleport(duckCFrame)
+end
+print("✅ Seluruh 30 Duck terkumpul!\n")
+
+-- ==================================================
+-- 3. TELEPORT KE NPC & TRIGGER CUTSCENE (PROXIMITY)
+-- ==================================================
+print("3️⃣ Menuju NPC RightLowerArm untuk Cutscene Final...")
+local hrp = getHRP()
 if hrp then
-	-- Koordinat NPC yang kamu temukan
 	local npcCFrame = CFrame.new(-243.319672, 66.2359161, -730.588928, 0.129616991, -0.084891215, -0.987923563, 0.0729253292, 0.994446397, -0.0758837909, 0.988878846, -0.0622088276, 0.135087863)
-	
-	-- Pindah ke NPC
 	hrp.CFrame = npcCFrame
-	task.wait(0.5) -- Tunggu server menyadari kita pindah
+	task.wait(0.8) 
 	
-	-- Eksekusi interaksi dengan NPC
+	-- Di sini baru kita gunakan ProximityPrompt
 	firePromptsNearMe(15) 
 	task.wait(0.5)
 	
-	-- Menembak event cutscene 30 duck
 	cutsceneEvent:FireServer("NPC_FirstTime_All30")
-	print("   ✅ Cutscene berhasil di-trigger!")
+	print("✅ Cutscene di-trigger!\n")
+	task.wait(1.5)
 	
-	task.wait(1.5) -- Jeda sebelum teleport terakhir agar tidak *glitch*
-	
-	-- 3. TELEPORT KE FINAL ITEM & KLAIM
-	print("\n3️⃣ Menuju lokasi item final...")
-	
-	-- Koordinat item final yang kamu temukan
+-- ==================================================
+-- 4. TELEPORT KE FINAL ITEM & KLAIM (PROXIMITY)
+-- ==================================================
+	print("4️⃣ Menuju lokasi item final...")
 	local itemCFrame = CFrame.new(-235.199097, 78.6688232, -777.403625, -0.296778828, 1.86118303e-08, 0.95494622, -2.75188246e-08, 1, -2.80422423e-08, -0.95494622, -3.46013422e-08, -0.296778828)
 	
-	-- Pindah ke Final Item
 	hrp.CFrame = itemCFrame
-	task.wait(0.5) -- Tunggu *map* ter-load (StreamingEnabled)
+	task.wait(0.8) 
 	
-	-- Eksekusi interaksi "???" pada item final
+	-- Dan proximity terakhir untuk mengklaim "???"
 	firePromptsNearMe(15)
-	
-	print("   ✅ Mencoba mengklaim Final Item!")
+	print("✅ Mencoba mengklaim Final Item!")
 else
 	print("❌ Gagal: Karakter tidak ditemukan.")
 end
 
 print("==================================================")
 print("🏆 SELURUH PROSES SELESAI!")
-print("Silakan cek inventory/badge kamu untuk memastikan itemnya masuk.")
 print("==================================================")
