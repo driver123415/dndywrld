@@ -23,7 +23,7 @@ local SETTINGS = {
     EmergencyRadius = 15,
     OptimizerOn = false,
     AutoDistance = false,
-    SafeRadius = 18  -- Jarak aman dari player lain (studs)
+    SafeRadius = 60  -- Jarak aman dari player lain (studs)
 }
 
 local LastClick = 0
