@@ -1,6 +1,6 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1.1 (SENSITIVITY UPDATE)
-    Fitur: Real-time Ping, Dot Product Math, FPS Optimizer, Smart Visualizer, Custom GUI
+    THE ULTIMATE AUTO PARRY V1.2 (REAL PLAYER FIX)
+    Fix: Memperbaiki bug tidak merespon pada player asli & bola melengkung (curveball).
 ]]
 
 local Players = game:GetService("Players")
@@ -12,14 +12,14 @@ local CoreGui = game:GetService("CoreGui")
 
 local Player = Players.LocalPlayer
 
--- Konfigurasi Global (Diperbarui agar lebih sensitif)
+-- Konfigurasi Global
 local SETTINGS = {
     AutoParry = false,
     Visuals = false,
-    PingBasedOffset = 2.5,   -- Lebih waspada terhadap lag server
-    DistanceToParry = 1.2,   -- Menangkis sedikit lebih awal
-    EmergencyRadius = 18,    -- Kalau bola masuk jarak 18, paksa tangkis
-    ClashDistance = 25,      -- Mulai spam klik dari jarak sedikit lebih jauh
+    PingBasedOffset = 2.5,   
+    DistanceToParry = 1.2,   
+    EmergencyRadius = 18,    
+    ClashDistance = 25,      
     ClashSpeed = 0.01,
     NormalSpeed = 0.05,
     OptimizerOn = false
@@ -116,8 +116,16 @@ local function GetBall()
     return nil
 end
 
-local function IsTargeted()
+-- [UPDATE V1.2] Deteksi Target Jauh Lebih Akurat untuk Real Player
+local function IsTargeted(ball)
     if not Player.Character then return false end
+    
+    -- Deteksi Server Mutlak (Prioritas Utama untuk Player Asli)
+    if ball and ball:GetAttribute("target") == Player.Name then
+        return true
+    end
+    
+    -- Deteksi Visual/Atribut (Cadangan untuk Bot)
     return Player.Character:GetAttribute("Targeted") == true 
         or Player.Character:FindFirstChild("Highlight") ~= nil
 end
@@ -127,7 +135,6 @@ local function SendClick(isClashing, ball)
     local now = tick()
     local cd = isClashing and SETTINGS.ClashSpeed or SETTINGS.NormalSpeed
     
-    -- Anti-spam diturunkan agar lebih cepat bereaksi ulang
     if not isClashing and LastBallHit == ball and (now - LastClick) < 0.2 then return end
     if (now - LastClick) < cd then return end
     
@@ -136,7 +143,7 @@ local function SendClick(isClashing, ball)
     LastBallHit = ball
     
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-    task.wait(0.035) -- Durasi ditahan sedikit lebih lama agar terbaca server
+    task.wait(0.035) 
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
     
     task.delay(cd, function() IsParrying = false end)
@@ -172,9 +179,9 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Auto Parry v1.1"
+Title.Text = "Ultimate Auto Parry v1.2"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 14
+Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -278,13 +285,8 @@ MainConnection = RunService.PostSimulation:Connect(function()
     local Speed = Velocity.Magnitude
     local Distance = (PlayerPos - BallPos).Magnitude
     
-    local directionToPlayer = (PlayerPos - BallPos).Unit
-    local velocityDirection = Velocity.Unit
-    local dot = directionToPlayer:Dot(velocityDirection)
-
-    if dot < 0 then LastBallHit = nil end 
-
-    local Targeted = IsTargeted()
+    -- [UPDATE V1.2] Mengirimkan variabel 'Ball' ke fungsi IsTargeted
+    local Targeted = IsTargeted(Ball)
     local IsClashing = Targeted and Distance <= SETTINGS.ClashDistance
     
     frameCounter = frameCounter + 1
@@ -292,9 +294,10 @@ MainConnection = RunService.PostSimulation:Connect(function()
         UpdateVisuals(Root, Distance, IsClashing and "clash" or (Targeted and "target" or "neutral"))
     end
 
+    -- [UPDATE V1.2] Menghapus syarat 'dot > 0' agar tetap merespon curveball dari player asli
     if IsClashing then
         SendClick(true, Ball)
-    elseif Targeted and dot > 0 then
+    elseif Targeted then
         local Ping = (NetworkStats and NetworkStats.Value / 1000) or 0.04
         local TimeToHit = Distance / math.max(Speed, 1)
         
