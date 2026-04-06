@@ -1,4 +1,4 @@
---!native
+--!native simplespy anti spam remote edited jika spam langsung auto exclude - bisa geser geser
 --50/50 this breaks but it's a beta for a reason!
 
 if getgenv().SimpleSpyExecuted and type(getgenv().SimpleSpyShutdown) == "function" then
