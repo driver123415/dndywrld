@@ -1,116 +1,329 @@
---Path Deteksi + CFrame Copyer
-local player = game.Players.LocalPlayer
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 
--- Membuat ScreenGui
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "PartInfoGui"
-screenGui.Parent = player:WaitForChild("PlayerGui")
+-- Menggunakan CoreGui agar aman dari deteksi game (jika executor support), fallback ke PlayerGui
+local parentGui = pcall(function() return CoreGui.Name end) and CoreGui or player:WaitForChild("PlayerGui")
 
--- Membuat Frame untuk GUI
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0.4, 0, 0.4, 0)
-frame.Position = UDim2.new(0.3, 0, 0.3, 0)
-frame.BackgroundColor3 = Color3.new(1, 1, 1)
-frame.Parent = screenGui
-
--- Tombol Close
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0.15, 0, 0.15, 0)
-closeButton.Position = UDim2.new(0.85, 0, 0, 0)
-closeButton.Text = "Close"
-closeButton.TextScaled = true
-closeButton.Parent = frame
-
--- Label untuk menampilkan Nama Part
-local partNameLabel = Instance.new("TextLabel")
-partNameLabel.Size = UDim2.new(1, 0, 0.2, 0)
-partNameLabel.Position = UDim2.new(0, 0, 0.2, 0)
-partNameLabel.TextScaled = true
-partNameLabel.Parent = frame
-
--- Label untuk menampilkan CFrame Part
-local cframeLabel = Instance.new("TextLabel")
-cframeLabel.Size = UDim2.new(1, 0, 0.2, 0)
-cframeLabel.Position = UDim2.new(0, 0, 0.45, 0)
-cframeLabel.TextScaled = true
-cframeLabel.Parent = frame
-
--- Tombol Copy Nama Part
-local copyPartNameButton = Instance.new("TextButton")
-copyPartNameButton.Size = UDim2.new(1, 0, 0.2, 0)
-copyPartNameButton.Position = UDim2.new(0, 0, 0.7, 0)
-copyPartNameButton.Text = "Copy Part Name"
-copyPartNameButton.TextScaled = true
-copyPartNameButton.Parent = frame
-
--- Tombol Copy CFrame Part
-local copyCFrameButton = Instance.new("TextButton")
-copyCFrameButton.Size = UDim2.new(1, 0, 0.2, 0)
-copyCFrameButton.Position = UDim2.new(0, 0, 0.9, 0)
-copyCFrameButton.Text = "Copy CFrame"
-copyCFrameButton.TextScaled = true
-copyCFrameButton.Parent = frame
-
--- Fungsi untuk copy text ke clipboard
-local function copyToClipboard(text, label)
-    setclipboard(text)
-    label.BackgroundColor3 = Color3.new(0, 1, 0) -- Ganti warna jadi hijau
-    wait(1) -- Tunggu 1 detik
-    label.BackgroundColor3 = Color3.new(1, 1, 1) -- Kembalikan ke warna asli
+-- Hapus GUI lama jika sudah ada (mencegah duplikat saat re-execute)
+if parentGui:FindFirstChild("DevToolGUI") then
+	parentGui.DevToolGUI:Destroy()
 end
 
--- Update GUI saat mouse menunjuk ke part dan di-klik
+-- ==========================================
+-- MEMBUAT UI ELEMENTS
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DevToolGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = parentGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -140)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- TOP BAR (Untuk Dragging)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+local TopBarHider = Instance.new("Frame")
+TopBarHider.Size = UDim2.new(1, 0, 0, 10)
+TopBarHider.Position = UDim2.new(0, 0, 1, -10)
+TopBarHider.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBarHider.BorderSizePixel = 0
+TopBarHider.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Inspector & Teleporter"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- TOMBOL MINIMIZE & CLOSE
+local MinButton = Instance.new("TextButton")
+MinButton.Size = UDim2.new(0, 30, 0, 30)
+MinButton.Position = UDim2.new(1, -60, 0, 0)
+MinButton.BackgroundTransparency = 1
+MinButton.Text = "-"
+MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinButton.Font = Enum.Font.GothamBold
+MinButton.TextSize = 18
+MinButton.Parent = TopBar
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 14
+CloseButton.Parent = TopBar
+
+-- AREA KONTEN (Disembunyikan saat di-minimize)
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- --- BAGIAN 1: DETECTOR ---
+local InspectorTitle = Instance.new("TextLabel")
+InspectorTitle.Size = UDim2.new(1, -20, 0, 20)
+InspectorTitle.Position = UDim2.new(0, 10, 0, 5)
+InspectorTitle.BackgroundTransparency = 1
+InspectorTitle.Text = "[ Click any part to inspect ]"
+InspectorTitle.TextColor3 = Color3.fromRGB(150, 150, 150)
+InspectorTitle.Font = Enum.Font.Gotham
+InspectorTitle.TextSize = 12
+InspectorTitle.Parent = ContentFrame
+
+local PartNameLabel = Instance.new("TextLabel")
+PartNameLabel.Size = UDim2.new(1, -20, 0, 20)
+PartNameLabel.Position = UDim2.new(0, 10, 0, 30)
+PartNameLabel.BackgroundTransparency = 1
+PartNameLabel.Text = "Name: None"
+PartNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+PartNameLabel.Font = Enum.Font.GothamSemibold
+PartNameLabel.TextSize = 13
+PartNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+PartNameLabel.Parent = ContentFrame
+
+local CFrameLabel = Instance.new("TextLabel")
+CFrameLabel.Size = UDim2.new(1, -20, 0, 35)
+CFrameLabel.Position = UDim2.new(0, 10, 0, 50)
+CFrameLabel.BackgroundTransparency = 1
+CFrameLabel.Text = "CFrame: None"
+CFrameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+CFrameLabel.Font = Enum.Font.Gotham
+CFrameLabel.TextSize = 11
+CFrameLabel.TextWrapped = true
+CFrameLabel.TextXAlignment = Enum.TextXAlignment.Left
+CFrameLabel.TextYAlignment = Enum.TextYAlignment.Top
+CFrameLabel.Parent = ContentFrame
+
+local CopyNameBtn = Instance.new("TextButton")
+CopyNameBtn.Size = UDim2.new(0.45, 0, 0, 30)
+CopyNameBtn.Position = UDim2.new(0, 10, 0, 90)
+CopyNameBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+CopyNameBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyNameBtn.Font = Enum.Font.GothamBold
+CopyNameBtn.TextSize = 12
+CopyNameBtn.Text = "Copy Name"
+CopyNameBtn.Parent = ContentFrame
+Instance.new("UICorner", CopyNameBtn).CornerRadius = UDim.new(0, 6)
+
+local CopyCFrameBtn = Instance.new("TextButton")
+CopyCFrameBtn.Size = UDim2.new(0.45, 0, 0, 30)
+CopyCFrameBtn.Position = UDim2.new(0.55, -10, 0, 90)
+CopyCFrameBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+CopyCFrameBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CopyCFrameBtn.Font = Enum.Font.GothamBold
+CopyCFrameBtn.TextSize = 12
+CopyCFrameBtn.Text = "Copy CFrame"
+CopyCFrameBtn.Parent = ContentFrame
+Instance.new("UICorner", CopyCFrameBtn).CornerRadius = UDim.new(0, 6)
+
+-- GARIS PEMISAH
+local Divider = Instance.new("Frame")
+Divider.Size = UDim2.new(1, -20, 0, 2)
+Divider.Position = UDim2.new(0, 10, 0, 135)
+Divider.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+Divider.BorderSizePixel = 0
+Divider.Parent = ContentFrame
+
+-- --- BAGIAN 2: TELEPORTER ---
+local TeleportTitle = Instance.new("TextLabel")
+TeleportTitle.Size = UDim2.new(1, -20, 0, 20)
+TeleportTitle.Position = UDim2.new(0, 10, 0, 145)
+TeleportTitle.BackgroundTransparency = 1
+TeleportTitle.Text = "Manual Teleport (Paste X,Y,Z)"
+TeleportTitle.TextColor3 = Color3.fromRGB(150, 150, 150)
+TeleportTitle.Font = Enum.Font.Gotham
+TeleportTitle.TextSize = 12
+TeleportTitle.Parent = ContentFrame
+
+local CoordInput = Instance.new("TextBox")
+CoordInput.Size = UDim2.new(1, -20, 0, 35)
+CoordInput.Position = UDim2.new(0, 10, 0, 165)
+CoordInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CoordInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+CoordInput.Font = Enum.Font.Gotham
+CoordInput.TextSize = 12
+CoordInput.PlaceholderText = "Paste koordinat di sini..."
+CoordInput.Text = ""
+CoordInput.ClearTextOnFocus = false
+CoordInput.Parent = ContentFrame
+Instance.new("UICorner", CoordInput).CornerRadius = UDim.new(0, 6)
+
+local TeleportBtn = Instance.new("TextButton")
+TeleportBtn.Size = UDim2.new(1, -20, 0, 35)
+TeleportBtn.Position = UDim2.new(0, 10, 0, 205)
+TeleportBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+TeleportBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TeleportBtn.Font = Enum.Font.GothamBold
+TeleportBtn.TextSize = 14
+TeleportBtn.Text = "Teleport"
+TeleportBtn.Parent = ContentFrame
+Instance.new("UICorner", TeleportBtn).CornerRadius = UDim.new(0, 6)
+
+-- ==========================================
+-- LOGIKA DRAGGING (Geser UI)
+-- ==========================================
+local dragging, dragInput, mousePos, framePos
+
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		mousePos = input.Position
+		framePos = MainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - mousePos
+		MainFrame.Position = UDim2.new(
+			framePos.X.Scale, framePos.X.Offset + delta.X,
+			framePos.Y.Scale, framePos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+-- ==========================================
+-- LOGIKA TOMBOL MIN & CLOSE
+-- ==========================================
+local isMinimized = false
+MinButton.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		MainFrame:TweenSize(UDim2.new(0, 320, 0, 30), "Out", "Quad", 0.3, true)
+		ContentFrame.Visible = false
+	else
+		MainFrame:TweenSize(UDim2.new(0, 320, 0, 280), "Out", "Quad", 0.3, true)
+		ContentFrame.Visible = true
+	end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+end)
+
+-- ==========================================
+-- LOGIKA INSPECTOR & COPY
+-- ==========================================
+local currentTargetName = ""
+local currentTargetCFrame = ""
+
+-- Fungsi visual saat copy berhasil
+local function flashButton(btn, text)
+	local oriColor = btn.BackgroundColor3
+	local oriText = btn.Text
+	btn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	btn.Text = text
+	task.wait(1)
+	btn.BackgroundColor3 = oriColor
+	btn.Text = oriText
+end
+
+-- Update data saat klik part (TIDAK menyambungkan tombol copy di sini untuk mencegah bug)
 mouse.Button1Down:Connect(function()
-    local target = mouse.Target
-    if target and target:IsA("BasePart") then
-        -- Update label nama part dan CFrame
-        partNameLabel.Text = "Part Name: " .. target.Name
-        cframeLabel.Text = "CFrame: " .. tostring(target.CFrame)
-
-        -- Hubungkan tombol untuk copy nama part dan CFrame
-        copyPartNameButton.MouseButton1Click:Connect(function()
-            copyToClipboard(target.Name, partNameLabel)
-            print("Nama Part tercopy: " .. target.Name)
-        end)
-
-        copyCFrameButton.MouseButton1Click:Connect(function()
-            copyToClipboard(tostring(target.CFrame), cframeLabel)
-            print("CFrame Part tercopy: " .. tostring(target.CFrame))
-        end)
-    else
-        partNameLabel.Text = "Tidak ada part yang ditunjuk."
-        cframeLabel.Text = ""
-    end
+	local target = mouse.Target
+	if target and target:IsA("BasePart") then
+		currentTargetName = target.Name
+		currentTargetCFrame = tostring(target.CFrame)
+		
+		PartNameLabel.Text = "Name: " .. currentTargetName
+		CFrameLabel.Text = "CFrame: " .. currentTargetCFrame
+	end
 end)
 
--- Fungsi untuk tombol close
-closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
+-- Koneksi tombol copy (Hanya dibuat 1 kali, membaca dari variabel di atas)
+CopyNameBtn.MouseButton1Click:Connect(function()
+	if currentTargetName ~= "" then
+		local success = pcall(function() setclipboard(currentTargetName) end)
+		if success then
+			flashButton(CopyNameBtn, "Copied!")
+		else
+			flashButton(CopyNameBtn, "Error!")
+		end
+	end
 end)
 
--- Dragging functionality
-local isDragging = false
-local dragStart = nil
-local startPos = nil
-
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
+CopyCFrameBtn.MouseButton1Click:Connect(function()
+	if currentTargetCFrame ~= "" then
+		local success = pcall(function() setclipboard(currentTargetCFrame) end)
+		if success then
+			flashButton(CopyCFrameBtn, "Copied!")
+		else
+			flashButton(CopyCFrameBtn, "Error!")
+		end
+	end
 end)
 
-frame.InputChanged:Connect(function(input)
-    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-frame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isDragging = false
-    end
+-- ==========================================
+-- LOGIKA TELEPORT
+-- ==========================================
+TeleportBtn.MouseButton1Click:Connect(function()
+	local inputText = CoordInput.Text
+	inputText = string.gsub(inputText, " ", "") -- Hapus spasi
+	local coords = string.split(inputText, ",")
+	
+	if #coords >= 3 then
+		local x = tonumber(coords[1])
+		local y = tonumber(coords[2])
+		local z = tonumber(coords[3])
+		
+		if x and y and z then
+			local char = player.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			
+			if hrp then
+				hrp.CFrame = CFrame.new(x, y, z)
+				flashButton(TeleportBtn, "Success!")
+			end
+		else
+			CoordInput.Text = "Gunakan angka/format salah!"
+			task.wait(1.5)
+			CoordInput.Text = ""
+		end
+	else
+		CoordInput.Text = "Butuh minimal X, Y, Z!"
+		task.wait(1.5)
+		CoordInput.Text = ""
+	end
 end)
