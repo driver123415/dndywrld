@@ -1,7 +1,7 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1.6 (RADAR DISTANCE & FIX)
-    Fix: Memperbaiki bug karakter diam (Error NaN Vector) pada Auto Distance.
-    New: Menambahkan Cincin Radar Oranye untuk melihat radius Auto Distance.
+    THE ULTIMATE AUTO PARRY V1.7 (FORCE WALK & MULTI-BOX FIX)
+    Fix: Menggunakan MoveTo() agar karakter dipaksa menjauh walau jendela game sedang tidak fokus.
+    Fix: Menghentikan karakter dengan akurat saat sudah berada di luar zona bahaya.
 ]]
 
 local Players = game:GetService("Players")
@@ -19,7 +19,7 @@ local SETTINGS = {
     Visuals = false,
     OptimizerOn = false,
     AutoDistance = false,    
-    KeepDistance = 30,       -- Diubah jadi 30 agar lebih seimbang
+    KeepDistance = 30,       
     PingBasedOffset = 2.5,   
     BaseDistanceToParry = 1.0, 
     EmergencyRadius = 15     
@@ -29,8 +29,9 @@ local LastClick = 0
 local LastBallHit = nil
 local IsParrying = false
 local frameCounter = 0
+local WasInZone = false -- Memori agar karakter tahu kapan harus berhenti lari
 local VisualPart, VisualMesh
-local DistVisualPart, DistVisualMesh -- Visualizer untuk Auto Distance
+local DistVisualPart, DistVisualMesh
 local MainConnection
 
 local NetworkStats = Stats:FindFirstChild("Network") 
@@ -98,12 +99,11 @@ local function CreateDistVisualizer()
     DistVisualPart.CanCollide = false
     DistVisualPart.Transparency = 1
     DistVisualPart.Material = Enum.Material.Neon
-    DistVisualPart.Color = Color3.fromRGB(255, 150, 0) -- Warna Oranye
+    DistVisualPart.Color = Color3.fromRGB(255, 150, 0) 
     DistVisualPart.Size = Vector3.new(1, 1, 1)
     
     DistVisualMesh = Instance.new("SpecialMesh", DistVisualPart)
     DistVisualMesh.MeshId = "rbxassetid://3270017"
-    -- Ukuran dikunci sesuai angka KeepDistance
     DistVisualMesh.Scale = Vector3.new(SETTINGS.KeepDistance * 1.5, SETTINGS.KeepDistance * 1.5, 0.5)
 end
 
@@ -121,13 +121,12 @@ local function UpdateDistVisuals(root, isActive)
         return 
     end
     
-    -- Lingkaran oranye ditaruh sedikit lebih bawah dari cincin parry agar tidak bertumpuk jelek
     DistVisualPart.CFrame = root.CFrame * CFrame.new(0, -2.65, 0) * CFrame.Angles(math.rad(90), 0, 0)
     
     if isActive then
-        DistVisualPart.Transparency = 0.2 -- Menyala terang kalau ada musuh masuk radius
+        DistVisualPart.Transparency = 0.2 
     else
-        DistVisualPart.Transparency = 0.8 -- Redup kalau aman
+        DistVisualPart.Transparency = 0.8 
     end
 end
 
@@ -219,7 +218,7 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Parry v1.6"
+Title.Text = "Ultimate Parry v1.7"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -307,7 +306,6 @@ end)
 -- ==========================================
 -- 6. LOOP UTAMA (CORE ENGINE)
 -- ==========================================
--- Diubah ke PreSimulation agar input kaki dikirim sebelum fisika game dirender
 MainConnection = RunService.PreSimulation:Connect(function()
     local Char = Player.Character
     local Root = Char and Char:FindFirstChild("HumanoidRootPart")
@@ -337,12 +335,20 @@ MainConnection = RunService.PreSimulation:Connect(function()
 
         if nearestDist < SETTINGS.KeepDistance and escapeDir then
             enemyInZone = true
-            -- Mencegah Error NaN: Pastikan vektor tidak 0 setelah sumbu Y dibuang
+            WasInZone = true
             local flatDir = Vector3.new(escapeDir.X, 0, escapeDir.Z)
             if flatDir.Magnitude > 0.01 then
-                Hum:Move(flatDir.Unit, false) 
+                -- Memaksa karakter berjalan ke titik aman (10 studs menjauh dari arah musuh)
+                -- Sistem MoveTo akan bekerja secara konsisten meskipun jendela game di-minimize
+                Hum:MoveTo(Root.Position + (flatDir.Unit * 10)) 
             end
         end
+    end
+
+    -- Hentikan pergerakan otomatis jika semua musuh sudah di luar batas zona
+    if not enemyInZone and WasInZone then
+        Hum:MoveTo(Root.Position) -- Menghentikan karakter agar tidak kebablasan
+        WasInZone = false
     end
 
     -- Update UI Radar Jarak
@@ -404,4 +410,5 @@ end)
 Player.CharacterAdded:Connect(function()
     LastBallHit = nil
     IsParrying = false
+    WasInZone = false
 end)
