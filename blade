@@ -1,6 +1,6 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1.2 (REAL PLAYER FIX)
-    Fix: Memperbaiki bug tidak merespon pada player asli & bola melengkung (curveball).
+    THE ULTIMATE AUTO PARRY V1.3 (ANTI-CHOKE & SPAM FIX)
+    Fix: Menggunakan task.spawn agar radar tidak macet saat mengeklik, dan menstabilkan VirtualInputManager.
 ]]
 
 local Players = game:GetService("Players")
@@ -20,8 +20,8 @@ local SETTINGS = {
     DistanceToParry = 1.2,   
     EmergencyRadius = 18,    
     ClashDistance = 25,      
-    ClashSpeed = 0.01,
-    NormalSpeed = 0.05,
+    ClashSpeed = 0.05,       -- DIUBAH: Disesuaikan jadi 0.05 agar Virtual Input tidak nge-bug/macet
+    NormalSpeed = 0.15,      -- DIUBAH: Jeda normal dirapikan
     OptimizerOn = false
 }
 
@@ -116,22 +116,21 @@ local function GetBall()
     return nil
 end
 
--- [UPDATE V1.2] Deteksi Target Jauh Lebih Akurat untuk Real Player
 local function IsTargeted(ball)
     if not Player.Character then return false end
     
-    -- Deteksi Server Mutlak (Prioritas Utama untuk Player Asli)
     if ball and ball:GetAttribute("target") == Player.Name then
         return true
     end
     
-    -- Deteksi Visual/Atribut (Cadangan untuk Bot)
     return Player.Character:GetAttribute("Targeted") == true 
         or Player.Character:FindFirstChild("Highlight") ~= nil
 end
 
+-- [UPDATE V1.3] Penggunaan task.spawn agar loop tidak macet
 local function SendClick(isClashing, ball)
     if not SETTINGS.AutoParry or IsParrying then return end
+    
     local now = tick()
     local cd = isClashing and SETTINGS.ClashSpeed or SETTINGS.NormalSpeed
     
@@ -142,9 +141,12 @@ local function SendClick(isClashing, ball)
     LastClick = now
     LastBallHit = ball
     
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-    task.wait(0.035) 
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    -- Eksekusi klik di background thread (tidak menghentikan radar)
+    task.spawn(function()
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+        task.wait(0.015) -- Dibuat sangat singkat agar VIM tidak tumpang tindih
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    end)
     
     task.delay(cd, function() IsParrying = false end)
 end
@@ -179,7 +181,7 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Auto Parry v1.2"
+Title.Text = "Ultimate Auto Parry v1.3"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -285,7 +287,6 @@ MainConnection = RunService.PostSimulation:Connect(function()
     local Speed = Velocity.Magnitude
     local Distance = (PlayerPos - BallPos).Magnitude
     
-    -- [UPDATE V1.2] Mengirimkan variabel 'Ball' ke fungsi IsTargeted
     local Targeted = IsTargeted(Ball)
     local IsClashing = Targeted and Distance <= SETTINGS.ClashDistance
     
@@ -294,7 +295,6 @@ MainConnection = RunService.PostSimulation:Connect(function()
         UpdateVisuals(Root, Distance, IsClashing and "clash" or (Targeted and "target" or "neutral"))
     end
 
-    -- [UPDATE V1.2] Menghapus syarat 'dot > 0' agar tetap merespon curveball dari player asli
     if IsClashing then
         SendClick(true, Ball)
     elseif Targeted then
