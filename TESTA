@@ -1,23 +1,25 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 
 local promptInputResult = ReplicatedStorage:WaitForChild("PromptInputResult")
 local cutsceneEvent = ReplicatedStorage:WaitForChild("DuckCutsceneFinished")
 
 print("==================================================")
-print("🦆 MEMULAI PROTOKOL AUTO-FINISH DUCK (TOUCH FIX)...")
+print("🦆 MEMULAI PROTOKOL AUTO-FINISH DUCK & BORONG UGC...")
 print("==================================================")
 
+-- ==================================================
+-- FUNGSI BANTUAN (HELPER FUNCTIONS)
+-- ==================================================
 local function getHRP()
 	local char = player.Character
-	if char then
-		return char:FindFirstChild("HumanoidRootPart")
-	end
+	if char then return char:FindFirstChild("HumanoidRootPart") end
 	return nil
 end
 
--- Fungsi khusus untuk menekan tombol 'E' (Proximity) di sekitar karakter
 local function firePromptsNearMe(radius)
 	local hrp = getHRP()
 	if hrp then
@@ -25,8 +27,7 @@ local function firePromptsNearMe(radius)
 			if prompt:IsA("ProximityPrompt") then
 				local promptPart = prompt.Parent
 				if promptPart and promptPart:IsA("BasePart") then
-					local distance = (hrp.Position - promptPart.Position).Magnitude
-					if distance <= radius then
+					if (hrp.Position - promptPart.Position).Magnitude <= radius then
 						fireproximityprompt(prompt)
 					end
 				end
@@ -35,23 +36,18 @@ local function firePromptsNearMe(radius)
 	end
 end
 
--- Fungsi untuk memastikan sentuhan fisik (Touch) terdeteksi server
 local function touchTeleport(targetCFrame)
 	local hrp = getHRP()
 	if hrp then
-		-- Teleport ke titik pas
 		hrp.CFrame = targetCFrame
 		task.wait(0.3)
-		
-		-- Jiggle: Gerakkan karakter sedikit ke atas lalu biarkan jatuh
-		-- Ini memaksa physics engine Roblox mendeteksi event .Touched
-		hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0)
+		hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0) -- Jiggle untuk memastikan Touch
 		task.wait(0.3)
 	end
 end
 
 -- ==================================================
--- 1. DATABASE 10 DUCK GRATIS (Tanpa Password)
+-- 1. MENGAMBIL 10 DUCK GRATIS (Tanpa Password)
 -- ==================================================
 local freeDucks = {
 	{"Duck_01", CFrame.new(19.5500641, 65.194191, -545.32135, -0.994764447, 0.0368720219, -0.0953106731, 0.0334633887, 0.998750448, 0.037118163, 0.0965601951, 0.0337344147, -0.994755387)},
@@ -71,10 +67,10 @@ for _, duck in ipairs(freeDucks) do
 	print("   -> Teleport & Menyentuh: " .. duck[1])
 	touchTeleport(duck[2])
 end
-print("✅ Selesai mengambil Duck gratis!\n")
+print("✅ Selesai mengambil 10 Duck gratis!\n")
 
 -- ==================================================
--- 2. DATABASE 20 DUCK PEDESTAL (Password + CFrame)
+-- 2. MEMBUKA 20 PEDESTAL DUCK (Kirim Password + Ambil)
 -- ==================================================
 local pedestalDucks = {
 	{"CSG", "contained", CFrame.new(-295.188873, 112.899704, -630.343994, -0.97252202, 0.0249951389, 0.231468692, 0.012367988, 0.998362958, -0.0558439046, -0.232485563, -0.0514465459, -0.97123903)},
@@ -108,59 +104,51 @@ for _, data in ipairs(pedestalDucks) do
 	promptInputResult:FireServer(pedestalName, password)
 	task.wait(0.2) 
 	
-	print("   -> Buka, Teleport, & Menyentuh: " .. pedestalName)
+	print("   -> Buka & Menyentuh: " .. pedestalName)
 	touchTeleport(duckCFrame)
 end
 print("✅ Seluruh 30 Duck terkumpul!\n")
 
 -- ==================================================
--- 3. TELEPORT KE NPC & TRIGGER CUTSCENE (PROXIMITY)
+-- 3. TRIGGER CUTSCENE 30 DUCK (NPC RightLowerArm)
 -- ==================================================
 print("3️⃣ Menuju NPC RightLowerArm untuk Cutscene Final...")
 local hrp = getHRP()
 if hrp then
-	local npcCFrame = CFrame.new(-243.319672, 66.2359161, -730.588928, 0.129616991, -0.084891215, -0.987923563, 0.0729253292, 0.994446397, -0.0758837909, 0.988878846, -0.0622088276, 0.135087863)
-	hrp.CFrame = npcCFrame
+	hrp.CFrame = CFrame.new(-243.319672, 66.2359161, -730.588928, 0.129616991, -0.084891215, -0.987923563, 0.0729253292, 0.994446397, -0.0758837909, 0.988878846, -0.0622088276, 0.135087863)
 	task.wait(0.8) 
 	
-	-- Di sini baru kita gunakan ProximityPrompt
 	firePromptsNearMe(15) 
 	task.wait(0.5)
 	
-	cutsceneEvent:FireServer("NPC_FirstTime_All30")
+	pcall(function() cutsceneEvent:FireServer("NPC_FirstTime_All30") end)
 	print("✅ Cutscene di-trigger!\n")
 	task.wait(1.5)
-	
--- ==================================================
--- 4. TELEPORT KE FINAL ITEM & KLAIM (PROXIMITY + AUTO BUY UGC)
--- ==================================================
-	print("4️⃣ Menuju lokasi item final...")
-	local itemCFrame = CFrame.new(-235.199097, 78.6688232, -777.403625, -0.296778828, 1.86118303e-08, 0.95494622, -2.75188246e-08, 1, -2.80422423e-08, -0.95494622, -3.46013422e-08, -0.296778828)
-	
-	hrp.CFrame = itemCFrame
-	task.wait(1) -- Beri waktu lebih agar proximity ter-load
-	
-	-- Memicu Proximity Prompt terakhir ("???")
-	firePromptsNearMe(15)
-	print("✅ Mencoba mengklaim Final Item...")
+end
 
-	-- ===============================================
-	-- LOGIKA AUTO-BUY UGC (BYPASS COREGUI)
-	-- ===============================================
-	print("⏳ Menunggu pop-up Roblox Purchase muncul...")
-	task.wait(2.5) -- Beri waktu agar pop-up "Buy item" selesai *loading* muncul di layar
+-- ==================================================
+-- 4. DATABASE & LOGIKA BORONG SEMUA UGC (5 ITEM)
+-- ==================================================
+print("4️⃣ Memulai Protokol Borong UGC...")
 
-	local CoreGui = game:GetService("CoreGui")
-	local VirtualInputManager = game:GetService("VirtualInputManager")
+-- Kumpulan Item Final + 4 Item Baru
+local ugcItems = {
+	{"Final Item (Duck Head)", CFrame.new(-235.199097, 78.6688232, -777.403625, -0.296778828, 1.86118303e-08, 0.95494622, -2.75188246e-08, 1, -2.80422423e-08, -0.95494622, -3.46013422e-08, -0.296778828)},
+	{"Extra Item 1", CFrame.new(18.9283524, 152.016907, -551.260925, 0.683667541, -5.64013414e-09, 0.729793608, 1.4545221e-08, 1, -5.89750471e-09, -0.729793608, 1.46469414e-08, 0.683667541)},
+	{"Extra Item 2", CFrame.new(-12.05828, 64.1875381, -407.384979, -0.348917574, -4.56518706e-07, 0.937153399, 2.14122636e-07, 1, 5.66854737e-07, -0.937153399, 3.98451334e-07, -0.348917574)},
+	{"Extra Item 3", CFrame.new(-18.9465733, 62.8016815, -427.226776, -0.110282153, 4.54213236e-08, 0.993900299, 1.47796239e-12, 1, -4.56999167e-08, -0.993900299, -5.03841635e-09, -0.110282153)},
+	{"Extra Item 4", CFrame.new(-15.2813377, 59.847847, -447.028564, -0.375132501, 9.84792692e-08, 0.926971197, 9.18668732e-08, 1, -6.90604196e-08, -0.926971197, 5.92511391e-08, -0.375132501)}
+}
+
+-- Fungsi untuk membypass pop-up Roblox CoreGui
+local function autoBuyUGC()
+	print("   ⏳ Menunggu pop-up Roblox Purchase muncul...")
+	task.wait(2.5) -- Waktu tunggu pop-up muncul
+	
 	local buttonClicked = false
-
-	-- Mencari tombol "Buy" di dalam sistem keamanan UI Roblox
 	for _, instance in ipairs(CoreGui:GetDescendants()) do
-		-- Hanya menargetkan tombol yang teksnya persis "Buy"
 		if instance:IsA("TextButton") and instance.Text == "Buy" then
-			print("🦆 Tombol 'Buy' UGC terdeteksi! Mengeksekusi klik...")
-			
-			-- Metode 1: Memaksa trigger klik menggunakan fitur Executor (Sangat Ampuh)
+			print("   🎯 Tombol 'Buy' terdeteksi! Mengeksekusi...")
 			if firesignal then
 				firesignal(instance.MouseButton1Click)
 				buttonClicked = true
@@ -170,10 +158,8 @@ if hrp then
 				end
 				buttonClicked = true
 			else
-				-- Metode 2: Simulasi klik mouse asli ke koordinat layar (Fallback)
 				local clickX = instance.AbsolutePosition.X + (instance.AbsoluteSize.X / 2)
-				local clickY = instance.AbsolutePosition.Y + (instance.AbsoluteSize.Y / 2) + 36 -- +36 menyesuaikan topbar Roblox
-				
+				local clickY = instance.AbsolutePosition.Y + (instance.AbsoluteSize.Y / 2) + 36
 				VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
 				task.wait(0.1)
 				VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
@@ -182,17 +168,51 @@ if hrp then
 			break
 		end
 	end
-
+	
 	if buttonClicked then
-		print("🎉 BERHASIL! Item UGC 'Roblox Learn Ducky Head' berhasil diklaim secara otomatis!")
+		print("   🎉 Item berhasil di-Buy!")
+		task.wait(2) 
+		
+		-- Auto-close tombol "OK" pada pop-up sukses (agar layar tidak penuh)
+		for _, instance in ipairs(CoreGui:GetDescendants()) do
+			if instance:IsA("TextButton") and instance.Text == "OK" then
+				if firesignal then 
+					firesignal(instance.MouseButton1Click) 
+				elseif getconnections then
+					for _, connection in pairs(getconnections(instance.MouseButton1Click)) do
+						connection:Fire()
+					end
+				else
+					local clickX = instance.AbsolutePosition.X + (instance.AbsoluteSize.X / 2)
+					local clickY = instance.AbsolutePosition.Y + (instance.AbsoluteSize.Y / 2) + 36
+					VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
+					task.wait(0.1)
+					VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
+				end
+				break
+			end
+		end
 	else
-		print("⚠️ Gagal mengeklik otomatis. Eksekutor-mu mungkin kurang *support* CoreGui.")
-		print("Silakan klik tombol 'Buy' secara manual di layar. (Gratis kok, 0 Robux!)")
+		print("   ⚠️ Auto-buy gagal/tidak muncul. Silakan klik manual atau item sudah pernah diklaim.")
 	end
-else
-	print("❌ Gagal: Karakter tidak ditemukan.")
+end
+
+-- Eksekusi perulangan 5 Item UGC
+for i, itemData in ipairs(ugcItems) do
+	local itemName = itemData[1]
+	local itemLoc = itemData[2]
+	
+	local currentHrp = getHRP()
+	if currentHrp then
+		print("\n▶️ [" .. i .. "/5] OTW ke: " .. itemName)
+		currentHrp.CFrame = itemLoc
+		task.wait(1) -- Beri waktu agar proximity memuat
+		
+		firePromptsNearMe(15)
+		autoBuyUGC()
+	end
 end
 
 print("==================================================")
-print("🏆 SELURUH PROSES SELESAI!")
+print("🏆 SELURUH PROSES SELESAI! SILAKAN CEK INVENTORY!")
 print("==================================================")
