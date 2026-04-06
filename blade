@@ -1,0 +1,323 @@
+--[[
+    THE ULTIMATE AUTO PARRY V1
+    Fitur: Real-time Ping, Dot Product Math, FPS Optimizer, Smart Visualizer, Custom GUI
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local CoreGui = game:GetService("CoreGui")
+
+local Player = Players.LocalPlayer
+
+-- Konfigurasi Global
+local SETTINGS = {
+    AutoParry = false,
+    Visuals = false,
+    PingBasedOffset = 1.95, 
+    DistanceToParry = 0.65,
+    EmergencyRadius = 10,
+    ClashDistance = 22,
+    ClashSpeed = 0.01,
+    NormalSpeed = 0.05,
+    OptimizerOn = false
+}
+
+local LastClick = 0
+local LastBallHit = nil
+local IsParrying = false
+local frameCounter = 0
+local VisualPart, VisualMesh
+local MainConnection
+
+-- Ambil Data Ping
+local NetworkStats = Stats:FindFirstChild("Network") 
+    and Stats.Network:FindFirstChild("ServerStatsItem") 
+    and Stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
+
+-- ==========================================
+-- 1. SISTEM VISUALIZER (SMART CIRCLE)
+-- ==========================================
+local function CreateVisualizer()
+    if VisualPart then return end
+    VisualPart = Instance.new("Part")
+    VisualPart.Name = "UltimateSmartCircle"
+    VisualPart.Parent = workspace
+    VisualPart.Anchored = true
+    VisualPart.CanCollide = false
+    VisualPart.Transparency = 1
+    VisualPart.Material = Enum.Material.Neon
+    VisualPart.Size = Vector3.new(1, 1, 1)
+    
+    VisualMesh = Instance.new("SpecialMesh", VisualPart)
+    VisualMesh.MeshId = "rbxassetid://3270017"
+    VisualMesh.Scale = Vector3.new(0, 0, 0)
+end
+
+local function DestroyVisualizer()
+    if VisualPart then
+        VisualPart:Destroy()
+        VisualPart = nil
+        VisualMesh = nil
+    end
+end
+
+local function UpdateVisuals(root, distance, state)
+    if not SETTINGS.Visuals or not VisualPart then 
+        if VisualPart then VisualPart.Transparency = 1 end
+        return 
+    end
+    
+    VisualPart.CFrame = root.CFrame * CFrame.new(0, -2.6, 0) * CFrame.Angles(math.rad(90), 0, 0)
+    local targetSize = math.clamp(distance * 0.8, 5, 65)
+    VisualMesh.Scale = VisualMesh.Scale:Lerp(Vector3.new(targetSize, targetSize, 0.5), 0.5)
+
+    if state == "clash" then
+        VisualPart.Color = Color3.fromRGB(255, 0, 0)
+        VisualPart.Transparency = 0.05
+    elseif state == "target" then
+        VisualPart.Color = Color3.fromRGB(0, 255, 255)
+        VisualPart.Transparency = 0.1
+    else
+        VisualPart.Color = Color3.fromRGB(150, 240, 255)
+        VisualPart.Transparency = 0.5
+    end
+end
+
+-- ==========================================
+-- 2. SISTEM OPTIMIZER FPS
+-- ==========================================
+local function ApplyOptimizer()
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows = false
+        lighting.FogEnd = 1e10
+
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+                v.Enabled = false
+            end
+        end
+    end)
+end
+
+-- ==========================================
+-- 3. LOGIKA AUTO PARRY & MATEMATIKA
+-- ==========================================
+local function GetBall()
+    local BallsFolder = workspace:FindFirstChild("Balls")
+    if not BallsFolder then return nil end
+    for _, v in ipairs(BallsFolder:GetChildren()) do
+        if v:GetAttribute("realBall") == true then return v end
+    end
+    return nil
+end
+
+local function IsTargeted()
+    if not Player.Character then return false end
+    return Player.Character:GetAttribute("Targeted") == true 
+        or Player.Character:FindFirstChild("Highlight") ~= nil
+end
+
+local function SendClick(isClashing, ball)
+    if not SETTINGS.AutoParry or IsParrying then return end
+    local now = tick()
+    local cd = isClashing and SETTINGS.ClashSpeed or SETTINGS.NormalSpeed
+    
+    if not isClashing and LastBallHit == ball and (now - LastClick) < 0.5 then return end
+    if (now - LastClick) < cd then return end
+    
+    IsParrying = true
+    LastClick = now
+    LastBallHit = ball
+    
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    task.wait(0.01)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    
+    task.delay(cd, function() IsParrying = false end)
+end
+
+-- ==========================================
+-- 4. PEMBUATAN GUI (INTERFAS PENGGUNA)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "UltimateParryGUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- Membuat UI bisa digeser
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner", MainFrame)
+UICorner.CornerRadius = UDim.new(0, 8)
+
+-- Header Bar
+local Header = Instance.new("Frame", MainFrame)
+Header.Size = UDim2.new(1, 0, 0, 30)
+Header.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+Header.BorderSizePixel = 0
+local HeaderCorner = Instance.new("UICorner", Header)
+HeaderCorner.CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1, -60, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Ultimate Auto Parry"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Tombol Minimize
+local MinimizeBtn = Instance.new("TextButton", Header)
+MinimizeBtn.Size = UDim2.new(0, 30, 1, 0)
+MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinimizeBtn.TextSize = 20
+
+-- Tombol Close
+local CloseBtn = Instance.new("TextButton", Header)
+CloseBtn.Size = UDim2.new(0, 30, 1, 0)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+
+-- Konten Menu
+local Content = Instance.new("Frame", MainFrame)
+Content.Size = UDim2.new(1, 0, 1, -30)
+Content.Position = UDim2.new(0, 0, 0, 30)
+Content.BackgroundTransparency = 1
+
+local UIListLayout = Instance.new("UIListLayout", Content)
+UIListLayout.Padding = UDim.new(0, 10)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+-- Fungsi untuk membuat tombol Toggle
+local function CreateToggle(name, settingKey, action)
+    local Btn = Instance.new("TextButton", Content)
+    Btn.Size = UDim2.new(0, 200, 0, 35)
+    Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    Btn.Text = name .. ": OFF"
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.Font = Enum.Font.GothamSemibold
+    Btn.TextSize = 14
+    local BtnCorner = Instance.new("UICorner", Btn)
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+
+    Btn.MouseButton1Click:Connect(function()
+        SETTINGS[settingKey] = not SETTINGS[settingKey]
+        if SETTINGS[settingKey] then
+            Btn.Text = name .. ": ON"
+            Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 80)
+            if action then action() end
+        else
+            Btn.Text = name .. ": OFF"
+            Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            if settingKey == "Visuals" then DestroyVisualizer() end
+        end
+    end)
+    return Btn
+end
+
+CreateToggle("Auto Parry", "AutoParry")
+CreateToggle("Smart Visualizer", "Visuals", CreateVisualizer)
+CreateToggle("FPS Optimizer", "OptimizerOn", ApplyOptimizer)
+
+-- Logika UI (Minimize & Close)
+local IsMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    IsMinimized = not IsMinimized
+    if IsMinimized then
+        MainFrame.Size = UDim2.new(0, 250, 0, 30)
+        Content.Visible = false
+    else
+        MainFrame.Size = UDim2.new(0, 250, 0, 180)
+        Content.Visible = true
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    SETTINGS.AutoParry = false
+    DestroyVisualizer()
+    if MainConnection then MainConnection:Disconnect() end
+    ScreenGui:Destroy()
+end)
+
+-- ==========================================
+-- 5. LOOP UTAMA (CORE ENGINE)
+-- ==========================================
+MainConnection = RunService.PostSimulation:Connect(function()
+    if not SETTINGS.AutoParry then 
+        if VisualPart then VisualPart.Transparency = 1 end
+        return 
+    end
+    
+    local Char = Player.Character
+    local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+    if not Root then return end
+
+    local Ball = GetBall()
+    if not Ball then
+        if VisualPart then VisualPart.Transparency = 1 end
+        return
+    end
+
+    local BallPos, PlayerPos = Ball.Position, Root.Position
+    local Velocity = Ball.AssemblyLinearVelocity
+    local Speed = Velocity.Magnitude
+    local Distance = (PlayerPos - BallPos).Magnitude
+    
+    -- Vektor Dot Product untuk akurasi arah
+    local directionToPlayer = (PlayerPos - BallPos).Unit
+    local velocityDirection = Velocity.Unit
+    local dot = directionToPlayer:Dot(velocityDirection)
+
+    if dot < 0 then LastBallHit = nil end 
+
+    local Targeted = IsTargeted()
+    local IsClashing = Targeted and Distance <= SETTINGS.ClashDistance
+    
+    frameCounter = frameCounter + 1
+    if VisualPart and frameCounter % 2 == 0 then 
+        UpdateVisuals(Root, Distance, IsClashing and "clash" or (Targeted and "target" or "neutral"))
+    end
+
+    if IsClashing then
+        SendClick(true, Ball)
+    elseif Targeted and dot > 0 then
+        local Ping = (NetworkStats and NetworkStats.Value / 1000) or 0.04
+        local TimeToHit = Distance / math.max(Speed, 1)
+        
+        -- Kalkulasi ambang prediksi berbasis Ping (Sangat Akurat)
+        local PredictionThreshold = SETTINGS.DistanceToParry + (Ping * SETTINGS.PingBasedOffset)
+        
+        if Speed > 150 then
+            PredictionThreshold = PredictionThreshold * 1.15
+        end
+
+        if TimeToHit <= PredictionThreshold or Distance <= SETTINGS.EmergencyRadius then
+            SendClick(false, Ball)
+        end
+    end
+end)
+
+Player.CharacterAdded:Connect(function()
+    LastBallHit = nil
+    IsParrying = false
+end)
