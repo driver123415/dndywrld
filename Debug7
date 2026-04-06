@@ -1,0 +1,420 @@
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+local camera = workspace.CurrentCamera
+
+-- Menggunakan CoreGui agar aman dari deteksi game, fallback ke PlayerGui
+local parentGui = pcall(function() return CoreGui.Name end) and CoreGui or player:WaitForChild("PlayerGui")
+
+-- Hapus GUI lama jika sudah ada
+if parentGui:FindFirstChild("DevToolGUI") then
+	parentGui.DevToolGUI:Destroy()
+end
+
+-- ==========================================
+-- MEMBUAT UI ELEMENTS (All-in-One Frame)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DevToolGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = parentGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 400)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- TOP BAR (Untuk Dragging)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
+
+local TopBarHider = Instance.new("Frame")
+TopBarHider.Size = UDim2.new(1, 0, 0, 10)
+TopBarHider.Position = UDim2.new(0, 0, 1, -10)
+TopBarHider.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TopBarHider.BorderSizePixel = 0
+TopBarHider.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Ultimate Multi-Tool V3"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- TOMBOL MINIMIZE & CLOSE
+local MinButton = Instance.new("TextButton")
+MinButton.Size = UDim2.new(0, 30, 0, 30)
+MinButton.Position = UDim2.new(1, -60, 0, 0)
+MinButton.BackgroundTransparency = 1
+MinButton.Text = "-"
+MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinButton.Font = Enum.Font.GothamBold
+MinButton.TextSize = 18
+MinButton.Parent = TopBar
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 14
+CloseButton.Parent = TopBar
+
+-- AREA KONTEN
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+-- Helper UI Function
+local function createBtn(text, size, pos, color, parent)
+	local btn = Instance.new("TextButton")
+	btn.Size = size
+	btn.Position = pos
+	btn.BackgroundColor3 = color
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 12
+	btn.Text = text
+	btn.Parent = parent
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+	return btn
+end
+
+-- --- BAGIAN 1: DETECTOR ---
+local InspectorTitle = Instance.new("TextLabel")
+InspectorTitle.Size = UDim2.new(1, -20, 0, 15)
+InspectorTitle.Position = UDim2.new(0, 10, 0, 5)
+InspectorTitle.BackgroundTransparency = 1
+InspectorTitle.Text = "[ Click any part to inspect ]"
+InspectorTitle.TextColor3 = Color3.fromRGB(150, 150, 150)
+InspectorTitle.Font = Enum.Font.Gotham
+InspectorTitle.TextSize = 11
+InspectorTitle.Parent = ContentFrame
+
+local PartNameLabel = Instance.new("TextLabel")
+PartNameLabel.Size = UDim2.new(1, -20, 0, 15)
+PartNameLabel.Position = UDim2.new(0, 10, 0, 25)
+PartNameLabel.BackgroundTransparency = 1
+PartNameLabel.Text = "Name: None"
+PartNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+PartNameLabel.Font = Enum.Font.GothamSemibold
+PartNameLabel.TextSize = 12
+PartNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+PartNameLabel.Parent = ContentFrame
+
+local CFrameLabel = Instance.new("TextLabel")
+CFrameLabel.Size = UDim2.new(1, -20, 0, 30)
+CFrameLabel.Position = UDim2.new(0, 10, 0, 45)
+CFrameLabel.BackgroundTransparency = 1
+CFrameLabel.Text = "CFrame: None"
+CFrameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+CFrameLabel.Font = Enum.Font.Gotham
+CFrameLabel.TextSize = 10
+CFrameLabel.TextWrapped = true
+CFrameLabel.TextXAlignment = Enum.TextXAlignment.Left
+CFrameLabel.TextYAlignment = Enum.TextYAlignment.Top
+CFrameLabel.Parent = ContentFrame
+
+local CopyNameBtn = createBtn("Copy Name", UDim2.new(0.45, 0, 0, 30), UDim2.new(0, 10, 0, 80), Color3.fromRGB(70, 70, 70), ContentFrame)
+local CopyCFrameBtn = createBtn("Copy CFrame", UDim2.new(0.45, 0, 0, 30), UDim2.new(0.55, -10, 0, 80), Color3.fromRGB(70, 70, 70), ContentFrame)
+
+-- GARIS PEMISAH 1
+local Divider1 = Instance.new("Frame")
+Divider1.Size = UDim2.new(1, -20, 0, 2)
+Divider1.Position = UDim2.new(0, 10, 0, 120)
+Divider1.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+Divider1.BorderSizePixel = 0
+Divider1.Parent = ContentFrame
+
+-- --- BAGIAN 2: PLAYER TOOLS (Fly, Noclip, Copy Pos) ---
+local ToolsTitle = InspectorTitle:Clone()
+ToolsTitle.Text = "Player Tools & Movement"
+ToolsTitle.Position = UDim2.new(0, 10, 0, 125)
+ToolsTitle.Parent = ContentFrame
+
+local CopyMyPosBtn = createBtn("Copy My Position", UDim2.new(0.45, 0, 0, 30), UDim2.new(0, 10, 0, 145), Color3.fromRGB(0, 150, 200), ContentFrame)
+local NoclipBtn = createBtn("Noclip: OFF", UDim2.new(0.45, 0, 0, 30), UDim2.new(0.55, -10, 0, 145), Color3.fromRGB(70, 70, 70), ContentFrame)
+
+-- Fly Controls
+local FlyBtn = createBtn("Fly: OFF", UDim2.new(0.35, 0, 0, 30), UDim2.new(0, 10, 0, 185), Color3.fromRGB(70, 70, 70), ContentFrame)
+local SpdMinusBtn = createBtn("-", UDim2.new(0.12, 0, 0, 30), UDim2.new(0.4, 0, 0, 185), Color3.fromRGB(200, 80, 80), ContentFrame)
+
+local SpdLabel = Instance.new("TextLabel")
+SpdLabel.Size = UDim2.new(0.25, 0, 0, 30)
+SpdLabel.Position = UDim2.new(0.54, 0, 0, 185)
+SpdLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+SpdLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpdLabel.Font = Enum.Font.GothamBold
+SpdLabel.TextSize = 12
+SpdLabel.Text = "Spd: 1"
+SpdLabel.Parent = ContentFrame
+Instance.new("UICorner", SpdLabel).CornerRadius = UDim.new(0, 6)
+
+local SpdPlusBtn = createBtn("+", UDim2.new(0.12, 0, 0, 30), UDim2.new(0.81, 0, 0, 185), Color3.fromRGB(80, 200, 80), ContentFrame)
+
+-- GARIS PEMISAH 2
+local Divider2 = Divider1:Clone()
+Divider2.Position = UDim2.new(0, 10, 0, 225)
+Divider2.Parent = ContentFrame
+
+-- --- BAGIAN 3: TELEPORTER ---
+local TeleportTitle = InspectorTitle:Clone()
+TeleportTitle.Text = "Manual Teleporter (Paste X,Y,Z)"
+TeleportTitle.Position = UDim2.new(0, 10, 0, 235)
+TeleportTitle.Parent = ContentFrame
+
+local CoordInput = Instance.new("TextBox")
+CoordInput.Size = UDim2.new(1, -20, 0, 35)
+CoordInput.Position = UDim2.new(0, 10, 0, 255)
+CoordInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CoordInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+CoordInput.Font = Enum.Font.Gotham
+CoordInput.TextSize = 12
+CoordInput.PlaceholderText = "Paste koordinat di sini..."
+CoordInput.Text = ""
+CoordInput.ClearTextOnFocus = false
+CoordInput.Parent = ContentFrame
+Instance.new("UICorner", CoordInput).CornerRadius = UDim.new(0, 6)
+
+local TeleportBtn = createBtn("Teleport", UDim2.new(1, -20, 0, 35), UDim2.new(0, 10, 0, 300), Color3.fromRGB(0, 170, 255), ContentFrame)
+TeleportBtn.TextSize = 14
+
+-- ==========================================
+-- LOGIKA DRAGGING (Geser UI)
+-- ==========================================
+local dragging, dragInput, mousePos, framePos
+
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		mousePos = input.Position
+		framePos = MainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - mousePos
+		MainFrame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+	end
+end)
+
+-- ==========================================
+-- LOGIKA TOMBOL & VISUAL FEEDBACK
+-- ==========================================
+local isMinimized = false
+MinButton.MouseButton1Click:Connect(function()
+	isMinimized = not isMinimized
+	if isMinimized then
+		MainFrame:TweenSize(UDim2.new(0, 320, 0, 30), "Out", "Quad", 0.3, true)
+		ContentFrame.Visible = false
+	else
+		MainFrame:TweenSize(UDim2.new(0, 320, 0, 350), "Out", "Quad", 0.3, true)
+		ContentFrame.Visible = true
+	end
+end)
+
+CloseButton.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+local function flashButton(btn, text)
+	local oriColor = btn.BackgroundColor3
+	local oriText = btn.Text
+	btn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	btn.Text = text
+	task.wait(1)
+	btn.BackgroundColor3 = oriColor
+	btn.Text = oriText
+end
+
+-- ==========================================
+-- LOGIKA INSPECTOR & COPY
+-- ==========================================
+local currentTargetName, currentTargetCFrame = "", ""
+
+mouse.Button1Down:Connect(function()
+	local target = mouse.Target
+	if target and target:IsA("BasePart") then
+		currentTargetName = target.Name
+		currentTargetCFrame = tostring(target.CFrame)
+		PartNameLabel.Text = "Name: " .. currentTargetName
+		CFrameLabel.Text = "CFrame: " .. currentTargetCFrame
+	end
+end)
+
+CopyNameBtn.MouseButton1Click:Connect(function()
+	if currentTargetName ~= "" then
+		if pcall(function() setclipboard(currentTargetName) end) then flashButton(CopyNameBtn, "Copied!") end
+	end
+end)
+
+CopyCFrameBtn.MouseButton1Click:Connect(function()
+	if currentTargetCFrame ~= "" then
+		if pcall(function() setclipboard(currentTargetCFrame) end) then flashButton(CopyCFrameBtn, "Copied!") end
+	end
+end)
+
+CopyMyPosBtn.MouseButton1Click:Connect(function()
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if hrp then
+		if pcall(function() setclipboard(tostring(hrp.CFrame)) end) then flashButton(CopyMyPosBtn, "Pos Copied!") end
+	end
+end)
+
+-- ==========================================
+-- LOGIKA NOCLIP
+-- ==========================================
+local noclipEnabled = false
+local noclipConnection
+
+NoclipBtn.MouseButton1Click:Connect(function()
+	noclipEnabled = not noclipEnabled
+	if noclipEnabled then
+		NoclipBtn.Text = "Noclip: ON"
+		NoclipBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+		
+		noclipConnection = RunService.Stepped:Connect(function()
+			local char = player.Character
+			if char then
+				for _, v in pairs(char:GetDescendants()) do
+					if v:IsA("BasePart") and v.CanCollide then
+						v.CanCollide = false
+					end
+				end
+			end
+		end)
+	else
+		NoclipBtn.Text = "Noclip: OFF"
+		NoclipBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+		if noclipConnection then noclipConnection:Disconnect() end
+	end
+end)
+
+-- ==========================================
+-- LOGIKA FLY (SMOOTH & MOBILE SUPPORT)
+-- ==========================================
+local flying = false
+local flySpeed = 1
+local flyConnection
+
+SpdMinusBtn.MouseButton1Click:Connect(function()
+	if flySpeed > 1 then flySpeed -= 1; SpdLabel.Text = "Spd: " .. flySpeed end
+end)
+SpdPlusBtn.MouseButton1Click:Connect(function()
+	flySpeed += 1; SpdLabel.Text = "Spd: " .. flySpeed
+end)
+
+FlyBtn.MouseButton1Click:Connect(function()
+	flying = not flying
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+
+	if flying and hrp and hum then
+		FlyBtn.Text = "Fly: ON"
+		FlyBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+		hum.PlatformStand = true
+
+		local bg = Instance.new("BodyGyro", hrp)
+		bg.P = 9e4
+		bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+		bg.cframe = hrp.CFrame
+		local bv = Instance.new("BodyVelocity", hrp)
+		bv.velocity = Vector3.new(0, 0, 0)
+		bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
+
+		flyConnection = RunService.RenderStepped:Connect(function()
+			if not flying or not char or hum.Health <= 0 then
+				flying = false
+				FlyBtn.Text = "Fly: OFF"
+				FlyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+				hum.PlatformStand = false
+				if bg then bg:Destroy() end
+				if bv then bv:Destroy() end
+				if flyConnection then flyConnection:Disconnect() end
+				return
+			end
+			
+			-- Menggunakan input bawaan Roblox (Otomatis support WASD & Mobile Joystick)
+			local moveDir = hum.MoveDirection
+			if moveDir.Magnitude > 0 then
+				local camLook = camera.CFrame.LookVector
+				-- Campur arah joystick dengan arah kamera untuk bisa terbang ke atas/bawah
+				bv.velocity = Vector3.new(moveDir.X, camLook.Y, moveDir.Z).Unit * (flySpeed * 50)
+			else
+				bv.velocity = Vector3.new(0, 0, 0) -- Berhenti jika tidak bergerak
+			end
+			bg.cframe = camera.CFrame
+		end)
+	else
+		flying = false
+		FlyBtn.Text = "Fly: OFF"
+		FlyBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+		if hum then hum.PlatformStand = false end
+		if hrp then
+			local bg = hrp:FindFirstChildOfClass("BodyGyro")
+			local bv = hrp:FindFirstChildOfClass("BodyVelocity")
+			if bg then bg:Destroy() end
+			if bv then bv:Destroy() end
+		end
+		if flyConnection then flyConnection:Disconnect() end
+	end
+end)
+
+-- ==========================================
+-- LOGIKA TELEPORTER
+-- ==========================================
+TeleportBtn.MouseButton1Click:Connect(function()
+	local inputText = string.gsub(CoordInput.Text, " ", "")
+	local coords = string.split(inputText, ",")
+	
+	if #coords >= 3 then
+		local x, y, z = tonumber(coords[1]), tonumber(coords[2]), tonumber(coords[3])
+		if x and y and z then
+			local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				hrp.CFrame = CFrame.new(x, y, z)
+				flashButton(TeleportBtn, "Success!")
+			end
+		else
+			CoordInput.Text = "Gunakan format angka yang benar!"
+			task.wait(1.5); CoordInput.Text = ""
+		end
+	else
+		CoordInput.Text = "Butuh minimal X, Y, Z!"
+		task.wait(1.5); CoordInput.Text = ""
+	end
+end)
