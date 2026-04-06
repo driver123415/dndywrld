@@ -1,7 +1,6 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1.4 (DYNAMIC SPEED & ANTI-FREEZE FIX)
-    Fix 1: Karakter tidak lagi bengong/freeze saat duel 1v1 jarak dekat.
-    Fix 2: Radar otomatis melebar jika kecepatan bola sangat ekstrem.
+    THE ULTIMATE AUTO PARRY V1.5 (AUTO DISTANCE UPDATE)
+    Fix: Menambahkan fitur "Auto Distance" untuk menghindari pertarungan jarak dekat otomatis.
 ]]
 
 local Players = game:GetService("Players")
@@ -17,10 +16,12 @@ local Player = Players.LocalPlayer
 local SETTINGS = {
     AutoParry = false,
     Visuals = false,
+    OptimizerOn = false,
+    AutoDistance = false,    -- FITUR BARU
+    KeepDistance = 35,       -- Jarak aman yang akan dipertahankan dari player lain
     PingBasedOffset = 2.5,   
-    BaseDistanceToParry = 1.0, -- Jarak dasar (diubah jadi Base)
-    EmergencyRadius = 15,    
-    OptimizerOn = false
+    BaseDistanceToParry = 1.0, 
+    EmergencyRadius = 15     
 }
 
 local LastClick = 0
@@ -125,7 +126,7 @@ local function SendClick(ball)
     if not SETTINGS.AutoParry or IsParrying then return end
     
     local now = tick()
-    local cd = 0.1 -- Cooldown aman agar WASD tidak macet (Anti-Freeze)
+    local cd = 0.1 
     
     if LastBallHit == ball and (now - LastClick) < 0.15 then return end
     if (now - LastClick) < cd then return end
@@ -151,8 +152,8 @@ ScreenGui.Name = "UltimateParryGUI"
 ScreenGui.Parent = game:GetService("CoreGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 180)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
+MainFrame.Size = UDim2.new(0, 250, 0, 225) -- DIPERPANJANG UNTUK 4 TOMBOL
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -112)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -173,7 +174,7 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Parry v1.4"
+Title.Text = "Ultimate Parry v1.5"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -234,6 +235,7 @@ end
 
 CreateToggle("Auto Parry", "AutoParry")
 CreateToggle("Smart Visualizer", "Visuals", CreateVisualizer)
+CreateToggle("Auto Distance", "AutoDistance") -- TOMBOL KE-4 DITAMBAHKAN
 CreateToggle("FPS Optimizer", "OptimizerOn", ApplyOptimizer)
 
 local IsMinimized = false
@@ -243,13 +245,14 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         MainFrame.Size = UDim2.new(0, 250, 0, 30)
         Content.Visible = false
     else
-        MainFrame.Size = UDim2.new(0, 250, 0, 180)
+        MainFrame.Size = UDim2.new(0, 250, 0, 225)
         Content.Visible = true
     end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
     SETTINGS.AutoParry = false
+    SETTINGS.AutoDistance = false
     DestroyVisualizer()
     if MainConnection then MainConnection:Disconnect() end
     ScreenGui:Destroy()
@@ -259,14 +262,46 @@ end)
 -- 5. LOOP UTAMA (CORE ENGINE)
 -- ==========================================
 MainConnection = RunService.PostSimulation:Connect(function()
+    local Char = Player.Character
+    local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+    local Hum = Char and Char:FindFirstChild("Humanoid")
+    if not Root or not Hum then return end
+
+    -- [FITUR BARU] SISTEM AUTO JAGA JARAK (ANTI CLOSE COMBAT)
+    if SETTINGS.AutoDistance and Hum.Health > 0 then
+        local nearestDist = math.huge
+        local escapeDir = nil
+        
+        -- Cari player terdekat
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local eHum = p.Character:FindFirstChild("Humanoid")
+                if eHum and eHum.Health > 0 then
+                    local eRoot = p.Character.HumanoidRootPart
+                    local dist = (eRoot.Position - Root.Position).Magnitude
+                    
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        -- Hitung arah menjauh (posisi kita dikurangi posisi musuh)
+                        escapeDir = (Root.Position - eRoot.Position).Unit
+                    end
+                end
+            end
+        end
+
+        -- Eksekusi pergerakan mundur otomatis jika ada musuh yang terlalu dekat
+        if nearestDist < SETTINGS.KeepDistance and escapeDir then
+            -- Buang sumbu Y agar karakter tidak mencoba terbang/masuk tanah
+            local safeDir = Vector3.new(escapeDir.X, 0, escapeDir.Z).Unit
+            Hum:Move(safeDir, false) 
+        end
+    end
+
+    -- SISTEM AUTO PARRY
     if not SETTINGS.AutoParry then 
         if VisualPart then VisualPart.Transparency = 1 end
         return 
     end
-    
-    local Char = Player.Character
-    local Root = Char and Char:FindFirstChild("HumanoidRootPart")
-    if not Root then return end
 
     local Ball = GetBall()
     if not Ball then
@@ -283,7 +318,6 @@ MainConnection = RunService.PostSimulation:Connect(function()
     local velocityDirection = Velocity.Unit
     local dot = directionToPlayer:Dot(velocityDirection)
 
-    -- SMART FILTER: Kalau bola jelas-jelas bergerak MENJAUH, stop script untuk hemat performa dan cegah Freeze
     if dot < -0.2 then 
         LastBallHit = nil 
         if VisualPart and frameCounter % 2 == 0 then UpdateVisuals(Root, Distance, "neutral") end
@@ -301,7 +335,6 @@ MainConnection = RunService.PostSimulation:Connect(function()
         local Ping = (NetworkStats and NetworkStats.Value / 1000) or 0.04
         local TimeToHit = Distance / math.max(Speed, 1)
         
-        -- DYNAMIC SCALING: Kecepatan tinggi akan menambah radius parry secara otomatis
         local SpeedFactor = Speed / 100 
         local PredictionThreshold = SETTINGS.BaseDistanceToParry + (Ping * SETTINGS.PingBasedOffset) + SpeedFactor
         
@@ -309,7 +342,6 @@ MainConnection = RunService.PostSimulation:Connect(function()
             PredictionThreshold = PredictionThreshold * 1.2
         end
 
-        -- Eksekusi hanya jika bola benar-benar masuk hitungan waktu, bukan asal spam
         if TimeToHit <= PredictionThreshold or Distance <= SETTINGS.EmergencyRadius then
             SendClick(Ball)
         end
