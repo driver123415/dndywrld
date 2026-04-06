@@ -150,55 +150,49 @@ local function touchTeleport(targetCFrame)
 end
 
 -- ==================================================
--- LOGIKA AUTO-BUY (DOUBLE CLICK FIX)
+-- LOGIKA AUTO-BUY (METODE SPAM CLICK / BRUTE-FORCE)
 -- ==================================================
 local function autoBuyUGC()
 	local inset = GuiService:GetGuiInset()
-	print("⏳ Menunggu pop-up 'Buy' (3.5 detik)...")
-	task.wait(3.5) 
+	print("   ⏳ Mencari tombol 'Buy'...")
 	
 	local buyBtn = nil
-	for _, v in ipairs(CoreGui:GetDescendants()) do
-		if (v:IsA("TextButton") or v:IsA("TextLabel")) and v.Text == "Buy" then
-			buyBtn = v:IsA("TextButton") and v or v.Parent
-			break
+	local timeout = 0
+	
+	-- Tunggu maksimal 5 detik sampai tombol benar-benar nongol di layar
+	while not buyBtn and timeout < 50 do 
+		for _, v in ipairs(CoreGui:GetDescendants()) do
+			if (v:IsA("TextButton") or v:IsA("TextLabel")) and v.Text == "Buy" then
+				buyBtn = v:IsA("TextButton") and v or v.Parent
+				break
+			end
 		end
+		task.wait(0.1)
+		timeout += 1
 	end
 
 	if buyBtn and buyBtn.AbsolutePosition.X > 0 then
-		-- Simpan koordinat tombol Buy
+		-- Mengunci koordinat tombol
 		local bX = buyBtn.AbsolutePosition.X + (buyBtn.AbsoluteSize.X / 2)
 		local bY = buyBtn.AbsolutePosition.Y + (buyBtn.AbsoluteSize.Y / 2) + inset.Y
 		
-		-- KLIK 1: Tekan tombol Buy
-		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, true, game, 1)
-		task.wait(0.1)
-		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, false, game, 1)
-		print("🎯 Tombol 'Buy' diklik!")
+		print("   🎯 Posisi dikunci! Memulai mode SPAM KLIK selama 8 detik...")
 		
-		-- KLIK 2: Tunggu loading lalu tekan di titik yang sama persis untuk tombol OK
-		task.wait(3.5) -- Tunggu proses loading Roblox
-		print("⏳ Menekan 'OK' di titik yang sama...")
+		-- Mode Spam Klik (Menghajar Buy dan OK sekaligus)
+		local endTime = os.clock() + 8 -- Berjalan selama 8 detik
 		
-		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, true, game, 1)
-		task.wait(0.1)
-		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, false, game, 1)
-		print("✅ Pop-up ditutup.")
+		while os.clock() < endTime do
+			VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, true, game, 1)
+			task.wait(0.05) -- Tekan tahan sedikit
+			VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, false, game, 1)
+			
+			task.wait(0.15) -- Jeda aman antar klik agar Roblox tidak crash
+		end
+		
+		print("   ✅ Spam klik selesai! Lanjut ke rute berikutnya.")
 	else
-		print("⚠️ Pop-up 'Buy' tidak ditemukan. Lewati...")
+		print("   ⚠️ Pop-up 'Buy' tidak muncul. Lewati...")
 	end
-end
-
-local function visualClick(btn, oriText)
-	local oriColor = btn.BackgroundColor3
-	btn.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
-	btn.Text = "Processing..."
-	return oriColor
-end
-
-local function resetBtn(btn, oriColor, oriText)
-	btn.BackgroundColor3 = oriColor
-	btn.Text = oriText
 end
 
 -- ==================================================
