@@ -1,0 +1,116 @@
+--Path Deteksi + CFrame Copyer
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- Membuat ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PartInfoGui"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Membuat Frame untuk GUI
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0.4, 0, 0.4, 0)
+frame.Position = UDim2.new(0.3, 0, 0.3, 0)
+frame.BackgroundColor3 = Color3.new(1, 1, 1)
+frame.Parent = screenGui
+
+-- Tombol Close
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0.15, 0, 0.15, 0)
+closeButton.Position = UDim2.new(0.85, 0, 0, 0)
+closeButton.Text = "Close"
+closeButton.TextScaled = true
+closeButton.Parent = frame
+
+-- Label untuk menampilkan Nama Part
+local partNameLabel = Instance.new("TextLabel")
+partNameLabel.Size = UDim2.new(1, 0, 0.2, 0)
+partNameLabel.Position = UDim2.new(0, 0, 0.2, 0)
+partNameLabel.TextScaled = true
+partNameLabel.Parent = frame
+
+-- Label untuk menampilkan CFrame Part
+local cframeLabel = Instance.new("TextLabel")
+cframeLabel.Size = UDim2.new(1, 0, 0.2, 0)
+cframeLabel.Position = UDim2.new(0, 0, 0.45, 0)
+cframeLabel.TextScaled = true
+cframeLabel.Parent = frame
+
+-- Tombol Copy Nama Part
+local copyPartNameButton = Instance.new("TextButton")
+copyPartNameButton.Size = UDim2.new(1, 0, 0.2, 0)
+copyPartNameButton.Position = UDim2.new(0, 0, 0.7, 0)
+copyPartNameButton.Text = "Copy Part Name"
+copyPartNameButton.TextScaled = true
+copyPartNameButton.Parent = frame
+
+-- Tombol Copy CFrame Part
+local copyCFrameButton = Instance.new("TextButton")
+copyCFrameButton.Size = UDim2.new(1, 0, 0.2, 0)
+copyCFrameButton.Position = UDim2.new(0, 0, 0.9, 0)
+copyCFrameButton.Text = "Copy CFrame"
+copyCFrameButton.TextScaled = true
+copyCFrameButton.Parent = frame
+
+-- Fungsi untuk copy text ke clipboard
+local function copyToClipboard(text, label)
+    setclipboard(text)
+    label.BackgroundColor3 = Color3.new(0, 1, 0) -- Ganti warna jadi hijau
+    wait(1) -- Tunggu 1 detik
+    label.BackgroundColor3 = Color3.new(1, 1, 1) -- Kembalikan ke warna asli
+end
+
+-- Update GUI saat mouse menunjuk ke part dan di-klik
+mouse.Button1Down:Connect(function()
+    local target = mouse.Target
+    if target and target:IsA("BasePart") then
+        -- Update label nama part dan CFrame
+        partNameLabel.Text = "Part Name: " .. target.Name
+        cframeLabel.Text = "CFrame: " .. tostring(target.CFrame)
+
+        -- Hubungkan tombol untuk copy nama part dan CFrame
+        copyPartNameButton.MouseButton1Click:Connect(function()
+            copyToClipboard(target.Name, partNameLabel)
+            print("Nama Part tercopy: " .. target.Name)
+        end)
+
+        copyCFrameButton.MouseButton1Click:Connect(function()
+            copyToClipboard(tostring(target.CFrame), cframeLabel)
+            print("CFrame Part tercopy: " .. tostring(target.CFrame))
+        end)
+    else
+        partNameLabel.Text = "Tidak ada part yang ditunjuk."
+        cframeLabel.Text = ""
+    end
+end)
+
+-- Fungsi untuk tombol close
+closeButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+-- Dragging functionality
+local isDragging = false
+local dragStart = nil
+local startPos = nil
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = false
+    end
+end)
