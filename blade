@@ -1,7 +1,6 @@
 --[[
-    THE ULTIMATE AUTO PARRY V1.6 (RADAR DISTANCE & FIX)
-    Fix: Memperbaiki bug karakter diam (Error NaN Vector) pada Auto Distance.
-    New: Menambahkan Cincin Radar Oranye untuk melihat radius Auto Distance.
+    THE ULTIMATE AUTO PARRY V1.5 (AUTO DISTANCE UPDATE)
+    Fix: Menambahkan fitur "Auto Distance" untuk menghindari pertarungan jarak dekat otomatis.
 ]]
 
 local Players = game:GetService("Players")
@@ -18,8 +17,8 @@ local SETTINGS = {
     AutoParry = false,
     Visuals = false,
     OptimizerOn = false,
-    AutoDistance = false,    
-    KeepDistance = 30,       -- Diubah jadi 30 agar lebih seimbang
+    AutoDistance = false,    -- FITUR BARU
+    KeepDistance = 35,       -- Jarak aman yang akan dipertahankan dari player lain
     PingBasedOffset = 2.5,   
     BaseDistanceToParry = 1.0, 
     EmergencyRadius = 15     
@@ -30,7 +29,6 @@ local LastBallHit = nil
 local IsParrying = false
 local frameCounter = 0
 local VisualPart, VisualMesh
-local DistVisualPart, DistVisualMesh -- Visualizer untuk Auto Distance
 local MainConnection
 
 local NetworkStats = Stats:FindFirstChild("Network") 
@@ -38,12 +36,12 @@ local NetworkStats = Stats:FindFirstChild("Network")
     and Stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
 
 -- ==========================================
--- 1. SISTEM VISUALIZER PARRY (BOLA)
+-- 1. SISTEM VISUALIZER (SMART CIRCLE)
 -- ==========================================
 local function CreateVisualizer()
     if VisualPart then return end
     VisualPart = Instance.new("Part")
-    VisualPart.Name = "ParrySmartCircle"
+    VisualPart.Name = "UltimateSmartCircle"
     VisualPart.Parent = workspace
     VisualPart.Anchored = true
     VisualPart.CanCollide = false
@@ -87,52 +85,7 @@ local function UpdateVisuals(root, distance, state)
 end
 
 -- ==========================================
--- 2. SISTEM VISUALIZER AUTO DISTANCE (MUSUH)
--- ==========================================
-local function CreateDistVisualizer()
-    if DistVisualPart then return end
-    DistVisualPart = Instance.new("Part")
-    DistVisualPart.Name = "DistanceSmartCircle"
-    DistVisualPart.Parent = workspace
-    DistVisualPart.Anchored = true
-    DistVisualPart.CanCollide = false
-    DistVisualPart.Transparency = 1
-    DistVisualPart.Material = Enum.Material.Neon
-    DistVisualPart.Color = Color3.fromRGB(255, 150, 0) -- Warna Oranye
-    DistVisualPart.Size = Vector3.new(1, 1, 1)
-    
-    DistVisualMesh = Instance.new("SpecialMesh", DistVisualPart)
-    DistVisualMesh.MeshId = "rbxassetid://3270017"
-    -- Ukuran dikunci sesuai angka KeepDistance
-    DistVisualMesh.Scale = Vector3.new(SETTINGS.KeepDistance * 1.5, SETTINGS.KeepDistance * 1.5, 0.5)
-end
-
-local function DestroyDistVisualizer()
-    if DistVisualPart then
-        DistVisualPart:Destroy()
-        DistVisualPart = nil
-        DistVisualMesh = nil
-    end
-end
-
-local function UpdateDistVisuals(root, isActive)
-    if not SETTINGS.AutoDistance or not DistVisualPart then 
-        if DistVisualPart then DistVisualPart.Transparency = 1 end
-        return 
-    end
-    
-    -- Lingkaran oranye ditaruh sedikit lebih bawah dari cincin parry agar tidak bertumpuk jelek
-    DistVisualPart.CFrame = root.CFrame * CFrame.new(0, -2.65, 0) * CFrame.Angles(math.rad(90), 0, 0)
-    
-    if isActive then
-        DistVisualPart.Transparency = 0.2 -- Menyala terang kalau ada musuh masuk radius
-    else
-        DistVisualPart.Transparency = 0.8 -- Redup kalau aman
-    end
-end
-
--- ==========================================
--- 3. SISTEM OPTIMIZER FPS
+-- 2. SISTEM OPTIMIZER FPS
 -- ==========================================
 local function ApplyOptimizer()
     pcall(function()
@@ -149,7 +102,7 @@ local function ApplyOptimizer()
 end
 
 -- ==========================================
--- 4. LOGIKA AUTO PARRY & MATEMATIKA
+-- 3. LOGIKA AUTO PARRY & MATEMATIKA
 -- ==========================================
 local function GetBall()
     local BallsFolder = workspace:FindFirstChild("Balls")
@@ -162,7 +115,9 @@ end
 
 local function IsTargeted(ball)
     if not Player.Character then return false end
-    if ball and ball:GetAttribute("target") == Player.Name then return true end
+    if ball and ball:GetAttribute("target") == Player.Name then
+        return true
+    end
     return Player.Character:GetAttribute("Targeted") == true 
         or Player.Character:FindFirstChild("Highlight") ~= nil
 end
@@ -190,14 +145,14 @@ local function SendClick(ball)
 end
 
 -- ==========================================
--- 5. PEMBUATAN GUI (INTERFAS PENGGUNA)
+-- 4. PEMBUATAN GUI (INTERFAS PENGGUNA)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "UltimateParryGUI"
 ScreenGui.Parent = game:GetService("CoreGui")
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 225)
+MainFrame.Size = UDim2.new(0, 250, 0, 225) -- DIPERPANJANG UNTUK 4 TOMBOL
 MainFrame.Position = UDim2.new(0.5, -125, 0.5, -112)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.BorderSizePixel = 0
@@ -219,7 +174,7 @@ local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -60, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Ultimate Parry v1.6"
+Title.Text = "Ultimate Parry v1.5"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 13
 Title.Font = Enum.Font.GothamBold
@@ -252,7 +207,7 @@ UIListLayout.Padding = UDim.new(0, 10)
 UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-local function CreateToggle(name, settingKey, onAction, offAction)
+local function CreateToggle(name, settingKey, action)
     local Btn = Instance.new("TextButton", Content)
     Btn.Size = UDim2.new(0, 200, 0, 35)
     Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
@@ -268,19 +223,19 @@ local function CreateToggle(name, settingKey, onAction, offAction)
         if SETTINGS[settingKey] then
             Btn.Text = name .. ": ON"
             Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 80)
-            if onAction then onAction() end
+            if action then action() end
         else
             Btn.Text = name .. ": OFF"
             Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-            if offAction then offAction() end
+            if settingKey == "Visuals" then DestroyVisualizer() end
         end
     end)
     return Btn
 end
 
 CreateToggle("Auto Parry", "AutoParry")
-CreateToggle("Smart Visualizer", "Visuals", CreateVisualizer, DestroyVisualizer)
-CreateToggle("Auto Distance", "AutoDistance", CreateDistVisualizer, DestroyDistVisualizer)
+CreateToggle("Smart Visualizer", "Visuals", CreateVisualizer)
+CreateToggle("Auto Distance", "AutoDistance") -- TOMBOL KE-4 DITAMBAHKAN
 CreateToggle("FPS Optimizer", "OptimizerOn", ApplyOptimizer)
 
 local IsMinimized = false
@@ -299,27 +254,25 @@ CloseBtn.MouseButton1Click:Connect(function()
     SETTINGS.AutoParry = false
     SETTINGS.AutoDistance = false
     DestroyVisualizer()
-    DestroyDistVisualizer()
     if MainConnection then MainConnection:Disconnect() end
     ScreenGui:Destroy()
 end)
 
 -- ==========================================
--- 6. LOOP UTAMA (CORE ENGINE)
+-- 5. LOOP UTAMA (CORE ENGINE)
 -- ==========================================
--- Diubah ke PreSimulation agar input kaki dikirim sebelum fisika game dirender
-MainConnection = RunService.PreSimulation:Connect(function()
+MainConnection = RunService.PostSimulation:Connect(function()
     local Char = Player.Character
     local Root = Char and Char:FindFirstChild("HumanoidRootPart")
     local Hum = Char and Char:FindFirstChild("Humanoid")
     if not Root or not Hum then return end
 
-    -- [SISTEM AUTO DISTANCE]
-    local enemyInZone = false
+    -- [FITUR BARU] SISTEM AUTO JAGA JARAK (ANTI CLOSE COMBAT)
     if SETTINGS.AutoDistance and Hum.Health > 0 then
         local nearestDist = math.huge
         local escapeDir = nil
         
+        -- Cari player terdekat
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 local eHum = p.Character:FindFirstChild("Humanoid")
@@ -329,28 +282,22 @@ MainConnection = RunService.PreSimulation:Connect(function()
                     
                     if dist < nearestDist then
                         nearestDist = dist
+                        -- Hitung arah menjauh (posisi kita dikurangi posisi musuh)
                         escapeDir = (Root.Position - eRoot.Position).Unit
                     end
                 end
             end
         end
 
+        -- Eksekusi pergerakan mundur otomatis jika ada musuh yang terlalu dekat
         if nearestDist < SETTINGS.KeepDistance and escapeDir then
-            enemyInZone = true
-            -- Mencegah Error NaN: Pastikan vektor tidak 0 setelah sumbu Y dibuang
-            local flatDir = Vector3.new(escapeDir.X, 0, escapeDir.Z)
-            if flatDir.Magnitude > 0.01 then
-                Hum:Move(flatDir.Unit, false) 
-            end
+            -- Buang sumbu Y agar karakter tidak mencoba terbang/masuk tanah
+            local safeDir = Vector3.new(escapeDir.X, 0, escapeDir.Z).Unit
+            Hum:Move(safeDir, false) 
         end
     end
 
-    -- Update UI Radar Jarak
-    if SETTINGS.AutoDistance and frameCounter % 2 == 0 then
-        UpdateDistVisuals(Root, enemyInZone)
-    end
-
-    -- [SISTEM AUTO PARRY]
+    -- SISTEM AUTO PARRY
     if not SETTINGS.AutoParry then 
         if VisualPart then VisualPart.Transparency = 1 end
         return 
