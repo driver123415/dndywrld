@@ -1,14 +1,127 @@
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
+local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 
-print("==================================================")
-print("🛒 MEMULAI TEST PROTOKOL AUTO-BUY UGC (5 ITEM)...")
-print("==================================================")
+local promptInputResult = ReplicatedStorage:WaitForChild("PromptInputResult")
+local cutsceneEvent = ReplicatedStorage:WaitForChild("DuckCutsceneFinished")
+
+-- Menggunakan CoreGui agar aman dari deteksi, fallback ke PlayerGui
+local parentGui = pcall(function() return CoreGui.Name end) and CoreGui or player:WaitForChild("PlayerGui")
+
+-- Hapus GUI lama jika sudah ada
+if parentGui:FindFirstChild("DuckUGCHub") then
+	parentGui.DuckUGCHub:Destroy()
+end
+
+-- ==========================================
+-- MEMBUAT UI ELEMENTS
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DuckUGCHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = parentGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 160)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -80)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- TOP BAR (Untuk Dragging)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Duck & UGC Auto-Farm"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- TOMBOL CLOSE
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 14
+CloseButton.Parent = TopBar
+
+-- TOMBOL 1: AUTO DUCK COLLECTION
+local BtnAutoDuck = Instance.new("TextButton")
+BtnAutoDuck.Size = UDim2.new(1, -20, 0, 40)
+BtnAutoDuck.Position = UDim2.new(0, 10, 0, 50)
+BtnAutoDuck.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+BtnAutoDuck.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnAutoDuck.Font = Enum.Font.GothamBold
+BtnAutoDuck.TextSize = 13
+BtnAutoDuck.Text = "1. Auto Duck Collection (Full Route)"
+BtnAutoDuck.Parent = MainFrame
+Instance.new("UICorner", BtnAutoDuck).CornerRadius = UDim.new(0, 6)
+
+-- TOMBOL 2: COLLECT EXTRA ITEMS
+local BtnExtraItems = Instance.new("TextButton")
+BtnExtraItems.Size = UDim2.new(1, -20, 0, 40)
+BtnExtraItems.Position = UDim2.new(0, 10, 0, 105)
+BtnExtraItems.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+BtnExtraItems.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnExtraItems.Font = Enum.Font.GothamBold
+BtnExtraItems.TextSize = 13
+BtnExtraItems.Text = "2. Collect All Extra Items (4 UGC)"
+BtnExtraItems.Parent = MainFrame
+Instance.new("UICorner", BtnExtraItems).CornerRadius = UDim.new(0, 6)
+
+-- ==========================================
+-- LOGIKA DRAGGING UI
+-- ==========================================
+local dragging, dragInput, mousePos, framePos
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		mousePos = input.Position
+		framePos = MainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - mousePos
+		MainFrame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+	end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+end)
 
 -- ==================================================
--- FUNGSI BANTUAN
+-- FUNGSI OTOMATISASI INTI
 -- ==================================================
 local function getHRP()
 	local char = player.Character
@@ -21,109 +134,179 @@ local function firePromptsNearMe(radius)
 	if hrp then
 		for _, prompt in ipairs(workspace:GetDescendants()) do
 			if prompt:IsA("ProximityPrompt") then
-				local promptPart = prompt.Parent
-				if promptPart and promptPart:IsA("BasePart") then
-					if (hrp.Position - promptPart.Position).Magnitude <= radius then
-						fireproximityprompt(prompt)
-					end
+				local pPart = prompt.Parent
+				if pPart and pPart:IsA("BasePart") and (hrp.Position - pPart.Position).Magnitude <= radius then
+					fireproximityprompt(prompt)
 				end
 			end
 		end
 	end
 end
 
--- Fungsi untuk membypass pop-up Roblox CoreGui
+local function touchTeleport(targetCFrame)
+	local hrp = getHRP()
+	if hrp then
+		hrp.CFrame = targetCFrame
+		task.wait(0.3)
+		hrp.CFrame = targetCFrame + Vector3.new(0, 2, 0)
+		task.wait(0.3)
+	end
+end
+
 local function autoBuyUGC()
-	print("   ⏳ Menunggu pop-up Roblox Purchase muncul (2.5 detik)...")
-	task.wait(2.5) -- Waktu tunggu pop-up muncul
+	local inset = GuiService:GetGuiInset()
+	print("⏳ Menunggu pop-up 'Buy'...")
+	task.wait(3.5) 
 	
-	local buttonClicked = false
-	for _, instance in ipairs(CoreGui:GetDescendants()) do
-		if instance:IsA("TextButton") and instance.Text == "Buy" then
-			print("   🎯 Tombol 'Buy' terdeteksi! Mengeksekusi...")
-			if firesignal then
-				firesignal(instance.MouseButton1Click)
-				buttonClicked = true
-			elseif getconnections then
-				for _, connection in pairs(getconnections(instance.MouseButton1Click)) do
-					connection:Fire()
-				end
-				buttonClicked = true
-			else
-				local clickX = instance.AbsolutePosition.X + (instance.AbsoluteSize.X / 2)
-				local clickY = instance.AbsolutePosition.Y + (instance.AbsoluteSize.Y / 2) + 36
-				VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
-				task.wait(0.1)
-				VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
-				buttonClicked = true
-			end
+	local buyBtn = nil
+	for _, v in ipairs(CoreGui:GetDescendants()) do
+		if (v:IsA("TextButton") or v:IsA("TextLabel")) and v.Text == "Buy" then
+			buyBtn = v:IsA("TextButton") and v or v.Parent
 			break
 		end
 	end
-	
-	if buttonClicked then
-		print("   🎉 Item berhasil di-Buy!")
-		task.wait(2) -- Tunggu pop-up "Purchase Complete" muncul
+
+	if buyBtn and buyBtn.AbsolutePosition.X > 0 then
+		local bX = buyBtn.AbsolutePosition.X + (buyBtn.AbsoluteSize.X / 2)
+		local bY = buyBtn.AbsolutePosition.Y + (buyBtn.AbsoluteSize.Y / 2) + inset.Y
+		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, true, game, 1)
+		task.wait(0.1)
+		VirtualInputManager:SendMouseButtonEvent(bX, bY, 0, false, game, 1)
+		print("🎯 Tombol 'Buy' diklik!")
 		
-		-- Auto-close tombol "OK" pada pop-up sukses
-		for _, instance in ipairs(CoreGui:GetDescendants()) do
-			if instance:IsA("TextButton") and instance.Text == "OK" then
-				if firesignal then 
-					firesignal(instance.MouseButton1Click) 
-				elseif getconnections then
-					for _, connection in pairs(getconnections(instance.MouseButton1Click)) do
-						connection:Fire()
-					end
-				else
-					local clickX = instance.AbsolutePosition.X + (instance.AbsoluteSize.X / 2)
-					local clickY = instance.AbsolutePosition.Y + (instance.AbsoluteSize.Y / 2) + 36
-					VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
-					task.wait(0.1)
-					VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
-				end
-				print("   ✅ Pop-up ditutup otomatis.")
+		task.wait(3) 
+		print("⏳ Menunggu konfirmasi 'OK'...")
+		
+		local okBtn = nil
+		for _, v in ipairs(CoreGui:GetDescendants()) do
+			if (v:IsA("TextButton") or v:IsA("TextLabel")) and (v.Text == "OK" or v.Text == "Ok") then
+				okBtn = v:IsA("TextButton") and v or v.Parent
 				break
 			end
 		end
+		
+		if okBtn then
+			local oX = okBtn.AbsolutePosition.X + (okBtn.AbsoluteSize.X / 2)
+			local oY = okBtn.AbsolutePosition.Y + (okBtn.AbsoluteSize.Y / 2) + inset.Y
+			VirtualInputManager:SendMouseButtonEvent(oX, oY, 0, true, game, 1)
+			task.wait(0.1)
+			VirtualInputManager:SendMouseButtonEvent(oX, oY, 0, false, game, 1)
+			print("✅ Konfirmasi Selesai.")
+		end
 	else
-		print("   ⚠️ Auto-buy gagal/tidak muncul. Kemungkinan item sudah diklaim sebelumnya.")
+		print("⚠️ Pop-up tidak ditemukan.")
 	end
 end
 
+local function visualClick(btn, oriText)
+	local oriColor = btn.BackgroundColor3
+	btn.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
+	btn.Text = "Processing..."
+	return oriColor
+end
+
+local function resetBtn(btn, oriColor, oriText)
+	btn.BackgroundColor3 = oriColor
+	btn.Text = oriText
+end
+
 -- ==================================================
--- DATABASE KORDINAT 5 UGC
+-- DATABASE LOKASI
 -- ==================================================
-local ugcItems = {
-	{"Final Item (Duck Head)", CFrame.new(-235.199097, 78.6688232, -777.403625, -0.296778828, 1.86118303e-08, 0.95494622, -2.75188246e-08, 1, -2.80422423e-08, -0.95494622, -3.46013422e-08, -0.296778828)},
-	{"Extra Item 1", CFrame.new(18.9283524, 152.016907, -551.260925, 0.683667541, -5.64013414e-09, 0.729793608, 1.4545221e-08, 1, -5.89750471e-09, -0.729793608, 1.46469414e-08, 0.683667541)},
-	{"Extra Item 2", CFrame.new(-12.05828, 64.1875381, -407.384979, -0.348917574, -4.56518706e-07, 0.937153399, 2.14122636e-07, 1, 5.66854737e-07, -0.937153399, 3.98451334e-07, -0.348917574)},
-	{"Extra Item 3", CFrame.new(-18.9465733, 62.8016815, -427.226776, -0.110282153, 4.54213236e-08, 0.993900299, 1.47796239e-12, 1, -4.56999167e-08, -0.993900299, -5.03841635e-09, -0.110282153)},
-	{"Extra Item 4", CFrame.new(-15.2813377, 59.847847, -447.028564, -0.375132501, 9.84792692e-08, 0.926971197, 9.18668732e-08, 1, -6.90604196e-08, -0.926971197, 5.92511391e-08, -0.375132501)}
+local allDucks = {
+	{"Duck_01", CFrame.new(19.55, 65.19, -545.32)}, {"Duck_02", CFrame.new(-380.41, 55.03, -859.36)},
+	{"Duck_03", CFrame.new(-34.87, 120.21, -750.61)}, {"Duck_04", CFrame.new(-104.64, 40.88, -425.45)},
+	{"Duck_05", CFrame.new(80.50, 136.92, -860.72)}, {"Duck_06", CFrame.new(214.79, 73.51, -771.93)},
+	{"Duck_07", CFrame.new(-319.93, 109.68, -437.97)}, {"Duck_08", CFrame.new(97.70, 99.80, -733.99)},
+	{"Duck_10", CFrame.new(431.88, 154.84, -277.10)}, {"Duck_11", CFrame.new(267.50, 111.13, -517.07)}
+}
+
+local pedestals = {
+	{"CSG", "contained", CFrame.new(-295.18, 112.89, -630.34)}, {"OOP", "be", CFrame.new(-244.91, 126.71, -553.81)},
+	{"ModuleScripts", "cannot", CFrame.new(-309.33, 126.71, -550.40)}, {"VoiceChat", "i", CFrame.new(-374.17, 126.72, -549.26)},
+	{"Optimization", "understand", CFrame.new(-338.98, 126.80, -479.85)}, {"DataStores", "i", CFrame.new(-269.98, 129.78, -482.67)},
+	{"OutdoorLighting", "i", CFrame.new(134.28, 70.77, -614.74)}, {"MovingObjects", "hear", CFrame.new(177.00, 69.52, -667.62)},
+	{"IslandJumperPedestal", "break", CFrame.new(179.58, 70.72, -510.97)}, {"UIFundamentals", "i", CFrame.new(233.48, 70.19, -584.98)},
+	{"2D3DAudio", "devforum", CFrame.new(429.80, 71.23, -538.56)}, {"LightSources", "to", CFrame.new(476.69, 70.77, -496.35)},
+	{"ProximityPrompts", "go", CFrame.new(460.16, 70.56, -420.97)}, {"ScoreBars", "seal", CFrame.new(395.19, 70.65, -399.82)},
+	{"IndoorLighting", "this", CFrame.new(342.88, 70.71, -429.13)}, {"SpinningObjectsPedestal", "know", CFrame.new(296.88, 69.67, -631.40)},
+	{"Volcanoes", "you", CFrame.new(302.91, 71.82, -777.01)}, {"Waterfalls", "can", CFrame.new(199.30, 85.46, -774.37)},
+	{"UGC", "me", CFrame.new(31.68, 83.35, -850.31)}, {"MakeanObby", "but", CFrame.new(-183.77, 115.98, -490.65)}
+}
+
+local finalDuckUGC = {
+	{"Final Duck Head", CFrame.new(-235.19, 78.66, -777.40)}
+}
+
+local extraUGCs = {
+	{"Extra 1", CFrame.new(18.92, 152.01, -551.26)},
+	{"Extra 2", CFrame.new(-12.05, 64.18, -407.38)},
+	{"Extra 3", CFrame.new(-18.94, 62.80, -427.22)},
+	{"Extra 4", CFrame.new(-15.28, 59.84, -447.02)}
 }
 
 -- ==================================================
--- EKSEKUSI LOOPING
+-- LOGIKA TOMBOL 1: AUTO DUCK COLLECTION
 -- ==================================================
-for i, itemData in ipairs(ugcItems) do
-	local itemName = itemData[1]
-	local itemLoc = itemData[2]
+BtnAutoDuck.MouseButton1Click:Connect(function()
+	local oriColor = visualClick(BtnAutoDuck, "1. Auto Duck Collection (Full Route)")
 	
-	local currentHrp = getHRP()
-	if currentHrp then
-		print("\n▶️ [" .. i .. "/5] OTW ke: " .. itemName)
+	-- Gunakan task.spawn agar GUI tidak freeze
+	task.spawn(function()
+		print("\n▶️ MEMULAI RUTE DUCK COLLECTION...")
+		for _, d in ipairs(allDucks) do touchTeleport(d[2]) end
 		
-		-- Teleport ke lokasi UGC
-		currentHrp.CFrame = itemLoc
-		task.wait(1.5) -- Jeda agar area dan Proximity Prompt sempat ter-load oleh server
-		
-		-- Eksekusi Proximity (Interact)
-		firePromptsNearMe(15)
-		
-		-- Proses Auto Buy
-		autoBuyUGC()
-	end
-end
+		for _, p in ipairs(pedestals) do
+			promptInputResult:FireServer(p[1], p[2])
+			task.wait(0.2)
+			touchTeleport(p[3])
+		end
 
-print("\n==================================================")
-print("🏆 TEST AUTO-BUY SELESAI!")
-print("==================================================")
+		local hrp = getHRP()
+		if hrp then
+			hrp.CFrame = CFrame.new(-243.31, 66.23, -730.58)
+			task.wait(1)
+			firePromptsNearMe(15)
+			task.wait(0.5)
+			pcall(function() cutsceneEvent:FireServer("NPC_FirstTime_All30") end)
+			task.wait(2)
+			
+			print("▶️ Klaim Final Duck UGC...")
+			hrp.CFrame = finalDuckUGC[1][2]
+			task.wait(1.5)
+			firePromptsNearMe(15)
+			autoBuyUGC()
+		end
+		
+		print("✅ RUTE DUCK SELESAI!")
+		resetBtn(BtnAutoDuck, oriColor, "1. Auto Duck Collection (Full Route)")
+	end)
+end)
+
+-- ==================================================
+-- LOGIKA TOMBOL 2: COLLECT EXTRA ITEMS
+-- ==================================================
+BtnExtraItems.MouseButton1Click:Connect(function()
+	local oriColor = visualClick(BtnExtraItems, "2. Collect All Extra Items (4 UGC)")
+	
+	task.spawn(function()
+		print("\n▶️ MEMULAI BORONG EXTRA ITEMS...")
+		local hrp = getHRP()
+		
+		for i, item in ipairs(extraUGCs) do
+			if hrp then
+				print("OTW: " .. item[1])
+				hrp.CFrame = item[2]
+				task.wait(1.5)
+				firePromptsNearMe(15)
+				autoBuyUGC()
+				task.wait(1)
+			end
+		end
+		
+		print("✅ BORONG ITEM SELESAI!")
+		resetBtn(BtnExtraItems, oriColor, "2. Collect All Extra Items (4 UGC)")
+	end)
+end)
+
+print("✅ GUI DuckUGCHub berhasil dimuat!")
