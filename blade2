@@ -1,0 +1,468 @@
+--[[
+    THE ULTIMATE AUTO PARRY V1.5 (+ AUTO DISTANCE KEEPER)
+    Fix 1: Karakter tidak lagi bengong/freeze saat duel 1v1 jarak dekat.
+    Fix 2: Radar otomatis melebar jika kecepatan bola sangat ekstrem.
+    NEW v1.5: Tombol ke-4 Auto Distance - menjaga jarak aman dari player lain.
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local CoreGui = game:GetService("CoreGui")
+
+local Player = Players.LocalPlayer
+
+-- Konfigurasi Global
+local SETTINGS = {
+    AutoParry = false,
+    Visuals = false,
+    PingBasedOffset = 2.5,
+    BaseDistanceToParry = 1.0,
+    EmergencyRadius = 15,
+    OptimizerOn = false,
+    AutoDistance = false,
+    SafeRadius = 18  -- Jarak aman dari player lain (studs)
+}
+
+local LastClick = 0
+local LastBallHit = nil
+local IsParrying = false
+local frameCounter = 0
+local VisualPart, VisualMesh
+local DistanceVisualPart, DistanceVisualMesh  -- Visualizer radius jarak
+local MainConnection
+
+local NetworkStats = Stats:FindFirstChild("Network")
+    and Stats.Network:FindFirstChild("ServerStatsItem")
+    and Stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
+
+-- ==========================================
+-- 1. SISTEM VISUALIZER (SMART CIRCLE - PARRY)
+-- ==========================================
+local function CreateVisualizer()
+    if VisualPart then return end
+    VisualPart = Instance.new("Part")
+    VisualPart.Name = "UltimateSmartCircle"
+    VisualPart.Parent = workspace
+    VisualPart.Anchored = true
+    VisualPart.CanCollide = false
+    VisualPart.Transparency = 1
+    VisualPart.Material = Enum.Material.Neon
+    VisualPart.Size = Vector3.new(1, 1, 1)
+
+    VisualMesh = Instance.new("SpecialMesh", VisualPart)
+    VisualMesh.MeshId = "rbxassetid://3270017"
+    VisualMesh.Scale = Vector3.new(0, 0, 0)
+end
+
+local function DestroyVisualizer()
+    if VisualPart then
+        VisualPart:Destroy()
+        VisualPart = nil
+        VisualMesh = nil
+    end
+end
+
+local function UpdateVisuals(root, distance, state)
+    if not SETTINGS.Visuals or not VisualPart then
+        if VisualPart then VisualPart.Transparency = 1 end
+        return
+    end
+
+    VisualPart.CFrame = root.CFrame * CFrame.new(0, -2.6, 0) * CFrame.Angles(math.rad(90), 0, 0)
+    local targetSize = math.clamp(distance * 0.8, 5, 80)
+    VisualMesh.Scale = VisualMesh.Scale:Lerp(Vector3.new(targetSize, targetSize, 0.5), 0.5)
+
+    if state == "danger" then
+        VisualPart.Color = Color3.fromRGB(255, 0, 0)
+        VisualPart.Transparency = 0.05
+    elseif state == "target" then
+        VisualPart.Color = Color3.fromRGB(0, 255, 255)
+        VisualPart.Transparency = 0.1
+    else
+        VisualPart.Color = Color3.fromRGB(150, 240, 255)
+        VisualPart.Transparency = 0.5
+    end
+end
+
+-- ==========================================
+-- 1B. VISUALIZER RADIUS JARAK (DISTANCE KEEPER)
+-- ==========================================
+local function CreateDistanceVisualizer()
+    if DistanceVisualPart then return end
+    DistanceVisualPart = Instance.new("Part")
+    DistanceVisualPart.Name = "DistanceKeeperCircle"
+    DistanceVisualPart.Parent = workspace
+    DistanceVisualPart.Anchored = true
+    DistanceVisualPart.CanCollide = false
+    DistanceVisualPart.Transparency = 1
+    DistanceVisualPart.Material = Enum.Material.Neon
+    DistanceVisualPart.Size = Vector3.new(1, 1, 1)
+
+    DistanceVisualMesh = Instance.new("SpecialMesh", DistanceVisualPart)
+    DistanceVisualMesh.MeshId = "rbxassetid://3270017"
+    -- Scale langsung sesuai SafeRadius, statis karena ini adalah zona tetap
+    local r = SETTINGS.SafeRadius * 1.0
+    DistanceVisualMesh.Scale = Vector3.new(r, r, 0.3)
+end
+
+local function DestroyDistanceVisualizer()
+    if DistanceVisualPart then
+        DistanceVisualPart:Destroy()
+        DistanceVisualPart = nil
+        DistanceVisualMesh = nil
+    end
+end
+
+local function UpdateDistanceVisuals(root, enemyNearby)
+    if not SETTINGS.AutoDistance or not DistanceVisualPart then
+        if DistanceVisualPart then DistanceVisualPart.Transparency = 1 end
+        return
+    end
+
+    -- Ikuti posisi player, flat di lantai
+    DistanceVisualPart.CFrame = root.CFrame * CFrame.new(0, -2.8, 0) * CFrame.Angles(math.rad(90), 0, 0)
+
+    -- Animasi scale: sedikit berdenyut saat ada musuh dekat
+    local r = SETTINGS.SafeRadius * 1.0
+    if enemyNearby then
+        -- Berdenyut / pulse merah
+        local pulse = math.sin(tick() * 8) * 2
+        DistanceVisualMesh.Scale = Vector3.new(r + pulse, r + pulse, 0.3)
+        DistanceVisualPart.Color = Color3.fromRGB(255, 80, 0)
+        DistanceVisualPart.Transparency = 0.15
+    else
+        -- Normal: hijau/kuning tenang
+        DistanceVisualMesh.Scale = DistanceVisualMesh.Scale:Lerp(Vector3.new(r, r, 0.3), 0.12)
+        DistanceVisualPart.Color = Color3.fromRGB(80, 255, 130)
+        DistanceVisualPart.Transparency = 0.45
+    end
+end
+
+-- ==========================================
+-- 2. SISTEM OPTIMIZER FPS
+-- ==========================================
+local function ApplyOptimizer()
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows = false
+        lighting.FogEnd = 1e10
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+                v.Enabled = false
+            end
+        end
+    end)
+end
+
+-- ==========================================
+-- 3. LOGIKA AUTO PARRY & MATEMATIKA
+-- ==========================================
+local function GetBall()
+    local BallsFolder = workspace:FindFirstChild("Balls")
+    if not BallsFolder then return nil end
+    for _, v in ipairs(BallsFolder:GetChildren()) do
+        if v:GetAttribute("realBall") == true then return v end
+    end
+    return nil
+end
+
+local function IsTargeted(ball)
+    if not Player.Character then return false end
+    if ball and ball:GetAttribute("target") == Player.Name then
+        return true
+    end
+    return Player.Character:GetAttribute("Targeted") == true
+        or Player.Character:FindFirstChild("Highlight") ~= nil
+end
+
+local function SendClick(ball)
+    if not SETTINGS.AutoParry or IsParrying then return end
+
+    local now = tick()
+    local cd = 0.1
+
+    if LastBallHit == ball and (now - LastClick) < 0.15 then return end
+    if (now - LastClick) < cd then return end
+
+    IsParrying = true
+    LastClick = now
+    LastBallHit = ball
+
+    task.spawn(function()
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+        task.wait(0.015)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    end)
+
+    task.delay(cd, function() IsParrying = false end)
+end
+
+-- ==========================================
+-- 3B. LOGIKA AUTO DISTANCE KEEPER
+-- ==========================================
+--[[
+    Cara kerja:
+    - Setiap frame, cari semua player lain yang ROOT-nya dalam jarak SafeRadius.
+    - Hitung vektor arah rata-rata dari semua musuh terdekat ke local player (escape vector).
+    - Gunakan Humanoid:MoveTo() ke titik yang jauh dari mereka.
+    - Jika tidak ada musuh dekat, biarkan pemain bergerak bebas (tidak override input).
+]]
+local lastMoveTime = 0
+
+local function RunAutoDistance(root, humanoid)
+    if not SETTINGS.AutoDistance then return end
+
+    local myPos = root.Position
+    local escapeVector = Vector3.new(0, 0, 0)
+    local countNear = 0
+    local closestDist = math.huge
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer == Player then continue end
+        local otherChar = otherPlayer.Character
+        local otherRoot = otherChar and otherChar:FindFirstChild("HumanoidRootPart")
+        if not otherRoot then continue end
+
+        local diff = myPos - otherRoot.Position
+        local dist = diff.Magnitude
+
+        if dist < SETTINGS.SafeRadius and dist > 0.5 then
+            -- Timbang berdasarkan kedekatan: semakin dekat, semakin kuat dorongan
+            local weight = 1 / math.max(dist, 1)
+            escapeVector = escapeVector + (diff.Unit * weight)
+            countNear = countNear + 1
+            if dist < closestDist then closestDist = dist end
+        end
+    end
+
+    if countNear > 0 then
+        -- Normalisasi dan tentukan titik tujuan lari
+        escapeVector = escapeVector.Unit
+        -- Jarak lari: setidaknya SafeRadius + sedikit buffer agar tidak terus menerus gerak
+        local targetPos = myPos + Vector3.new(escapeVector.X, 0, escapeVector.Z) * (SETTINGS.SafeRadius + 5)
+        -- Pertahankan Y dari floor agar tidak terbang
+        targetPos = Vector3.new(targetPos.X, myPos.Y, targetPos.Z)
+
+        -- Rate-limit agar tidak spam MoveTo setiap frame (cukup setiap 0.08 detik)
+        local now = tick()
+        if (now - lastMoveTime) > 0.08 then
+            humanoid:MoveTo(targetPos)
+            lastMoveTime = now
+        end
+        return true -- ada musuh dekat
+    end
+
+    return false -- aman, tidak ada yang dekat
+end
+
+-- ==========================================
+-- 4. PEMBUATAN GUI (INTERFAS PENGGUNA)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "UltimateParryGUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 230)  -- Diperbesar untuk tombol ke-4
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -115)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner", MainFrame)
+UICorner.CornerRadius = UDim.new(0, 8)
+
+local Header = Instance.new("Frame", MainFrame)
+Header.Size = UDim2.new(1, 0, 0, 30)
+Header.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+Header.BorderSizePixel = 0
+local HeaderCorner = Instance.new("UICorner", Header)
+HeaderCorner.CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1, -60, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Ultimate Parry v1.5"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 13
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local MinimizeBtn = Instance.new("TextButton", Header)
+MinimizeBtn.Size = UDim2.new(0, 30, 1, 0)
+MinimizeBtn.Position = UDim2.new(1, -60, 0, 0)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+MinimizeBtn.TextSize = 20
+
+local CloseBtn = Instance.new("TextButton", Header)
+CloseBtn.Size = UDim2.new(0, 30, 1, 0)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+
+local Content = Instance.new("Frame", MainFrame)
+Content.Size = UDim2.new(1, 0, 1, -30)
+Content.Position = UDim2.new(0, 0, 0, 30)
+Content.BackgroundTransparency = 1
+
+local UIListLayout = Instance.new("UIListLayout", Content)
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local function CreateToggle(name, settingKey, onAction, offAction)
+    local Btn = Instance.new("TextButton", Content)
+    Btn.Size = UDim2.new(0, 210, 0, 35)
+    Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    Btn.Text = name .. ": OFF"
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.Font = Enum.Font.GothamSemibold
+    Btn.TextSize = 13
+    local BtnCorner = Instance.new("UICorner", Btn)
+    BtnCorner.CornerRadius = UDim.new(0, 6)
+
+    Btn.MouseButton1Click:Connect(function()
+        SETTINGS[settingKey] = not SETTINGS[settingKey]
+        if SETTINGS[settingKey] then
+            Btn.Text = name .. ": ON"
+            Btn.BackgroundColor3 = Color3.fromRGB(50, 150, 80)
+            if onAction then onAction() end
+        else
+            Btn.Text = name .. ": OFF"
+            Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            if offAction then offAction() end
+        end
+    end)
+    return Btn
+end
+
+CreateToggle("Auto Parry", "AutoParry")
+CreateToggle("Smart Visualizer", "Visuals", CreateVisualizer, DestroyVisualizer)
+CreateToggle("FPS Optimizer", "OptimizerOn", ApplyOptimizer)
+
+-- Tombol ke-4: Auto Distance Keeper
+-- ON: buat visualizer radius jarak
+-- OFF: hancurkan visualizer radius jarak
+CreateToggle(
+    "Auto Distance Keeper",
+    "AutoDistance",
+    function()
+        CreateDistanceVisualizer()
+    end,
+    function()
+        DestroyDistanceVisualizer()
+    end
+)
+
+local IsMinimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    IsMinimized = not IsMinimized
+    if IsMinimized then
+        MainFrame.Size = UDim2.new(0, 250, 0, 30)
+        Content.Visible = false
+    else
+        MainFrame.Size = UDim2.new(0, 250, 0, 230)
+        Content.Visible = true
+    end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    SETTINGS.AutoParry = false
+    SETTINGS.AutoDistance = false
+    DestroyVisualizer()
+    DestroyDistanceVisualizer()
+    if MainConnection then MainConnection:Disconnect() end
+    ScreenGui:Destroy()
+end)
+
+-- ==========================================
+-- 5. LOOP UTAMA (CORE ENGINE)
+-- ==========================================
+MainConnection = RunService.PostSimulation:Connect(function()
+    local Char = Player.Character
+    local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+    local Humanoid = Char and Char:FindFirstChildOfClass("Humanoid")
+
+    if not Root or not Humanoid then return end
+
+    -- ---- AUTO DISTANCE KEEPER ----
+    local enemyNearby = false
+    if SETTINGS.AutoDistance then
+        enemyNearby = RunAutoDistance(Root, Humanoid)
+        UpdateDistanceVisuals(Root, enemyNearby)
+    elseif DistanceVisualPart then
+        DistanceVisualPart.Transparency = 1
+    end
+
+    -- ---- AUTO PARRY ----
+    if not SETTINGS.AutoParry then
+        if VisualPart then VisualPart.Transparency = 1 end
+        return
+    end
+
+    local Ball = GetBall()
+    if not Ball then
+        if VisualPart then VisualPart.Transparency = 1 end
+        return
+    end
+
+    local BallPos = Ball.Position
+    local PlayerPos = Root.Position
+    local Velocity = Ball.AssemblyLinearVelocity
+    local Speed = Velocity.Magnitude
+    local Distance = (PlayerPos - BallPos).Magnitude
+
+    local directionToPlayer = (PlayerPos - BallPos).Unit
+    local velocityDirection = Velocity.Unit
+    local dot = directionToPlayer:Dot(velocityDirection)
+
+    if dot < -0.2 then
+        LastBallHit = nil
+        if VisualPart and frameCounter % 2 == 0 then UpdateVisuals(Root, Distance, "neutral") end
+        return
+    end
+
+    local Targeted = IsTargeted(Ball)
+
+    frameCounter = frameCounter + 1
+    if VisualPart and frameCounter % 2 == 0 then
+        UpdateVisuals(Root, Distance, Targeted and "danger" or "neutral")
+    end
+
+    if Targeted then
+        local Ping = (NetworkStats and NetworkStats.Value / 1000) or 0.04
+        local TimeToHit = Distance / math.max(Speed, 1)
+
+        local SpeedFactor = Speed / 100
+        local PredictionThreshold = SETTINGS.BaseDistanceToParry + (Ping * SETTINGS.PingBasedOffset) + SpeedFactor
+
+        if Speed > 150 then
+            PredictionThreshold = PredictionThreshold * 1.2
+        end
+
+        if TimeToHit <= PredictionThreshold or Distance <= SETTINGS.EmergencyRadius then
+            SendClick(Ball)
+        end
+    end
+end)
+
+Player.CharacterAdded:Connect(function()
+    LastBallHit = nil
+    IsParrying = false
+    -- Reset visualizer distance saat respawn
+    if DistanceVisualPart then
+        DistanceVisualPart.Transparency = 1
+    end
+end)
