@@ -12,7 +12,7 @@ end
 
 local scripts = {
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey2",
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Claim",
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Scriptsolokey3",--mastery
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey3",--multiiiiiiiii
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",--solo
