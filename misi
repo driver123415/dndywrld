@@ -1,0 +1,6 @@
+wait (120)
+
+local args = {
+	game:GetService("ReplicatedStorage"):WaitForChild("SharedData"):WaitForChild("TowerData"):WaitForChild("Toodles") --Toodles, Tisha, Cosmo, Brightney, urut kiri ke kanan
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("ChangeChar"):FireServer(unpack(args))
