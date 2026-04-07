@@ -28,18 +28,6 @@ game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidayTower"):InvokeServe
 
 wait (0.5)
 local args = {
-	"Poppy"
-}
-game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
-
-wait (0.5)
-local args = {
-	"Shrimpo"
-}
-game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
-
-wait (0.5)
-local args = {
 	"Tisha"
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
@@ -64,7 +52,25 @@ game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpac
 
 wait (0.5)
 local args = {
+	"Poppy"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Shrimpo"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
 	"Finn"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Rodger"
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
 
