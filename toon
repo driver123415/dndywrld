@@ -62,6 +62,11 @@ local args = {
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
 
+wait (0.5)
+local args = {
+	"Finn"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
 
 --Stiker event easter
 wait (0.5)
