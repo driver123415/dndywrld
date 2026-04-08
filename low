@@ -1,5 +1,5 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK V5 (ELEGANT UI)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V5.2 ULTIMATE FULLBRIGHT)
 -- ==============================================================================
 
 local Config = {
@@ -29,10 +29,9 @@ local stats = {
     Holiday = "0"
 }
 
-local lastInventoryCount = 0
 local countedGenerators = {}
 
--- ==================== LOW GRAPHICS ENGINE ====================
+-- ==================== ULTIMATE POTATO + FULLBRIGHT ENGINE ====================
 local function applyLowGraphics()
     pcall(function()
         sethiddenproperty(Lighting, "Technology", 2)
@@ -42,49 +41,77 @@ local function applyLowGraphics()
     Terrain.WaterWaveSize = 0
     Terrain.WaterWaveSpeed = 0
     Terrain.WaterReflectance = 0
-    Terrain.WaterTransparency = 0
+    Terrain.WaterTransparency = 1
 
+    -- PENGATURAN FULLBRIGHT & ANTI-FOG
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
-    Lighting.Brightness = 0
+    Lighting.FogStart = 0
+    Lighting.ClockTime = 14
+    Lighting.Brightness = 3
+    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
 
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("BasePart") and not v:IsA("MeshPart") then
-            v.Material = "Plastic"
-            v.Reflectance = 0
-        elseif v:IsA("Decal") or v:IsA("Texture") then
-            v.Transparency = 1
-        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-            v.Lifetime = NumberRange.new(0)
-        elseif v:IsA("Explosion") then
-            v.BlastPressure = 1
-            v.BlastRadius = 1
-        elseif v:IsA("Fire") or v:IsA("SpotLight") or v:IsA("Smoke") or v:IsA("Sparkles") then
-            v.Enabled = false
-        end
+    -- MENGHANCURKAN TEKSTUR & KOSMETIK
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        pcall(function()
+            if v:IsA("BasePart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+                if v.MaterialVariant ~= "" then
+                    v.MaterialVariant = ""
+                end
+            end
+            
+            if v:IsA("MeshPart") then
+                v.TextureID = ""
+            elseif v:IsA("SpecialMesh") then
+                v.TextureId = ""
+            elseif v:IsA("Decal") or v:IsA("Texture") then
+                v.Transparency = 1
+            elseif v:IsA("SurfaceAppearance") then
+                v:Destroy() -- Dalang utama grafik bagus
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+                v.Lifetime = NumberRange.new(0)
+            elseif v:IsA("Explosion") then
+                v.BlastPressure = 1
+                v.BlastRadius = 1
+            elseif v:IsA("Fire") or v:IsA("SpotLight") or v:IsA("Smoke") or v:IsA("Sparkles") or v:IsA("PointLight") or v:IsA("SurfaceLight") then
+                v.Enabled = false
+            end
+        end)
     end
 
-    for _, e in pairs(Lighting:GetChildren()) do
-        if e:IsA("PostEffect") then e.Enabled = false end
+    -- MENGHANCURKAN LANGIT & POST-PROCESSING
+    for _, e in ipairs(Lighting:GetChildren()) do
+        pcall(function()
+            if e:IsA("PostEffect") or e:IsA("Atmosphere") or e:IsA("Sky") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") or e:IsA("BlurEffect") or e:IsA("SunRaysEffect") then
+                if e:IsA("Sky") or e:IsA("Atmosphere") then
+                    e:Destroy() 
+                else
+                    e.Enabled = false
+                end
+            end
+        end)
     end
     
     if setfpscap then pcall(function() setfpscap(15) end) end
 end
 
--- MENDETEKSI LANTAI BARU AGAR OTOMATIS DI-OPTIMASI
+-- ==================== AUTO-DETECTOR MAP BARU ====================
 local currentRoomFolder = Workspace:WaitForChild("CurrentRoom", 10)
 if currentRoomFolder then
     currentRoomFolder.ChildAdded:Connect(function(child)
         if isOptimized and child:IsA("Model") then
             task.wait(2) -- Tunggu map termuat penuh
             applyLowGraphics()
-            countedGenerators = {} -- Reset mesin saat masuk lantai baru
+            countedGenerators = {} -- Reset ingatan mesin di lantai baru
         end
     end)
 end
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizerV5"
+local guiName = "DandySuperOptimizerV5_Final"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
@@ -95,7 +122,7 @@ screenGui.DisplayOrder = 9999999
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetGui
 
--- BLACK SCREEN OVERLAY (200% Ukuran Layar)
+-- BLACK SCREEN OVERLAY (200% Screen)
 local blackScreen = Instance.new("Frame")
 blackScreen.Size = UDim2.new(2, 0, 2, 0)
 blackScreen.Position = UDim2.new(-0.5, 0, -0.5, 0)
@@ -104,7 +131,7 @@ blackScreen.Visible = false
 blackScreen.ZIndex = 1
 blackScreen.Parent = screenGui
 
--- TEXT CONTAINER
+-- TEXT CONTAINER (100% Screen)
 local textContainer = Instance.new("Frame")
 textContainer.Size = UDim2.new(1, 0, 1, 0)
 textContainer.Position = UDim2.new(0, 0, 0, 0)
@@ -132,7 +159,7 @@ local function CreateElegantToggle(config)
     local MainBorder = Instance.new("Frame")
     MainBorder.Parent = screenGui
     MainBorder.Size = UDim2.new(0, 160, 0, 50)
-    MainBorder.Position = UDim2.new(0, 20, 0.5, -25) -- Posisi default di kiri tengah
+    MainBorder.Position = UDim2.new(0, 20, 0.5, -25)
     MainBorder.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     MainBorder.BorderSizePixel = 0
     MainBorder.ZIndex = 10
@@ -217,7 +244,7 @@ local function CreateElegantToggle(config)
         config.Callback(state)
     end)
 
-    -- Sistem Drag
+    -- Sistem Drag Manual
     local dragging, dragStart, frameStart
     Main.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -238,7 +265,6 @@ local function CreateElegantToggle(config)
         end
     end)
 
-    -- Fungsi Trigger Manual
     return function(v)
         state = v
         Knob.Position = v and UDim2.fromScale(0.55, 0.05) or UDim2.fromScale(0.05, 0.05)
@@ -247,7 +273,6 @@ local function CreateElegantToggle(config)
     end
 end
 
--- Buat GUI
 local setToggleState = CreateElegantToggle({
     Text = "AFK\nOptimizer",
     Default = false,
@@ -318,7 +343,6 @@ local function checkLocalPlayerMachines()
 end
 
 local function updateStatsVariables()
-    -- Cek Toon
     local igp = Workspace:FindFirstChild("InGamePlayers")
     if igp then
         local myCharInfo = igp:FindFirstChild(player.Name)
@@ -330,7 +354,6 @@ local function updateStatsVariables()
         end
     end
 
-    -- Cek Currency
     local pGui = player:FindFirstChild("PlayerGui")
     if pGui then
         local sGui = pGui:FindFirstChild("ScreenGui")
@@ -348,7 +371,6 @@ local function updateStatsVariables()
             end
         end
 
-        -- Deteksi Lantai & Mastery
         for _, ui in ipairs(pGui:GetDescendants()) do
             if ui:IsA("TextLabel") and string.find(string.lower(ui.Text), "floor") then
                 local match = string.match(ui.Text, "FLOOR%s*(%d+)") or string.match(ui.Text, "Floor:%s*(%d+)")
@@ -394,10 +416,10 @@ task.spawn(function()
     end
 end)
 
--- ==================== AUTO START ====================
+-- ==================== AUTO START SAFE ====================
 if Config.AutoOptimizer then
     task.spawn(function()
-        task.wait(1.5)
+        task.wait(1.5) -- Jeda aman agar GUI Roblox termuat sebelum di-hide
         setToggleState(true)
     end)
 end
