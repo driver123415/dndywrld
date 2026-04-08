@@ -4,7 +4,7 @@
 
 local Config = {
     AutoOptimizer = true, 
-    AutoStartDelay = 0 -- Set 0 untuk instan (tanpa delay sama sekali)
+    AutoStartDelay = 0 -- Set 0 untuk instan (tanpa delay sama sekali 1.5-aman)
 }
 
 local INGAME_PLACE_ID = 16552821455
