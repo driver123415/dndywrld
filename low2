@@ -1,10 +1,10 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V11 ULTIMATE + AUTO-CLICK)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V12 FLAWLESS EDITION)
 -- ==============================================================================
 
 local Config = {
     AutoOptimizer = true, 
-    AutoStartDelay = 0 -- Set 0 untuk instan (tanpa delay sama sekali 1.5-aman)
+    AutoStartDelay = 0 -- Set 0 untuk instan secepat kilat
 }
 
 local INGAME_PLACE_ID = 16552821455
@@ -35,7 +35,7 @@ local stats = {
 }
 
 local countedGenerators = {}
-local previousMachines = 0 -- Untuk mendeteksi kapan mesin baru selesai dikerjakan
+local previousMachines = 0 
 
 local locationStatus = "UNKNOWN LOCATION"
 if game.PlaceId == INGAME_PLACE_ID then
@@ -94,7 +94,7 @@ local function applyLowGraphics()
     end
 end
 
--- ==================== SMART AUTO-DETECTOR MAP BARU (TIDAK YIELD) ====================
+-- ==================== SMART AUTO-DETECTOR MAP BARU ====================
 task.spawn(function()
     local currentRoomFolder = Workspace:WaitForChild("CurrentRoom", 10)
     if currentRoomFolder then
@@ -113,7 +113,7 @@ task.spawn(function()
 end)
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizerV11"
+local guiName = "DandySuperOptimizerV12"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
@@ -140,7 +140,6 @@ textContainer.Visible = false
 textContainer.ZIndex = 2
 textContainer.Parent = screenGui
 
--- PERBAIKAN 1: ANCHOR POINT AGAR PAS DI TENGAH
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Size = UDim2.new(1, 0, 0.2, 0)
 headerLabel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -154,10 +153,11 @@ headerLabel.Font = Enum.Font.FredokaOne
 headerLabel.TextSize = 80
 headerLabel.Parent = textContainer
 
+-- PERBAIKAN LEBAR KOTAK (0.35) AGAR TEKS PAS DI TENGAH DAN TIDAK NABRAK TOMBOL
 local statsLabel = Instance.new("TextLabel")
-statsLabel.Size = UDim2.new(0.6, 0, 0.6, 0)
+statsLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
 statsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-statsLabel.Position = UDim2.new(0.5, 0, 0.55, 0) -- Pas di tengah bawah
+statsLabel.Position = UDim2.new(0.5, 0, 0.55, 0) 
 statsLabel.BackgroundTransparency = 1
 statsLabel.Text = "Memuat Data..."
 statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -169,7 +169,7 @@ statsLabel.Parent = textContainer
 
 -- ==================== ELEGANT TOGGLE ====================
 local function CreateElegantToggle(config)
-    local state = config.Default or false
+    local state = config.Default or false -- Sekarang akan mengikuti Config.AutoOptimizer
     
     local MainBorder = Instance.new("Frame")
     MainBorder.Parent = screenGui
@@ -287,9 +287,10 @@ local function CreateElegantToggle(config)
     end
 end
 
+-- PERBAIKAN: Default mengikuti Config.AutoOptimizer agar langsung digambar HIJAU dari awal
 local setToggleState = CreateElegantToggle({
     Text = "AFK\nOptimizer",
-    Default = false,
+    Default = Config.AutoOptimizer, 
     Callback = function(on)
         isOptimized = on
         if on then 
@@ -309,7 +310,7 @@ local setToggleState = CreateElegantToggle({
     end
 })
 
--- ==================== FUNGSI SIMULASI KLIK (VIRTUAL / GETCONNECTIONS) ====================
+-- ==================== FUNGSI SIMULASI KLIK ====================
 local function fireClick(button)
     if getconnections then
         for _, conn in pairs(getconnections(button.MouseButton1Click)) do conn:Fire() end
@@ -439,7 +440,6 @@ task.spawn(function()
             checkLocalPlayerMachines()
             updateStatsVariables()
             
-            -- PERBAIKAN 3: AUTO-CLICKER VIEWSTATS JIKA MESIN SELESAI
             if stats.Machines > previousMachines then
                 previousMachines = stats.Machines
                 task.spawn(function()
@@ -448,21 +448,18 @@ task.spawn(function()
                         local menu = pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("Menu")
                         local stopGen = menu and menu:FindFirstChild("StopGenerator")
                         
-                        -- Tunggu sampai UI interaksi generator menghilang dari layar (Max 20 detik)
                         local timeout = 40
                         while stopGen and stopGen.Visible and timeout > 0 do
                             task.wait(0.5)
                             timeout = timeout - 1
                         end
                         
-                        task.wait(1.5) -- Jeda aman agar animasi skill check/UI game selesai
+                        task.wait(1.5) 
                         
                         local viewStatsBtn = pGui.ScreenGui:FindFirstChild("ViewStats")
                         if viewStatsBtn and (viewStatsBtn:IsA("TextButton") or viewStatsBtn:IsA("ImageButton")) then
-                            -- Klik untuk membuka
                             fireClick(viewStatsBtn)
-                            task.wait(1.5) -- Biarkan Smart Memory Loop membaca tulisan "COMPLETED!"
-                            -- Klik lagi untuk menutup
+                            task.wait(1.5) 
                             fireClick(viewStatsBtn)
                         end
                     end
@@ -494,6 +491,8 @@ if Config.AutoOptimizer then
         if Config.AutoStartDelay > 0 then
             task.wait(Config.AutoStartDelay)
         end
+        -- Karena GUI sudah dibuat hijau (berkat Default = Config.AutoOptimizer),
+        -- kita langsung panggil saja fungsi setter-nya agar merender layar hitam
         setToggleState(true)
     end)
 end
