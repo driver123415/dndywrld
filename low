@@ -1,0 +1,225 @@
+-- ==============================================================================
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK
+-- ==============================================================================
+
+local Config = {
+    AutoOptimizer = true, -- Jika true, layar langsung hitam & grafik direduksi saat dieksekusi
+}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local Terrain = Workspace.Terrain
+
+local player = Players.LocalPlayer
+
+local isOptimized = false
+local stats = {
+    Floor = "1",
+    Taken = 0,
+    Consumed = 0,
+    Mastery = "Scanning..."
+}
+
+-- ==================== TRACKING LOGIC (INVENTORY) ====================
+-- Memantau item masuk dan keluar untuk menghitung statistik
+local function hookInventory(character)
+    local inv = character:WaitForChild("Inventory", 5)
+    if inv then
+        inv.ChildAdded:Connect(function(child)
+            if child:IsA("ObjectValue") or child:IsA("StringValue") then
+                stats.Taken = stats.Taken + 1
+            end
+        end)
+        inv.ChildRemoved:Connect(function(child)
+            stats.Consumed = stats.Consumed + 1
+        end)
+    end
+end
+
+if player.Character then hookInventory(player.Character) end
+player.CharacterAdded:Connect(hookInventory)
+
+-- ==================== LOW GRAPHICS ENGINE ====================
+local function applyLowGraphics()
+    print("[OPTIMIZER] Mengurangi beban GPU ke titik minimum...")
+    sethiddenproperty(Lighting, "Technology", 2)
+    sethiddenproperty(Terrain, "Decoration", false)
+
+    Terrain.WaterWaveSize = 0
+    Terrain.WaterWaveSpeed = 0
+    Terrain.WaterReflectance = 0
+    Terrain.WaterTransparency = 0
+
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    Lighting.Brightness = 0
+
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("BasePart") and not v:IsA("MeshPart") then
+            v.Material = "Plastic"
+            v.Reflectance = 0
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
+            v.Lifetime = NumberRange.new(0)
+        elseif v:IsA("Explosion") then
+            v.BlastPressure = 1
+            v.BlastRadius = 1
+        elseif v:IsA("Fire") or v:IsA("SpotLight") or v:IsA("Smoke") or v:IsA("Sparkles") then
+            v.Enabled = false
+        elseif v:IsA("MeshPart") then
+            v.Material = "Plastic"
+            v.Reflectance = 0
+            v.TextureID = 10385902758728957
+        elseif v:IsA("SpecialMesh") then
+            v.TextureId = 0
+        end
+    end
+
+    for _, e in pairs(Lighting:GetChildren()) do
+        if e:IsA("BlurEffect") or e:IsA("SunRaysEffect") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") or e:IsA("DepthOfFieldEffect") then
+            e.Enabled = false
+        end
+    end
+    
+    -- Opsional ekstrim: Set FPS Cap ke 15-30 jika executor mendukung
+    if setfpscap then setfpscap(15) end
+end
+
+-- ==================== GUI CREATION ====================
+local guiName = "DandySuperOptimizer"
+local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = guiName
+screenGui.ResetOnSpawn = false
+-- Pastikan ZIndex sangat tinggi agar menutupi semuanya
+screenGui.DisplayOrder = 999999 
+screenGui.Parent = targetGui
+
+-- 1. TOMBOL DRAGGABLE (KIRI TENGAH)
+local toggleFrame = Instance.new("Frame")
+toggleFrame.Size = UDim2.new(0, 120, 0, 40)
+toggleFrame.Position = UDim2.new(0, 10, 0.5, -20)
+toggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+toggleFrame.Active = true
+toggleFrame.Draggable = true
+toggleFrame.ZIndex = 10
+toggleFrame.Parent = screenGui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0, 8)
+toggleCorner.Parent = toggleFrame
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, 0, 1, 0)
+toggleBtn.BackgroundTransparency = 1
+toggleBtn.Text = "OPTIMIZER: OFF"
+toggleBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 12
+toggleBtn.ZIndex = 11
+toggleBtn.Parent = toggleFrame
+
+-- 2. BLACK SCREEN OVERLAY (PITCH BLACK)
+local blackScreen = Instance.new("Frame")
+blackScreen.Size = UDim2.new(1, 0, 1, 0)
+blackScreen.Position = UDim2.new(0, 0, 0, 0)
+blackScreen.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+blackScreen.Visible = false
+blackScreen.ZIndex = 1
+blackScreen.Parent = screenGui
+
+-- 3. STATS TEXT DI TENGAH LAYAR
+local statsLabel = Instance.new("TextLabel")
+statsLabel.Size = UDim2.new(0.5, 0, 0.5, 0)
+statsLabel.Position = UDim2.new(0.25, 0, 0.25, 0)
+statsLabel.BackgroundTransparency = 1
+statsLabel.Text = "Memuat Data..."
+statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statsLabel.TextXAlignment = Enum.TextXAlignment.Left
+statsLabel.TextYAlignment = Enum.TextYAlignment.Top
+statsLabel.Font = Enum.Font.Code
+statsLabel.TextSize = 24
+statsLabel.ZIndex = 2
+statsLabel.Parent = blackScreen
+
+-- ==================== FUNGSI TOGGLE ====================
+local function toggleOptimizer(state)
+    isOptimized = state
+    if isOptimized then
+        toggleBtn.Text = "OPTIMIZER: ON"
+        toggleBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        blackScreen.Visible = true
+        applyLowGraphics()
+    else
+        toggleBtn.Text = "OPTIMIZER: OFF"
+        toggleBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        blackScreen.Visible = false
+        if setfpscap then setfpscap(60) end -- Kembalikan FPS cap normal
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+    toggleOptimizer(not isOptimized)
+end)
+
+-- ==================== STATS UPDATER LOOP ====================
+task.spawn(function()
+    while true do
+        if isOptimized then
+            local playerGui = player:FindFirstChild("PlayerGui")
+            if playerGui then
+                -- 1. Deteksi Lantai (Mencari UI bertuliskan "Floor X")
+                for _, ui in ipairs(playerGui:GetDescendants()) do
+                    if ui:IsA("TextLabel") and string.find(string.lower(ui.Text), "floor") then
+                        local match = string.match(ui.Text, "FLOOR%s*(%d+)") or string.match(ui.Text, "Floor:%s*(%d+)")
+                        if match then
+                            stats.Floor = match
+                            break
+                        end
+                    end
+                end
+
+                -- 2. Deteksi Mastery (Sesuai path gambar Dex Explorer)
+                local masteryFrame = playerGui:FindFirstChild("ScreenGui") and playerGui.ScreenGui:FindFirstChild("MasteryFrame")
+                if masteryFrame then
+                    local compText = masteryFrame:FindFirstChild("CompletedText")
+                    local progText = masteryFrame:FindFirstChild("ProgressText") or masteryFrame:FindFirstChild("Percentage")
+                    
+                    if compText and compText.Visible then
+                        stats.Mastery = compText.Text -- Akan menjadi "COMPLETED!"
+                    elseif progText and progText.Visible then
+                        stats.Mastery = progText.Text -- Akan menampilkan progress misal "45%"
+                    else
+                        stats.Mastery = "In Progress"
+                    end
+                else
+                    stats.Mastery = "Not Found / Hidden"
+                end
+            end
+
+            -- Update Teks di Layar Hitam
+            statsLabel.Text = string.format(
+                "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
+                "🏢 Current Floor : %s\n" ..
+                "🎒 Items Taken   : %d\n" ..
+                "🍔 Items Consumed: %d\n" ..
+                "⭐ Mastery Status: %s\n\n" ..
+                "===================================\n" ..
+                "Tinggalkan perangkat dengan tenang.",
+                stats.Floor, stats.Taken, stats.Consumed, stats.Mastery
+            )
+        end
+        task.wait(1)
+    end
+end)
+
+-- ==================== AUTO START ====================
+if Config.AutoOptimizer then
+    toggleOptimizer(true)
+end
