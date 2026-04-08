@@ -1,10 +1,13 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V5.2 ULTIMATE FULLBRIGHT)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V7 STATUS HEADER)
 -- ==============================================================================
 
 local Config = {
     AutoOptimizer = true, 
 }
+
+local INGAME_PLACE_ID = 16552821455
+local LOBBY_PLACE_ID = 16116270224
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -18,6 +21,7 @@ local Terrain = Workspace.Terrain
 local player = Players.LocalPlayer
 
 local isOptimized = false
+local hasOptimizedOnce = false -- Kunci Potato Mode Permanen
 local stats = {
     Toon = "Scanning...",
     Floor = "1",
@@ -31,6 +35,14 @@ local stats = {
 
 local countedGenerators = {}
 
+-- Menentukan Status Lokasi
+local locationStatus = "UNKNOWN LOCATION"
+if game.PlaceId == INGAME_PLACE_ID then
+    locationStatus = "IN GAME"
+elseif game.PlaceId == LOBBY_PLACE_ID then
+    locationStatus = "LOBBY"
+end
+
 -- ==================== ULTIMATE POTATO + FULLBRIGHT ENGINE ====================
 local function applyLowGraphics()
     pcall(function()
@@ -43,7 +55,6 @@ local function applyLowGraphics()
     Terrain.WaterReflectance = 0
     Terrain.WaterTransparency = 1
 
-    -- PENGATURAN FULLBRIGHT & ANTI-FOG
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
     Lighting.FogStart = 0
@@ -52,66 +63,54 @@ local function applyLowGraphics()
     Lighting.Ambient = Color3.fromRGB(255, 255, 255)
     Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
 
-    -- MENGHANCURKAN TEKSTUR & KOSMETIK
     for _, v in ipairs(Workspace:GetDescendants()) do
         pcall(function()
             if v:IsA("BasePart") then
                 v.Material = Enum.Material.SmoothPlastic
                 v.Reflectance = 0
-                if v.MaterialVariant ~= "" then
-                    v.MaterialVariant = ""
-                end
+                if v.MaterialVariant ~= "" then v.MaterialVariant = "" end
             end
             
-            if v:IsA("MeshPart") then
-                v.TextureID = ""
-            elseif v:IsA("SpecialMesh") then
-                v.TextureId = ""
-            elseif v:IsA("Decal") or v:IsA("Texture") then
-                v.Transparency = 1
-            elseif v:IsA("SurfaceAppearance") then
-                v:Destroy() -- Dalang utama grafik bagus
-            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then
-                v.Lifetime = NumberRange.new(0)
-            elseif v:IsA("Explosion") then
-                v.BlastPressure = 1
-                v.BlastRadius = 1
+            if v:IsA("MeshPart") then v.TextureID = ""
+            elseif v:IsA("SpecialMesh") then v.TextureId = ""
+            elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1
+            elseif v:IsA("SurfaceAppearance") then v:Destroy()
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v.Lifetime = NumberRange.new(0)
+            elseif v:IsA("Explosion") then v.BlastPressure = 1; v.BlastRadius = 1
             elseif v:IsA("Fire") or v:IsA("SpotLight") or v:IsA("Smoke") or v:IsA("Sparkles") or v:IsA("PointLight") or v:IsA("SurfaceLight") then
                 v.Enabled = false
             end
         end)
     end
 
-    -- MENGHANCURKAN LANGIT & POST-PROCESSING
     for _, e in ipairs(Lighting:GetChildren()) do
         pcall(function()
             if e:IsA("PostEffect") or e:IsA("Atmosphere") or e:IsA("Sky") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") or e:IsA("BlurEffect") or e:IsA("SunRaysEffect") then
-                if e:IsA("Sky") or e:IsA("Atmosphere") then
-                    e:Destroy() 
-                else
-                    e.Enabled = false
-                end
+                if e:IsA("Sky") or e:IsA("Atmosphere") then e:Destroy() 
+                else e.Enabled = false end
             end
         end)
     end
-    
-    if setfpscap then pcall(function() setfpscap(15) end) end
 end
 
--- ==================== AUTO-DETECTOR MAP BARU ====================
+-- ==================== SMART AUTO-DETECTOR MAP BARU ====================
 local currentRoomFolder = Workspace:WaitForChild("CurrentRoom", 10)
 if currentRoomFolder then
     currentRoomFolder.ChildAdded:Connect(function(child)
-        if isOptimized and child:IsA("Model") then
-            task.wait(2) -- Tunggu map termuat penuh
-            applyLowGraphics()
-            countedGenerators = {} -- Reset ingatan mesin di lantai baru
+        if hasOptimizedOnce and child:IsA("Model") then
+            task.spawn(function()
+                local gens = child:WaitForChild("Generators", 30)
+                applyLowGraphics()
+                countedGenerators = {} 
+                task.wait(3)
+                applyLowGraphics()
+            end)
         end
     end)
 end
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizerV5_Final"
+local guiName = "DandySuperOptimizerV7"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
@@ -122,7 +121,6 @@ screenGui.DisplayOrder = 9999999
 screenGui.IgnoreGuiInset = true 
 screenGui.Parent = targetGui
 
--- BLACK SCREEN OVERLAY (200% Screen)
 local blackScreen = Instance.new("Frame")
 blackScreen.Size = UDim2.new(2, 0, 2, 0)
 blackScreen.Position = UDim2.new(-0.5, 0, -0.5, 0)
@@ -131,7 +129,6 @@ blackScreen.Visible = false
 blackScreen.ZIndex = 1
 blackScreen.Parent = screenGui
 
--- TEXT CONTAINER (100% Screen)
 local textContainer = Instance.new("Frame")
 textContainer.Size = UDim2.new(1, 0, 1, 0)
 textContainer.Position = UDim2.new(0, 0, 0, 0)
@@ -140,9 +137,23 @@ textContainer.Visible = false
 textContainer.ZIndex = 2
 textContainer.Parent = screenGui
 
+-- HEADER RAKSASA (IN GAME / LOBBY)
+local headerLabel = Instance.new("TextLabel")
+headerLabel.Size = UDim2.new(1, 0, 0.2, 0)
+headerLabel.Position = UDim2.new(0, 0, 0.1, 0)
+headerLabel.BackgroundTransparency = 1
+headerLabel.Text = locationStatus
+headerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+headerLabel.TextXAlignment = Enum.TextXAlignment.Center
+headerLabel.TextYAlignment = Enum.TextYAlignment.Center
+headerLabel.Font = Enum.Font.FredokaOne -- Font tebal dan besar
+headerLabel.TextSize = 80
+headerLabel.Parent = textContainer
+
+-- STATS LABEL DITURUNKAN SEDIKIT
 local statsLabel = Instance.new("TextLabel")
 statsLabel.Size = UDim2.new(0.6, 0, 0.6, 0)
-statsLabel.Position = UDim2.new(0.2, 0, 0.2, 0)
+statsLabel.Position = UDim2.new(0.2, 0, 0.3, 0)
 statsLabel.BackgroundTransparency = 1
 statsLabel.Text = "Memuat Data..."
 statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -152,7 +163,7 @@ statsLabel.Font = Enum.Font.Code
 statsLabel.TextSize = 22
 statsLabel.Parent = textContainer
 
--- ==================== FUNGSI ELEGANT TOGGLE ====================
+-- ==================== ELEGANT TOGGLE ====================
 local function CreateElegantToggle(config)
     local state = config.Default or false
     
@@ -244,7 +255,6 @@ local function CreateElegantToggle(config)
         config.Callback(state)
     end)
 
-    -- Sistem Drag Manual
     local dragging, dragStart, frameStart
     Main.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -278,10 +288,15 @@ local setToggleState = CreateElegantToggle({
     Default = false,
     Callback = function(on)
         isOptimized = on
+        if on then 
+            hasOptimizedOnce = true 
+            applyLowGraphics() 
+        end 
+        
         if isOptimized then
             blackScreen.Visible = true
             textContainer.Visible = true
-            applyLowGraphics()
+            if setfpscap then pcall(function() setfpscap(15) end) end
         else
             blackScreen.Visible = false
             textContainer.Visible = false
@@ -419,7 +434,7 @@ end)
 -- ==================== AUTO START SAFE ====================
 if Config.AutoOptimizer then
     task.spawn(function()
-        task.wait(1.5) -- Jeda aman agar GUI Roblox termuat sebelum di-hide
+        task.wait(1.5)
         setToggleState(true)
     end)
 end
