@@ -30,7 +30,8 @@ local scripts = {
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/BuyV2",--beli lah
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use 
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote2",--vote
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote2",--vote 
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low2",--grapik low
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi"--ready
 }
 
