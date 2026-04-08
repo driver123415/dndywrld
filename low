@@ -1,9 +1,9 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK V2
 -- ==============================================================================
 
 local Config = {
-    AutoOptimizer = true, -- Jika true, layar langsung hitam & grafik direduksi saat dieksekusi
+    AutoOptimizer = true, 
 }
 
 local Players = game:GetService("Players")
@@ -20,33 +20,18 @@ local stats = {
     Floor = "1",
     Taken = 0,
     Consumed = 0,
+    Machines = 0,
     Mastery = "Scanning..."
 }
 
--- ==================== TRACKING LOGIC (INVENTORY) ====================
--- Memantau item masuk dan keluar untuk menghitung statistik
-local function hookInventory(character)
-    local inv = character:WaitForChild("Inventory", 5)
-    if inv then
-        inv.ChildAdded:Connect(function(child)
-            if child:IsA("ObjectValue") or child:IsA("StringValue") then
-                stats.Taken = stats.Taken + 1
-            end
-        end)
-        inv.ChildRemoved:Connect(function(child)
-            stats.Consumed = stats.Consumed + 1
-        end)
-    end
-end
-
-if player.Character then hookInventory(player.Character) end
-player.CharacterAdded:Connect(hookInventory)
+local lastInventoryCount = 0
 
 -- ==================== LOW GRAPHICS ENGINE ====================
 local function applyLowGraphics()
-    print("[OPTIMIZER] Mengurangi beban GPU ke titik minimum...")
-    sethiddenproperty(Lighting, "Technology", 2)
-    sethiddenproperty(Terrain, "Decoration", false)
+    pcall(function()
+        sethiddenproperty(Lighting, "Technology", 2)
+        sethiddenproperty(Terrain, "Decoration", false)
+    end)
 
     Terrain.WaterWaveSize = 0
     Terrain.WaterWaveSpeed = 0
@@ -73,32 +58,28 @@ local function applyLowGraphics()
         elseif v:IsA("MeshPart") then
             v.Material = "Plastic"
             v.Reflectance = 0
-            v.TextureID = 10385902758728957
-        elseif v:IsA("SpecialMesh") then
-            v.TextureId = 0
         end
     end
 
     for _, e in pairs(Lighting:GetChildren()) do
-        if e:IsA("BlurEffect") or e:IsA("SunRaysEffect") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") or e:IsA("DepthOfFieldEffect") then
+        if e:IsA("PostEffect") then
             e.Enabled = false
         end
     end
     
-    -- Opsional ekstrim: Set FPS Cap ke 15-30 jika executor mendukung
-    if setfpscap then setfpscap(15) end
+    if setfpscap then pcall(function() setfpscap(15) end) end
 end
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizer"
+local guiName = "DandySuperOptimizerV2"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = guiName
 screenGui.ResetOnSpawn = false
--- Pastikan ZIndex sangat tinggi agar menutupi semuanya
 screenGui.DisplayOrder = 999999 
+screenGui.IgnoreGuiInset = true -- FIX: Membuat UI mengabaikan batas atas (menutup full layar)
 screenGui.Parent = targetGui
 
 -- 1. TOMBOL DRAGGABLE (KIRI TENGAH)
@@ -125,7 +106,7 @@ toggleBtn.TextSize = 12
 toggleBtn.ZIndex = 11
 toggleBtn.Parent = toggleFrame
 
--- 2. BLACK SCREEN OVERLAY (PITCH BLACK)
+-- 2. BLACK SCREEN OVERLAY (PITCH BLACK FULL SCREEN)
 local blackScreen = Instance.new("Frame")
 blackScreen.Size = UDim2.new(1, 0, 1, 0)
 blackScreen.Position = UDim2.new(0, 0, 0, 0)
@@ -160,7 +141,7 @@ local function toggleOptimizer(state)
         toggleBtn.Text = "OPTIMIZER: OFF"
         toggleBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
         blackScreen.Visible = false
-        if setfpscap then setfpscap(60) end -- Kembalikan FPS cap normal
+        if setfpscap then pcall(function() setfpscap(60) end) end 
     end
 end
 
@@ -169,12 +150,71 @@ toggleBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==================== STATS UPDATER LOOP ====================
+-- Deteksi progress mesin dari notifikasi UI (SpectatorGui/InfoFrame)
+local lastTotalMachines = 0
+local function checkMachines()
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        local specGui = pGui:FindFirstChild("SpectatorGui")
+        if specGui then
+            local info = specGui:FindFirstChild("InfoFrame")
+            if info then
+                local genFrame = info:FindFirstChild("GeneratorFrame")
+                if genFrame then
+                    local msg = genFrame:FindFirstChild("Message")
+                    if msg and msg:IsA("TextLabel") then
+                        local cur, tot = string.match(msg.Text, "Machines Completed: (%d+)/(%d+)")
+                        if cur then
+                            local currentNum = tonumber(cur)
+                            -- Jika ada penambahan mesin selesai, catat
+                            if currentNum > lastTotalMachines then
+                                stats.Machines = stats.Machines + (currentNum - lastTotalMachines)
+                                lastTotalMachines = currentNum
+                            elseif currentNum == 0 and lastTotalMachines > 0 then
+                                -- Reset jika pindah lantai
+                                lastTotalMachines = 0
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Deteksi Inventory dengan Delta Check (Jumlah isi tas)
+local function checkInventory()
+    local char = player.Character
+    if not char then return end
+    local inv = char:FindFirstChild("Inventory")
+    if not inv then return end
+
+    local currentCount = 0
+    for i = 1, 4 do
+        local slot = inv:FindFirstChild("Slot" .. i)
+        if slot and slot.Value ~= "" and slot.Value ~= "None" then
+            currentCount = currentCount + 1
+        end
+    end
+
+    if currentCount > lastInventoryCount then
+        stats.Taken = stats.Taken + (currentCount - lastInventoryCount)
+    elseif currentCount < lastInventoryCount then
+        stats.Consumed = stats.Consumed + (lastInventoryCount - currentCount)
+    end
+    lastInventoryCount = currentCount
+end
+
 task.spawn(function()
     while true do
         if isOptimized then
             local playerGui = player:FindFirstChild("PlayerGui")
+            
+            checkInventory()
+            checkMachines()
+            
             if playerGui then
-                -- 1. Deteksi Lantai (Mencari UI bertuliskan "Floor X")
+                -- 1. Deteksi Lantai
                 for _, ui in ipairs(playerGui:GetDescendants()) do
                     if ui:IsA("TextLabel") and string.find(string.lower(ui.Text), "floor") then
                         local match = string.match(ui.Text, "FLOOR%s*(%d+)") or string.match(ui.Text, "Floor:%s*(%d+)")
@@ -185,16 +225,16 @@ task.spawn(function()
                     end
                 end
 
-                -- 2. Deteksi Mastery (Sesuai path gambar Dex Explorer)
+                -- 2. Deteksi Mastery 
                 local masteryFrame = playerGui:FindFirstChild("ScreenGui") and playerGui.ScreenGui:FindFirstChild("MasteryFrame")
                 if masteryFrame then
                     local compText = masteryFrame:FindFirstChild("CompletedText")
                     local progText = masteryFrame:FindFirstChild("ProgressText") or masteryFrame:FindFirstChild("Percentage")
                     
                     if compText and compText.Visible then
-                        stats.Mastery = compText.Text -- Akan menjadi "COMPLETED!"
+                        stats.Mastery = compText.Text 
                     elseif progText and progText.Visible then
-                        stats.Mastery = progText.Text -- Akan menampilkan progress misal "45%"
+                        stats.Mastery = progText.Text 
                     else
                         stats.Mastery = "In Progress"
                     end
@@ -206,16 +246,17 @@ task.spawn(function()
             -- Update Teks di Layar Hitam
             statsLabel.Text = string.format(
                 "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
-                "🏢 Current Floor : %s\n" ..
-                "🎒 Items Taken   : %d\n" ..
-                "🍔 Items Consumed: %d\n" ..
-                "⭐ Mastery Status: %s\n\n" ..
+                "🏢 Current Floor    : %s\n" ..
+                "🎒 Items Taken      : %d\n" ..
+                "🍔 Items Consumed   : %d\n" ..
+                "⚙️ Machines Handled : %d\n" ..
+                "⭐ Mastery Status   : %s\n\n" ..
                 "===================================\n" ..
                 "Tinggalkan perangkat dengan tenang.",
-                stats.Floor, stats.Taken, stats.Consumed, stats.Mastery
+                stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Mastery
             )
         end
-        task.wait(1)
+        task.wait(0.5) -- Loop lebih cepat sedikit agar update UI terasa mulus
     end
 end)
 
