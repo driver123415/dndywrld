@@ -1,0 +1,455 @@
+-- ==============================================================================
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V10 ULTIMATE EDITION)
+-- ==============================================================================
+
+local Config = {
+    AutoOptimizer = true, 
+    AutoStartDelay = 1.5 -- Ubah angka ini: 0 untuk instan, 1.5 atau 3 untuk aman (jika lag)
+}
+
+local INGAME_PLACE_ID = 16552821455
+local LOBBY_PLACE_ID = 16116270224
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Terrain = Workspace.Terrain
+
+local player = Players.LocalPlayer
+
+local isOptimized = false
+local hasOptimizedOnce = false -- Kunci Potato Mode Permanen
+local stats = {
+    Toon = "Scanning...",
+    Floor = "1",
+    Taken = 0,
+    Consumed = 0,
+    Machines = 0,
+    Mastery = "Menunggu Update...", -- Default sebelum view stat dibuka
+    Ichor = "0",
+    Holiday = "0"
+}
+
+local countedGenerators = {}
+
+local locationStatus = "UNKNOWN LOCATION"
+if game.PlaceId == INGAME_PLACE_ID then
+    locationStatus = "IN GAME"
+elseif game.PlaceId == LOBBY_PLACE_ID then
+    locationStatus = "LOBBY"
+end
+
+-- ==================== ULTIMATE POTATO + FULLBRIGHT ENGINE ====================
+local function applyLowGraphics()
+    pcall(function()
+        sethiddenproperty(Lighting, "Technology", 2)
+        sethiddenproperty(Terrain, "Decoration", false)
+    end)
+
+    Terrain.WaterWaveSize = 0
+    Terrain.WaterWaveSpeed = 0
+    Terrain.WaterReflectance = 0
+    Terrain.WaterTransparency = 1
+
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 9e9
+    Lighting.FogStart = 0
+    Lighting.ClockTime = 14
+    Lighting.Brightness = 3
+    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        pcall(function()
+            if v:IsA("BasePart") then
+                v.Material = Enum.Material.SmoothPlastic
+                v.Reflectance = 0
+                if v.MaterialVariant ~= "" then v.MaterialVariant = "" end
+            end
+            
+            if v:IsA("MeshPart") then v.TextureID = ""
+            elseif v:IsA("SpecialMesh") then v.TextureId = ""
+            elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1
+            elseif v:IsA("SurfaceAppearance") then v:Destroy()
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") then v.Lifetime = NumberRange.new(0)
+            elseif v:IsA("Explosion") then v.BlastPressure = 1; v.BlastRadius = 1
+            elseif v:IsA("Fire") or v:IsA("SpotLight") or v:IsA("Smoke") or v:IsA("Sparkles") or v:IsA("PointLight") or v:IsA("SurfaceLight") then
+                v.Enabled = false
+            end
+        end)
+    end
+
+    for _, e in ipairs(Lighting:GetChildren()) do
+        pcall(function()
+            if e:IsA("PostEffect") or e:IsA("Atmosphere") or e:IsA("Sky") or e:IsA("ColorCorrectionEffect") or e:IsA("BloomEffect") or e:IsA("BlurEffect") or e:IsA("SunRaysEffect") then
+                if e:IsA("Sky") or e:IsA("Atmosphere") then e:Destroy() 
+                else e.Enabled = false end
+            end
+        end)
+    end
+end
+
+-- ==================== SMART AUTO-DETECTOR MAP BARU ====================
+local currentRoomFolder = Workspace:WaitForChild("CurrentRoom", 10)
+if currentRoomFolder then
+    currentRoomFolder.ChildAdded:Connect(function(child)
+        if hasOptimizedOnce and child:IsA("Model") then
+            task.spawn(function()
+                local gens = child:WaitForChild("Generators", 30)
+                applyLowGraphics()
+                countedGenerators = {} 
+                task.wait(3)
+                applyLowGraphics()
+            end)
+        end
+    end)
+end
+
+-- ==================== GUI CREATION ====================
+local guiName = "DandySuperOptimizerFinal"
+local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = guiName
+screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 9999999 
+screenGui.IgnoreGuiInset = true 
+screenGui.Parent = targetGui
+
+local blackScreen = Instance.new("Frame")
+blackScreen.Size = UDim2.new(2, 0, 2, 0)
+blackScreen.Position = UDim2.new(-0.5, 0, -0.5, 0)
+blackScreen.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+blackScreen.Visible = false
+blackScreen.ZIndex = 1
+blackScreen.Parent = screenGui
+
+local textContainer = Instance.new("Frame")
+textContainer.Size = UDim2.new(1, 0, 1, 0)
+textContainer.Position = UDim2.new(0, 0, 0, 0)
+textContainer.BackgroundTransparency = 1
+textContainer.Visible = false
+textContainer.ZIndex = 2
+textContainer.Parent = screenGui
+
+local headerLabel = Instance.new("TextLabel")
+headerLabel.Size = UDim2.new(1, 0, 0.2, 0)
+headerLabel.Position = UDim2.new(0, 0, 0.1, 0)
+headerLabel.BackgroundTransparency = 1
+headerLabel.Text = locationStatus
+headerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+headerLabel.TextXAlignment = Enum.TextXAlignment.Center
+headerLabel.TextYAlignment = Enum.TextYAlignment.Center
+headerLabel.Font = Enum.Font.FredokaOne
+headerLabel.TextSize = 80
+headerLabel.Parent = textContainer
+
+local statsLabel = Instance.new("TextLabel")
+statsLabel.Size = UDim2.new(0.6, 0, 0.6, 0)
+statsLabel.Position = UDim2.new(0.2, 0, 0.3, 0)
+statsLabel.BackgroundTransparency = 1
+statsLabel.Text = "Memuat Data..."
+statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+statsLabel.TextXAlignment = Enum.TextXAlignment.Left
+statsLabel.TextYAlignment = Enum.TextYAlignment.Center
+statsLabel.Font = Enum.Font.Code
+statsLabel.TextSize = 22
+statsLabel.Parent = textContainer
+
+-- ==================== ELEGANT TOGGLE ====================
+local function CreateElegantToggle(config)
+    local state = config.Default or false
+    
+    local MainBorder = Instance.new("Frame")
+    MainBorder.Parent = screenGui
+    MainBorder.Size = UDim2.new(0, 160, 0, 50)
+    MainBorder.Position = UDim2.new(0, 20, 0.5, -25)
+    MainBorder.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainBorder.BorderSizePixel = 0
+    MainBorder.ZIndex = 10
+    Instance.new("UICorner", MainBorder).CornerRadius = UDim.new(0.15, 0)
+    
+    local Main = Instance.new("Frame")
+    Main.Parent = MainBorder
+    Main.AnchorPoint = Vector2.new(0.5, 0.5)
+    Main.Position = UDim2.fromScale(0.5, 0.5)
+    Main.Size = UDim2.fromScale(0.95, 0.85)
+    Main.BackgroundColor3 = Color3.fromRGB(112, 112, 112)
+    Main.BorderSizePixel = 0
+    Main.ZIndex = 11
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0.15, 0)
+    
+    local UIGradient = Instance.new("UIGradient", Main)
+    UIGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 140, 140)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(81, 81, 81))
+    })
+    UIGradient.Rotation = 90
+
+    local Label = Instance.new("TextLabel")
+    Label.Parent = Main
+    Label.BackgroundTransparency = 1
+    Label.Position = UDim2.fromScale(0.05, 0)
+    Label.Size = UDim2.fromScale(0.55, 1)
+    Label.Text = config.Text
+    Label.Font = Enum.Font.GothamBold
+    Label.TextScaled = true
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.ZIndex = 12
+    
+    local SwitchBorder = Instance.new("Frame")
+    SwitchBorder.Parent = Main
+    SwitchBorder.Size = UDim2.fromScale(0.3, 0.55)
+    SwitchBorder.Position = UDim2.fromScale(0.65, 0.225)
+    SwitchBorder.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    SwitchBorder.BorderSizePixel = 0
+    SwitchBorder.ZIndex = 12
+    Instance.new("UICorner", SwitchBorder).CornerRadius = UDim.new(1,0)
+
+    local Switch = Instance.new("Frame")
+    Switch.Parent = SwitchBorder
+    Switch.Size = UDim2.fromScale(0.85, 0.75)
+    Switch.AnchorPoint = Vector2.new(0.5, 0.5)
+    Switch.Position = UDim2.fromScale(0.5, 0.5)
+    Switch.BackgroundColor3 = Color3.fromRGB(112, 112, 112)
+    Switch.BorderSizePixel = 0
+    Switch.ZIndex = 13
+    Instance.new("UICorner", Switch).CornerRadius = UDim.new(1, 0)
+    
+    local SwitchGrad = Instance.new("UIGradient", Switch)
+    SwitchGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 140, 140)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(81, 81, 81))
+    })
+    SwitchGrad.Rotation = 90
+
+    local Knob = Instance.new("Frame")
+    Knob.Parent = Switch
+    Knob.Size = UDim2.fromScale(0.4, 0.9)
+    Knob.Position = state and UDim2.fromScale(0.55, 0.05) or UDim2.fromScale(0.05, 0.05)
+    Knob.BackgroundColor3 = state and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+    Knob.BorderSizePixel = 0
+    Knob.ZIndex = 14
+    Instance.new("UICorner", Knob).CornerRadius = UDim.new(1,0)
+
+    local Button = Instance.new("TextButton")
+    Button.Parent = Switch
+    Button.Size = UDim2.fromScale(1,1)
+    Button.BackgroundTransparency = 1
+    Button.Text = ""
+    Button.ZIndex = 15
+
+    Button.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(Knob, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
+            Position = state and UDim2.fromScale(0.55, 0.05) or UDim2.fromScale(0.05, 0.05),
+            BackgroundColor3 = state and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+        }):Play()
+        config.Callback(state)
+    end)
+
+    local dragging, dragStart, frameStart
+    Main.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            frameStart = MainBorder.Position
+        end
+    end)
+    Main.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            MainBorder.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
+        end
+    end)
+
+    return function(v)
+        state = v
+        Knob.Position = v and UDim2.fromScale(0.55, 0.05) or UDim2.fromScale(0.05, 0.05)
+        Knob.BackgroundColor3 = v and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+        config.Callback(state)
+    end
+end
+
+local setToggleState = CreateElegantToggle({
+    Text = "AFK\nOptimizer",
+    Default = false,
+    Callback = function(on)
+        isOptimized = on
+        if on then 
+            hasOptimizedOnce = true 
+            applyLowGraphics() 
+        end 
+        
+        if isOptimized then
+            blackScreen.Visible = true
+            textContainer.Visible = true
+            if setfpscap then pcall(function() setfpscap(15) end) end
+        else
+            blackScreen.Visible = false
+            textContainer.Visible = false
+            if setfpscap then pcall(function() setfpscap(60) end) end 
+        end
+    end
+})
+
+-- ==================== SMART MASTERY MEMORY LOOP ====================
+task.spawn(function()
+    local playerGui = player:WaitForChild("PlayerGui")
+    local screenGui = playerGui:WaitForChild("ScreenGui", 10)
+    if not screenGui then return end
+    
+    local masteryFrame = screenGui:WaitForChild("MasteryFrame", 5)
+    if not masteryFrame then return end
+
+    while true do
+        if masteryFrame.Visible then
+            local compText = masteryFrame:FindFirstChild("CompletedText")
+            local progText = masteryFrame:FindFirstChild("ProgressText") or masteryFrame:FindFirstChild("Percentage")
+            
+            if compText and compText.Visible and compText.Text ~= "" then 
+                stats.Mastery = compText.Text 
+            elseif progText and progText.Visible and progText.Text ~= "" then 
+                stats.Mastery = progText.Text 
+            else
+                stats.Mastery = "REACH 100% MASTERY TO UNLOCK A SKIN!"
+            end
+        end
+        task.wait(0.2) 
+    end
+end)
+
+-- ==================== TRACKER SYSTEM ====================
+local function hookInventory(character)
+    local inv = character:WaitForChild("Inventory", 10)
+    if not inv then return end
+
+    for i = 1, 4 do
+        local slot = inv:WaitForChild("Slot" .. i, 5)
+        if slot then
+            local prevValue = slot.Value
+            slot:GetPropertyChangedSignal("Value"):Connect(function()
+                local newValue = slot.Value
+                local isPrevEmpty = (prevValue == "" or prevValue == "None")
+                local isNewEmpty = (newValue == "" or newValue == "None")
+
+                if isPrevEmpty and not isNewEmpty then
+                    stats.Taken = stats.Taken + 1
+                elseif not isPrevEmpty and isNewEmpty then
+                    stats.Consumed = stats.Consumed + 1
+                elseif not isPrevEmpty and not isNewEmpty and prevValue ~= newValue then
+                    stats.Taken = stats.Taken + 1
+                    stats.Consumed = stats.Consumed + 1
+                end
+                prevValue = newValue
+            end)
+        end
+    end
+end
+
+if player.Character then hookInventory(player.Character) end
+player.CharacterAdded:Connect(hookInventory)
+
+local function checkLocalPlayerMachines()
+    local currentRoom = Workspace:FindFirstChild("CurrentRoom")
+    if not currentRoom then return end
+    
+    local map = currentRoom:FindFirstChildWhichIsA("Model")
+    if not map then return end
+
+    local generators = map:FindFirstChild("Generators")
+    if generators then
+        for _, gen in ipairs(generators:GetChildren()) do
+            if gen:IsA("Model") and not countedGenerators[gen] then
+                local pCompletion = gen:FindFirstChild("PlayerCompletion")
+                if pCompletion and pCompletion:FindFirstChild(player.Name) then
+                    stats.Machines = stats.Machines + 1
+                    countedGenerators[gen] = true 
+                end
+            end
+        end
+    end
+end
+
+local function updateStatsVariables()
+    local igp = Workspace:FindFirstChild("InGamePlayers")
+    if igp then
+        local myCharInfo = igp:FindFirstChild(player.Name)
+        if myCharInfo then
+            local conf = myCharInfo:FindFirstChild("Config")
+            if conf and conf:FindFirstChild("CharacterName") and conf.CharacterName:IsA("StringValue") then
+                stats.Toon = conf.CharacterName.Value
+            end
+        end
+    end
+
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        local sGui = pGui:FindFirstChild("ScreenGui")
+        if sGui then
+            local cFrames = sGui:FindFirstChild("CurrencyFrames")
+            if cFrames then
+                local ichor = cFrames:FindFirstChild("IchorFrame")
+                if ichor and ichor:FindFirstChild("Margin") and ichor.Margin:FindFirstChild("TextLabel") then
+                    stats.Ichor = ichor.Margin.TextLabel.Text
+                end
+                local holiday = cFrames:FindFirstChild("HolidayFrame")
+                if holiday and holiday:FindFirstChild("Margin") and holiday.Margin:FindFirstChild("TextLabel") then
+                    stats.Holiday = holiday.Margin.TextLabel.Text
+                end
+            end
+        end
+
+        for _, ui in ipairs(pGui:GetDescendants()) do
+            if ui:IsA("TextLabel") and string.find(string.lower(ui.Text), "floor") then
+                local match = string.match(ui.Text, "FLOOR%s*(%d+)") or string.match(ui.Text, "Floor:%s*(%d+)")
+                if match then stats.Floor = match; break end
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if isOptimized then
+            checkLocalPlayerMachines()
+            updateStatsVariables()
+            
+            statsLabel.Text = string.format(
+                "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
+                "👤 Used Toon        : %s\n" ..
+                "🏢 Current Floor    : %s\n" ..
+                "🎒 Items Taken      : %d\n" ..
+                "🍔 Items Consumed   : %d\n" ..
+                "⚙️ Handled by You   : %d\n" ..
+                "💰 Ichor            : %s\n" ..
+                "🎟️ Holiday Event    : %s\n" ..
+                "⭐ Mastery Status   : %s\n\n" ..
+                "===================================\n" ..
+                "Tinggalkan perangkat dengan tenang.",
+                stats.Toon, stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Ichor, stats.Holiday, stats.Mastery
+            )
+        end
+        task.wait(0.5) 
+    end
+end)
+
+-- ==================== AUTO START SAFE DENGAN DELAY ====================
+if Config.AutoOptimizer then
+    task.spawn(function()
+        if Config.AutoStartDelay > 0 then
+            task.wait(Config.AutoStartDelay)
+        end
+        setToggleState(true)
+    end)
+end
