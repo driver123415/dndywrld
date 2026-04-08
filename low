@@ -1,5 +1,5 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK V3 (ULTIMATE FIX)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK V4
 -- ==============================================================================
 
 local Config = {
@@ -11,6 +11,7 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 local Terrain = Workspace.Terrain
 
 local player = Players.LocalPlayer
@@ -21,10 +22,13 @@ local stats = {
     Taken = 0,
     Consumed = 0,
     Machines = 0,
-    Mastery = "Scanning..."
+    Mastery = "Scanning...",
+    Ichor = "0",
+    Holiday = "0"
 }
 
-local countedGenerators = {} -- Menyimpan mesin yang sudah dihitung agar tidak ganda
+local lastInventoryCount = 0
+local countedGenerators = {}
 
 -- ==================== LOW GRAPHICS ENGINE ====================
 local function applyLowGraphics()
@@ -66,7 +70,7 @@ local function applyLowGraphics()
 end
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizerV3"
+local guiName = "DandySuperOptimizerV4"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
@@ -83,7 +87,6 @@ toggleFrame.Size = UDim2.new(0, 120, 0, 40)
 toggleFrame.Position = UDim2.new(0, 10, 0.5, -20)
 toggleFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 toggleFrame.Active = true
-toggleFrame.Draggable = true
 toggleFrame.ZIndex = 10
 toggleFrame.Parent = screenGui
 
@@ -101,7 +104,31 @@ toggleBtn.TextSize = 12
 toggleBtn.ZIndex = 11
 toggleBtn.Parent = toggleFrame
 
--- BLACK SCREEN OVERLAY (Dibuat ukurannya 200% agar menutup celah HP/Notch)
+-- SISTEM DRAG MANUAL (Lebih Stabil dari Draggable bawaan)
+local dragging, dragInput, dragStart, startPos
+toggleFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = toggleFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+toggleFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        toggleFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- BLACK SCREEN OVERLAY (200% Ukuran Layar)
 local blackScreen = Instance.new("Frame")
 blackScreen.Size = UDim2.new(2, 0, 2, 0)
 blackScreen.Position = UDim2.new(-0.5, 0, -0.5, 0)
@@ -110,21 +137,27 @@ blackScreen.Visible = false
 blackScreen.ZIndex = 1
 blackScreen.Parent = screenGui
 
+-- TEXT CONTAINER (100% Ukuran Layar agar Teks tetap di tengah)
+local textContainer = Instance.new("Frame")
+textContainer.Size = UDim2.new(1, 0, 1, 0)
+textContainer.Position = UDim2.new(0, 0, 0, 0)
+textContainer.BackgroundTransparency = 1
+textContainer.Visible = false
+textContainer.ZIndex = 2
+textContainer.Parent = screenGui
+
 -- STATS TEXT
 local statsLabel = Instance.new("TextLabel")
-statsLabel.Size = UDim2.new(0.5, 0, 0.5, 0)
--- Anchor di tengah agar posisinya pas di tengah layar meskipun ukuran layarnya 200%
-statsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-statsLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+statsLabel.Size = UDim2.new(0.6, 0, 0.6, 0)
+statsLabel.Position = UDim2.new(0.2, 0, 0.2, 0)
 statsLabel.BackgroundTransparency = 1
 statsLabel.Text = "Memuat Data..."
 statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 statsLabel.TextXAlignment = Enum.TextXAlignment.Left
 statsLabel.TextYAlignment = Enum.TextYAlignment.Center
 statsLabel.Font = Enum.Font.Code
-statsLabel.TextSize = 24
-statsLabel.ZIndex = 2
-statsLabel.Parent = blackScreen
+statsLabel.TextSize = 22
+statsLabel.Parent = textContainer
 
 -- ==================== FUNGSI TOGGLE ====================
 local function toggleOptimizer(state)
@@ -133,11 +166,13 @@ local function toggleOptimizer(state)
         toggleBtn.Text = "OPTIMIZER: ON"
         toggleBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
         blackScreen.Visible = true
+        textContainer.Visible = true
         applyLowGraphics()
     else
         toggleBtn.Text = "OPTIMIZER: OFF"
         toggleBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
         blackScreen.Visible = false
+        textContainer.Visible = false
         if setfpscap then pcall(function() setfpscap(60) end) end 
     end
 end
@@ -146,8 +181,7 @@ toggleBtn.MouseButton1Click:Connect(function()
     toggleOptimizer(not isOptimized)
 end)
 
--- ==================== INVENTORY TRACKER (100% AKURAT) ====================
--- Logika baru: Memantau perubahan Teks/Value pada Slot tas secara real-time
+-- ==================== TRACKER SYSTEM ====================
 local function hookInventory(character)
     local inv = character:WaitForChild("Inventory", 10)
     if not inv then return end
@@ -163,14 +197,13 @@ local function hookInventory(character)
                 local isNewEmpty = (newValue == "" or newValue == "None")
 
                 if isPrevEmpty and not isNewEmpty then
-                    stats.Taken = stats.Taken + 1          -- Slot kosong jadi ada isi = Diambil
+                    stats.Taken = stats.Taken + 1
                 elseif not isPrevEmpty and isNewEmpty then
-                    stats.Consumed = stats.Consumed + 1    -- Slot ada isi jadi kosong = Dikonsumsi
+                    stats.Consumed = stats.Consumed + 1
                 elseif not isPrevEmpty and not isNewEmpty and prevValue ~= newValue then
-                    stats.Taken = stats.Taken + 1          -- Item ditukar (1 diambil, 1 dibuang/dikonsumsi)
+                    stats.Taken = stats.Taken + 1
                     stats.Consumed = stats.Consumed + 1
                 end
-                
                 prevValue = newValue
             end)
         end
@@ -180,14 +213,12 @@ end
 if player.Character then hookInventory(player.Character) end
 player.CharacterAdded:Connect(hookInventory)
 
--- ==================== MACHINE TRACKER (LOCAL PLAYER ONLY) ====================
 local function checkLocalPlayerMachines()
     local currentRoom = Workspace:FindFirstChild("CurrentRoom")
     if not currentRoom then return end
     
     local map = currentRoom:FindFirstChildWhichIsA("Model")
     if not map then 
-        -- Jika map hilang (masuk lift), bersihkan cache mesin agar siap di lantai berikutnya
         countedGenerators = {} 
         return 
     end
@@ -197,25 +228,46 @@ local function checkLocalPlayerMachines()
         for _, gen in ipairs(generators:GetChildren()) do
             if gen:IsA("Model") and not countedGenerators[gen] then
                 local pCompletion = gen:FindFirstChild("PlayerCompletion")
-                -- Jika ada folder PlayerCompletion dan di dalamnya ada nama LocalPlayer
                 if pCompletion and pCompletion:FindFirstChild(player.Name) then
                     stats.Machines = stats.Machines + 1
-                    countedGenerators[gen] = true -- Tandai sudah dihitung agar tidak dobel
+                    countedGenerators[gen] = true 
                 end
             end
         end
     end
 end
 
--- ==================== STATS UPDATER LOOP ====================
+local function checkCurrency()
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        local sGui = pGui:FindFirstChild("ScreenGui")
+        if sGui then
+            local cFrames = sGui:FindFirstChild("CurrencyFrames")
+            if cFrames then
+                -- Ichor
+                local ichor = cFrames:FindFirstChild("IchorFrame")
+                if ichor and ichor:FindFirstChild("Margin") and ichor.Margin:FindFirstChild("TextLabel") then
+                    stats.Ichor = ichor.Margin.TextLabel.Text
+                end
+                -- Holiday
+                local holiday = cFrames:FindFirstChild("HolidayFrame")
+                if holiday and holiday:FindFirstChild("Margin") and holiday.Margin:FindFirstChild("TextLabel") then
+                    stats.Holiday = holiday.Margin.TextLabel.Text
+                end
+            end
+        end
+    end
+end
+
 task.spawn(function()
     while true do
         if isOptimized then
             checkLocalPlayerMachines()
+            checkCurrency()
             
             local playerGui = player:FindFirstChild("PlayerGui")
             if playerGui then
-                -- 1. Deteksi Lantai
+                -- Deteksi Lantai
                 for _, ui in ipairs(playerGui:GetDescendants()) do
                     if ui:IsA("TextLabel") and string.find(string.lower(ui.Text), "floor") then
                         local match = string.match(ui.Text, "FLOOR%s*(%d+)") or string.match(ui.Text, "Floor:%s*(%d+)")
@@ -226,7 +278,7 @@ task.spawn(function()
                     end
                 end
 
-                -- 2. Deteksi Mastery 
+                -- Deteksi Mastery 
                 local masteryFrame = playerGui:FindFirstChild("ScreenGui") and playerGui.ScreenGui:FindFirstChild("MasteryFrame")
                 if masteryFrame then
                     local compText = masteryFrame:FindFirstChild("CompletedText")
@@ -244,24 +296,29 @@ task.spawn(function()
                 end
             end
 
-            -- Update Teks di Layar Hitam
+            -- Update Teks
             statsLabel.Text = string.format(
                 "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
                 "🏢 Current Floor    : %s\n" ..
                 "🎒 Items Taken      : %d\n" ..
                 "🍔 Items Consumed   : %d\n" ..
                 "⚙️ Handled by You   : %d\n" ..
+                "💰 Ichor            : %s\n" ..
+                "🎟️ Holiday Event    : %s\n" ..
                 "⭐ Mastery Status   : %s\n\n" ..
                 "===================================\n" ..
                 "Tinggalkan perangkat dengan tenang.",
-                stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Mastery
+                stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Ichor, stats.Holiday, stats.Mastery
             )
         end
         task.wait(0.5) 
     end
 end)
 
--- ==================== AUTO START ====================
+-- ==================== AUTO START SAFE ====================
 if Config.AutoOptimizer then
-    toggleOptimizer(true)
+    task.spawn(function()
+        task.wait(1.5) -- Menunggu GUI utama termuat agar bug mati teratasi
+        toggleOptimizer(true)
+    end)
 end
