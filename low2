@@ -1,10 +1,10 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V10 ULTIMATE EDITION)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V11 ULTIMATE + AUTO-CLICK)
 -- ==============================================================================
 
 local Config = {
     AutoOptimizer = true, 
-    AutoStartDelay = 0.5 -- Ubah angka ini: 0 untuk instan, 1.5 atau 3 untuk aman (jika lag)
+    AutoStartDelay = 0 -- Set 0 untuk instan (tanpa delay sama sekali)
 }
 
 local INGAME_PLACE_ID = 16552821455
@@ -22,19 +22,20 @@ local Terrain = Workspace.Terrain
 local player = Players.LocalPlayer
 
 local isOptimized = false
-local hasOptimizedOnce = false -- Kunci Potato Mode Permanen
+local hasOptimizedOnce = false 
 local stats = {
     Toon = "Scanning...",
     Floor = "1",
     Taken = 0,
     Consumed = 0,
     Machines = 0,
-    Mastery = "Menunggu Update...", -- Default sebelum view stat dibuka
+    Mastery = "Menunggu Update...", 
     Ichor = "0",
     Holiday = "0"
 }
 
 local countedGenerators = {}
+local previousMachines = 0 -- Untuk mendeteksi kapan mesin baru selesai dikerjakan
 
 local locationStatus = "UNKNOWN LOCATION"
 if game.PlaceId == INGAME_PLACE_ID then
@@ -93,24 +94,26 @@ local function applyLowGraphics()
     end
 end
 
--- ==================== SMART AUTO-DETECTOR MAP BARU ====================
-local currentRoomFolder = Workspace:WaitForChild("CurrentRoom", 10)
-if currentRoomFolder then
-    currentRoomFolder.ChildAdded:Connect(function(child)
-        if hasOptimizedOnce and child:IsA("Model") then
-            task.spawn(function()
-                local gens = child:WaitForChild("Generators", 30)
-                applyLowGraphics()
-                countedGenerators = {} 
-                task.wait(3)
-                applyLowGraphics()
-            end)
-        end
-    end)
-end
+-- ==================== SMART AUTO-DETECTOR MAP BARU (TIDAK YIELD) ====================
+task.spawn(function()
+    local currentRoomFolder = Workspace:WaitForChild("CurrentRoom", 10)
+    if currentRoomFolder then
+        currentRoomFolder.ChildAdded:Connect(function(child)
+            if hasOptimizedOnce and child:IsA("Model") then
+                task.spawn(function()
+                    local gens = child:WaitForChild("Generators", 30)
+                    applyLowGraphics()
+                    countedGenerators = {} 
+                    task.wait(3)
+                    applyLowGraphics()
+                end)
+            end
+        end)
+    end
+end)
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizerFinal"
+local guiName = "DandySuperOptimizerV11"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
@@ -137,9 +140,11 @@ textContainer.Visible = false
 textContainer.ZIndex = 2
 textContainer.Parent = screenGui
 
+-- PERBAIKAN 1: ANCHOR POINT AGAR PAS DI TENGAH
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Size = UDim2.new(1, 0, 0.2, 0)
-headerLabel.Position = UDim2.new(0, 0, 0.1, 0)
+headerLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+headerLabel.Position = UDim2.new(0.5, 0, 0.2, 0)
 headerLabel.BackgroundTransparency = 1
 headerLabel.Text = locationStatus
 headerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -151,7 +156,8 @@ headerLabel.Parent = textContainer
 
 local statsLabel = Instance.new("TextLabel")
 statsLabel.Size = UDim2.new(0.6, 0, 0.6, 0)
-statsLabel.Position = UDim2.new(0.2, 0, 0.3, 0)
+statsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+statsLabel.Position = UDim2.new(0.5, 0, 0.55, 0) -- Pas di tengah bawah
 statsLabel.BackgroundTransparency = 1
 statsLabel.Text = "Memuat Data..."
 statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -303,6 +309,14 @@ local setToggleState = CreateElegantToggle({
     end
 })
 
+-- ==================== FUNGSI SIMULASI KLIK (VIRTUAL / GETCONNECTIONS) ====================
+local function fireClick(button)
+    if getconnections then
+        for _, conn in pairs(getconnections(button.MouseButton1Click)) do conn:Fire() end
+        for _, conn in pairs(getconnections(button.Activated)) do conn:Fire() end
+    end
+end
+
 -- ==================== SMART MASTERY MEMORY LOOP ====================
 task.spawn(function()
     local playerGui = player:WaitForChild("PlayerGui")
@@ -425,6 +439,36 @@ task.spawn(function()
             checkLocalPlayerMachines()
             updateStatsVariables()
             
+            -- PERBAIKAN 3: AUTO-CLICKER VIEWSTATS JIKA MESIN SELESAI
+            if stats.Machines > previousMachines then
+                previousMachines = stats.Machines
+                task.spawn(function()
+                    local pGui = player:FindFirstChild("PlayerGui")
+                    if pGui then
+                        local menu = pGui:FindFirstChild("ScreenGui") and pGui.ScreenGui:FindFirstChild("Menu")
+                        local stopGen = menu and menu:FindFirstChild("StopGenerator")
+                        
+                        -- Tunggu sampai UI interaksi generator menghilang dari layar (Max 20 detik)
+                        local timeout = 40
+                        while stopGen and stopGen.Visible and timeout > 0 do
+                            task.wait(0.5)
+                            timeout = timeout - 1
+                        end
+                        
+                        task.wait(1.5) -- Jeda aman agar animasi skill check/UI game selesai
+                        
+                        local viewStatsBtn = pGui.ScreenGui:FindFirstChild("ViewStats")
+                        if viewStatsBtn and (viewStatsBtn:IsA("TextButton") or viewStatsBtn:IsA("ImageButton")) then
+                            -- Klik untuk membuka
+                            fireClick(viewStatsBtn)
+                            task.wait(1.5) -- Biarkan Smart Memory Loop membaca tulisan "COMPLETED!"
+                            -- Klik lagi untuk menutup
+                            fireClick(viewStatsBtn)
+                        end
+                    end
+                end)
+            end
+
             statsLabel.Text = string.format(
                 "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
                 "👤 Used Toon        : %s\n" ..
@@ -444,7 +488,7 @@ task.spawn(function()
     end
 end)
 
--- ==================== AUTO START SAFE DENGAN DELAY ====================
+-- ==================== AUTO START INSTANT ====================
 if Config.AutoOptimizer then
     task.spawn(function()
         if Config.AutoStartDelay > 0 then
