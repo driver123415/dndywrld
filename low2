@@ -1,5 +1,5 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V13 TRUE INSTANT)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14 DYNAMIC HEADER)
 -- ==============================================================================
 
 local Config = {
@@ -113,7 +113,7 @@ task.spawn(function()
 end)
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizerV13"
+local guiName = "DandySuperOptimizerV14"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
@@ -370,11 +370,8 @@ local function hookInventory(character)
     end
 end
 
--- PERBAIKAN: Dibungkus task.spawn agar TIDAK memblokir script utama
 if player.Character then 
-    task.spawn(function()
-        hookInventory(player.Character)
-    end)
+    task.spawn(function() hookInventory(player.Character) end)
 end
 player.CharacterAdded:Connect(function(char)
     task.spawn(function() hookInventory(char) end)
@@ -444,6 +441,13 @@ task.spawn(function()
         if isOptimized then
             checkLocalPlayerMachines()
             updateStatsVariables()
+            
+            -- PERBAIKAN: Mengupdate teks Header secara dinamis
+            if locationStatus == "IN GAME" then
+                headerLabel.Text = "IN GAME (" .. stats.Floor .. ")"
+            else
+                headerLabel.Text = "LOBBY"
+            end
             
             if stats.Machines > previousMachines then
                 previousMachines = stats.Machines
