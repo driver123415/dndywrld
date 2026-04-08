@@ -4,7 +4,7 @@
 
 local Config = {
     AutoOptimizer = true, 
-    AutoStartDelay = 1.5 -- Ubah angka ini: 0 untuk instan, 1.5 atau 3 untuk aman (jika lag)
+    AutoStartDelay = 0.5 -- Ubah angka ini: 0 untuk instan, 1.5 atau 3 untuk aman (jika lag)
 }
 
 local INGAME_PLACE_ID = 16552821455
