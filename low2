@@ -1,10 +1,10 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V12 FLAWLESS EDITION)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V13 TRUE INSTANT)
 -- ==============================================================================
 
 local Config = {
     AutoOptimizer = true, 
-    AutoStartDelay = 0.5 -- Set 0 untuk instan secepat kilat
+    AutoStartDelay = 0 -- Set 0 untuk instan secepat kilat
 }
 
 local INGAME_PLACE_ID = 16552821455
@@ -113,7 +113,7 @@ task.spawn(function()
 end)
 
 -- ==================== GUI CREATION ====================
-local guiName = "DandySuperOptimizerV12"
+local guiName = "DandySuperOptimizerV13"
 local targetGui = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
 if targetGui:FindFirstChild(guiName) then targetGui[guiName]:Destroy() end
 
@@ -153,7 +153,6 @@ headerLabel.Font = Enum.Font.FredokaOne
 headerLabel.TextSize = 80
 headerLabel.Parent = textContainer
 
--- PERBAIKAN LEBAR KOTAK (0.35) AGAR TEKS PAS DI TENGAH DAN TIDAK NABRAK TOMBOL
 local statsLabel = Instance.new("TextLabel")
 statsLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
 statsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -169,7 +168,7 @@ statsLabel.Parent = textContainer
 
 -- ==================== ELEGANT TOGGLE ====================
 local function CreateElegantToggle(config)
-    local state = config.Default or false -- Sekarang akan mengikuti Config.AutoOptimizer
+    local state = config.Default or false 
     
     local MainBorder = Instance.new("Frame")
     MainBorder.Parent = screenGui
@@ -287,7 +286,6 @@ local function CreateElegantToggle(config)
     end
 end
 
--- PERBAIKAN: Default mengikuti Config.AutoOptimizer agar langsung digambar HIJAU dari awal
 local setToggleState = CreateElegantToggle({
     Text = "AFK\nOptimizer",
     Default = Config.AutoOptimizer, 
@@ -372,8 +370,15 @@ local function hookInventory(character)
     end
 end
 
-if player.Character then hookInventory(player.Character) end
-player.CharacterAdded:Connect(hookInventory)
+-- PERBAIKAN: Dibungkus task.spawn agar TIDAK memblokir script utama
+if player.Character then 
+    task.spawn(function()
+        hookInventory(player.Character)
+    end)
+end
+player.CharacterAdded:Connect(function(char)
+    task.spawn(function() hookInventory(char) end)
+end)
 
 local function checkLocalPlayerMachines()
     local currentRoom = Workspace:FindFirstChild("CurrentRoom")
@@ -491,8 +496,6 @@ if Config.AutoOptimizer then
         if Config.AutoStartDelay > 0 then
             task.wait(Config.AutoStartDelay)
         end
-        -- Karena GUI sudah dibuat hijau (berkat Default = Config.AutoOptimizer),
-        -- kita langsung panggil saja fungsi setter-nya agar merender layar hitam
         setToggleState(true)
     end)
 end
