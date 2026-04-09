@@ -1,4 +1,4 @@
-wait (30)
+wait (10)
 
 local args = {
 	game:GetService("ReplicatedStorage"):WaitForChild("SharedData"):WaitForChild("TowerData"):WaitForChild("Brightney") --Toodles, Tisha, Cosmo, Brightney, urut kiri ke kanan
