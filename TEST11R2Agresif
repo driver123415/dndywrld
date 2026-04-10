@@ -1,0 +1,1129 @@
+-- ==============================================================================
+-- MAIN SCRIPT REVISION 22: SUPER SAFE UI HYBRID & HARD REBOOT FAILSAFE work tanpa encounter item gk ada deteksi anti monster
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    print("[SYSTEM] Not in-game. Script disabled.")
+    return
+end
+
+print("Master Script (Gen + Item + ESP) Executed!")
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local isMasterFarming = false     
+local isItemFarmingActive = false 
+
+-- ==================== CONFIGURATION ====================
+local Config = {
+    AutoStartFarming = true, 
+    
+    failsafegenerator = 60, -- Detik maksimal stuck sebelum HARD REBOOT
+    
+    Pickup = {
+        Enable = true,              
+        MovementMode = "Instant",   
+        TweenSpeed = 1.25,          
+        AuraRange = 30,             
+        PriorityList = {"ResearchCapsule", "Tape"},--, "HolidayCollectibleItem", "Holiday Collectible Item"
+        SecondPriorityList = {"Bandage", "HealthKit"}, 
+        IgnoreList = {"Pop", "FakeCapsule"}
+    },
+    ItemESP = { Enable = true },
+    
+    MonsterESP = {
+        Enable = true,
+        Color = Color3.fromRGB(255, 0, 0)
+    },
+
+    Skillcheck = { Enable = false }, 
+    Teleport = {
+        Enable = true,          
+        Mode = "Instant",       
+        TweenSpeed = 1.25,      
+        SafeRadius = 20,--angka aman 30       
+        PlayerRadius = 8,       
+        
+        SyncDelayMin = 0.1,     
+        SyncDelayMax = 0.4,     
+        
+        DelayNext = 1.0,        
+        UndergroundOffset = 11.5,
+        
+        -- [FITUR BARU] UI-BASED EVASION
+        SuperSafeMonsterDetect = false,
+        
+        LethalRadius = 15,--angka aman 60
+        AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
+        
+        LooseRadius = 10,--angka aman 15
+        LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster", "ConnieMonster", "GourdyMonster" } 
+    },
+    GenESP = {
+        Enable = true,          
+        ShowSafeRadius = true,  
+        NormalColor = Color3.fromRGB(150, 150, 150),   
+        CompletedColor = Color3.fromRGB(255, 0, 255),  
+        PossessedColor = Color3.fromRGB(0, 255, 255)   
+    }
+}
+
+-- ==================== SHARED FUNCTIONS ====================
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
+
+local function getModelCenter(model)
+    if not model or not model:IsA("Model") then return nil end
+    local parts = {}
+    for _, part in pairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then table.insert(parts, part) end
+    end
+    if #parts == 0 then return nil end
+    local totalPos = Vector3.zero
+    for _, part in pairs(parts) do totalPos = totalPos + part.Position end
+    return totalPos / #parts
+end
+
+local function getSafePlaceCFrame()
+    local elevators = Workspace:FindFirstChild("Elevators")
+    if elevators then
+        for _, el in ipairs(elevators:GetChildren()) do
+            if el.Name == "Elevator" and el:IsA("Model") then
+                local dandyStore = el:FindFirstChild("DandyStore")
+                if dandyStore then
+                    local dandyShop = dandyStore:FindFirstChild("DandyShop")
+                    if dandyShop then
+                        local root = dandyShop:FindFirstChild("RootPart")
+                        if root then
+                            return root.CFrame * CFrame.new(0, 3, 0)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    local map = getMap()
+    if map then
+        local freeArea = map:FindFirstChild("FreeArea")
+        if freeArea then
+            local fakeElevator = freeArea:FindFirstChild("FakeElevator")
+            if fakeElevator and fakeElevator:IsA("Model") then 
+                local center = getModelCenter(fakeElevator)
+                if center then return CFrame.new(center) end
+            end
+        end
+    end
+    return nil
+end
+
+local function teleportplr(cf)
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    character:PivotTo(cf)
+    Workspace.Gravity = originalGravity
+end
+
+local function forceStop()
+    local decoding = character:FindFirstChild("Decoding") and character.Decoding.Value
+    if decoding ~= nil then
+        pcall(function() decoding.Stats.StopInteracting:FireServer("Stop") end)
+    end
+end
+
+-- [REVISI 22] INTEGRASI UI HYBRID (Super Safe)
+local function isThreatened(targetPosition, radius)
+    -- Cek apakah targetPosition adalah posisi karakter saat ini (Evade Check)
+    local isEvasionCheck = rootPart and (targetPosition - rootPart.Position).Magnitude <= 5
+
+    -- 1. SUPER SAFE UI DETECTION (Diprioritaskan hanya untuk Evasion)
+    if Config.Teleport.SuperSafeMonsterDetect and isEvasionCheck then
+        local pGui = player:FindFirstChild("PlayerGui")
+        local screenGui = pGui and pGui:FindFirstChild("ScreenGui")
+        local monsterIcon = screenGui and screenGui:FindFirstChild("MonsterIcon")
+        
+        if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
+            if monsterIcon.ImageTransparency < 0.99 then
+                return true -- INSTAN KABUR KARENA UI BERKEDIP!
+            end
+        end
+    end
+
+    -- 2. SPATIAL DETECTION (Dipakai untuk ngecek Generator jarak jauh & Fallback Evasion)
+    local map = getMap()
+    if map then
+        local monstersFolder = map:FindFirstChild("Monsters")
+        if monstersFolder then
+            for _, monster in pairs(monstersFolder:GetChildren()) do
+                if monster:FindFirstChild("ChasingValue") and monster.ChasingValue.Value == character then
+                    return true 
+                end
+                
+                if monster:IsA("Model") and monster.PrimaryPart then
+                    local distance = (monster.PrimaryPart.Position - targetPosition).Magnitude
+                    
+                    local isLethal = false
+                    for _, lethalName in ipairs(Config.Teleport.AvoidmoreradiusMonsters) do
+                        if monster.Name == lethalName then
+                            isLethal = true
+                            break
+                        end
+                    end
+                    
+                    if isLethal then
+                        if distance <= Config.Teleport.LethalRadius then return true end
+                        continue 
+                    end
+                    
+                    local isLooseMonster = false
+                    for _, looseName in ipairs(Config.Teleport.LooseMonsters) do
+                        if monster.Name == looseName then
+                            isLooseMonster = true
+                            break
+                        end
+                    end
+                    
+                    if isLooseMonster then
+                        if distance <= Config.Teleport.LooseRadius then return true end
+                    else
+                        if distance <= radius then return true end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- ==================== PROGRESS & INVENTORY CHECKERS ====================
+local function getMachineProgress()
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        local specGui = pGui:FindFirstChild("SpectatorGui")
+        if specGui then
+            local info = specGui:FindFirstChild("InfoFrame")
+            if info then
+                local genFrame = info:FindFirstChild("GeneratorFrame")
+                if genFrame then
+                    local msg = genFrame:FindFirstChild("Message")
+                    if msg and msg:IsA("TextLabel") then
+                        local cur, tot = string.match(msg.Text, "Machines Completed: (%d+)/(%d+)")
+                        if cur and tot then
+                            return tonumber(cur), tonumber(tot)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return -1, -1
+end
+
+local function getEmptyInventorySlots()
+    local char = player.Character
+    if not char then return 0 end
+    local inv = char:FindFirstChild("Inventory")
+    if not inv then return 0 end
+    
+    local emptyCount = 0
+    for i = 1, 4 do
+        local slot = inv:FindFirstChild("Slot" .. i)
+        if slot and (slot.Value == "" or slot.Value == "None") then
+            emptyCount = emptyCount + 1
+        end
+    end
+    return emptyCount
+end
+
+-- ==================== MONSTER ESP ====================
+local function updateMonsterESP()
+    if not Config.MonsterESP.Enable then return end
+    local map = getMap()
+    if not map then return end
+    
+    local monstersFolder = map:FindFirstChild("Monsters")
+    if monstersFolder then
+        for _, monster in pairs(monstersFolder:GetChildren()) do
+            if monster:IsA("Model") and monster.PrimaryPart then
+                local highlight = monster:FindFirstChild("MonsterESP")
+                if not highlight then
+                    highlight = Instance.new("Highlight", monster)
+                    highlight.Name = "MonsterESP"
+                    highlight.FillColor = Config.MonsterESP.Color
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.5
+                end
+                
+                local billboard = monster:FindFirstChild("MonsterText")
+                local label
+                if not billboard then
+                    billboard = Instance.new("BillboardGui", monster)
+                    billboard.Name = "MonsterText"
+                    billboard.Size = UDim2.new(0, 150, 0, 50)
+                    billboard.AlwaysOnTop = true
+                    billboard.Adornee = monster.PrimaryPart
+                    
+                    label = Instance.new("TextLabel", billboard)
+                    label.Name = "Text"
+                    label.Size = UDim2.new(1, 0, 1, 0)
+                    label.BackgroundTransparency = 1
+                    label.Font = Enum.Font.Nunito
+                    label.TextColor3 = Config.MonsterESP.Color
+                    label.TextStrokeTransparency = 0.5
+                    label.TextSize = 14
+                else 
+                    label = billboard.Text 
+                end
+                
+                label.Text = "[MONSTER]\n" .. monster.Name
+            end
+        end
+    end
+end
+
+-- ==================== ITEM AUTO-FARM ====================
+local isItemAuraActive = false
+
+local function isIgnored(itemName)
+    local nameLower = string.lower(itemName)
+    for _, blackName in ipairs(Config.Pickup.IgnoreList) do
+        if string.find(nameLower, string.lower(blackName), 1, true) then return true end
+    end
+    return false
+end
+
+local function isPriority(itemName)
+    local nameLower = string.lower(itemName)
+    for _, prioName in ipairs(Config.Pickup.PriorityList) do
+        if string.find(nameLower, string.lower(prioName), 1, true) then return true end
+    end
+    return false
+end
+
+local function isSecondPriority(itemName)
+    local nameLower = string.lower(itemName)
+    for _, healName in ipairs(Config.Pickup.SecondPriorityList) do
+        if string.find(nameLower, string.lower(healName), 1, true) then return true end
+    end
+    return false
+end
+
+local function applyItemESP()
+    if not Config.ItemESP.Enable then return end
+    local map = getMap()
+    if map and map:FindFirstChild("Items") then
+        for _, item in ipairs(map.Items:GetChildren()) do
+            if item:IsA("Model") and not item:FindFirstChild("ItemESP") then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ItemESP"
+                highlight.Parent = item
+                highlight.FillTransparency = 0.5
+                
+                if isIgnored(item.Name) or item:GetAttribute("BlacklistLimbo") then highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                elseif isPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 255, 0)
+                elseif isSecondPriority(item.Name) then highlight.FillColor = Color3.fromRGB(255, 100, 255) 
+                else highlight.FillColor = Color3.fromRGB(0, 255, 0) end
+                
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ItemESPText"
+                billboard.Adornee = item
+                billboard.Size = UDim2.new(0, 100, 0, 50)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = item
+                
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Text = item.Name
+                label.TextColor3 = highlight.FillColor
+                label.TextStrokeTransparency = 0.5
+                label.TextSize = 14
+                label.Parent = billboard
+            end
+        end
+    end
+end
+
+local function interactWithPrompt(prompt)
+    if prompt.HoldDuration == 0 then
+        prompt:InputHoldBegin()
+        prompt:InputHoldEnd()
+    else
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration)
+        prompt:InputHoldEnd()
+    end
+end
+
+local function startItemAura()
+    isItemAuraActive = true
+    task.spawn(function()
+        while isItemAuraActive do
+            local map = getMap()
+            if map and rootPart then
+                local itemsFolder = map:FindFirstChild("Items")
+                if itemsFolder then
+                    for _, item in pairs(itemsFolder:GetChildren()) do
+                        if not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
+                            local promptPart = item:FindFirstChild("Prompt")
+                            if promptPart then
+                                local proximityPrompt = promptPart:FindFirstChild("ProximityPrompt")
+                                if proximityPrompt and proximityPrompt.Enabled then
+                                    if (promptPart.Position - rootPart.Position).Magnitude <= Config.Pickup.AuraRange then
+                                        interactWithPrompt(proximityPrompt)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function moveToPositionItem(targetCFrame)
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    if Config.Pickup.MovementMode == "Instant" then
+        rootPart.CFrame = targetCFrame
+        task.wait(0.05)
+    else
+        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
+        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+        local duration = distance / (speed * Config.Pickup.TweenSpeed)
+        if duration <= 0 then duration = 0.1 end
+        local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+        local tween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
+        tween:Play()
+        tween.Completed:Wait()
+    end
+    Workspace.Gravity = originalGravity
+end
+
+local function executePickup()
+    if not Config.Pickup.Enable then return end
+    local map = getMap()
+    if not map then return end
+
+    applyItemESP()
+    startItemAura()
+    
+    local maxLoops = 8 
+    local currentLoop = 1
+    local hasCleanedAll = false
+
+    while currentLoop <= maxLoops and not hasCleanedAll do
+        local itemsFolder = map:FindFirstChild("Items")
+        if not itemsFolder then break end
+        
+        local priorityItems, normalItems = {}, {}
+        for _, item in ipairs(itemsFolder:GetChildren()) do
+            if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
+                if isPriority(item.Name) or isSecondPriority(item.Name) then table.insert(priorityItems, item)
+                else table.insert(normalItems, item) end
+            end
+        end
+
+        if #priorityItems == 0 and #normalItems == 0 then
+            hasCleanedAll = true
+            break
+        end
+
+        local itemsToProcess = (#priorityItems > 0) and priorityItems or normalItems
+
+        table.sort(itemsToProcess, function(a, b)
+            return (rootPart.Position - a:GetPivot().Position).Magnitude < (rootPart.Position - b:GetPivot().Position).Magnitude
+        end)
+
+        for _, item in ipairs(itemsToProcess) do
+            if item and item.Parent and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
+                
+                if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                    print("[SAFETY - ITEM] Monster terdeteksi! Batal ambil item, ngungsi ke Safe Place...")
+                    local safePos = getSafePlaceCFrame()
+                    if safePos then teleportplr(safePos)
+                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end 
+                    task.wait(1)
+                    break
+                end
+
+                local targetCFrame = item:GetPivot() * CFrame.new(0, -2.5, 0)
+                local platform = Instance.new("Part")
+                platform.Size = Vector3.new(15, 1, 15) 
+                platform.Anchored = true
+                platform.CanCollide = true
+                platform.Transparency = 0.5 
+                platform.Color = Color3.fromRGB(0, 255, 0)
+                platform.CFrame = targetCFrame * CFrame.new(0, -3.5, 0)
+                platform.Parent = Workspace
+                
+                moveToPositionItem(targetCFrame)
+                task.wait(0.15)
+                
+                local promptPart = item:FindFirstChild("Prompt")
+                if promptPart then
+                    local proximityPrompt = promptPart:FindFirstChild("ProximityPrompt")
+                    if proximityPrompt and proximityPrompt.Enabled then interactWithPrompt(proximityPrompt) end
+                end
+                
+                local timeout = 15 
+                local interrupted = false
+                while item.Parent and timeout > 0 do
+                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                        interrupted = true
+                        break
+                    end
+                    task.wait(0.1)
+                    timeout = timeout - 1
+                end
+                
+                if platform then platform:Destroy() end
+
+                if interrupted then
+                    print("[SAFETY - ITEM] Diserang saat memungut item! Kabur ke Safe Place!")
+                    local safePos = getSafePlaceCFrame()
+                    if safePos then teleportplr(safePos)
+                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                    task.wait(1)
+                    break
+                end
+                
+                if item.Parent then
+                    if isPriority(item.Name) then
+                        print("[SYSTEM] Item Priority " .. item.Name .. " masih mencoba diambil. Bypass Blacklist aktif.")
+                    else
+                        print("[SYSTEM] Gagal mengambil " .. item.Name .. " (Tas Penuh / Gagal). Dimasukkan ke Blacklist Permanen Lantai Ini.")
+                        item:SetAttribute("BlacklistLimbo", true)
+                        local highlight = item:FindFirstChild("ItemESP")
+                        if highlight then highlight.FillColor = Color3.fromRGB(255, 0, 0) end
+                    end
+                end
+            end
+        end
+        currentLoop = currentLoop + 1
+        task.wait(0.5) 
+    end
+
+    isItemAuraActive = false
+    print("[DONE] Pengambilan item selesai. Melanjutkan ke target Generator...")
+end
+
+
+-- ==================== GENERATOR AUTO-FARM ====================
+local function isInteractingUI()
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if playerGui then
+        local screenGui = playerGui:FindFirstChild("ScreenGui")
+        if screenGui then
+            local menu = screenGui:FindFirstChild("Menu")
+            if menu then
+                local stopGen = menu:FindFirstChild("StopGenerator")
+                return stopGen and stopGen.Visible or false
+            end
+        end
+    end
+    return false
+end
+
+local function isTrinketActive()
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then return false end
+    
+    local trinketsUI = playerGui:FindFirstChild("ScreenGui")
+        and playerGui.ScreenGui:FindFirstChild("Menu")
+        and playerGui.ScreenGui.Menu:FindFirstChild("BottomLeftCorner")
+        and playerGui.ScreenGui.Menu.BottomLeftCorner:FindFirstChild("Trinkets")
+        
+    if trinketsUI then
+        for i = 1, 2 do
+            local slot = trinketsUI:FindFirstChild("TrinketSlot" .. i)
+            if slot then
+                local textLabel = slot:FindFirstChild("TextLabel")
+                if textLabel and textLabel.Text == "Active" then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local safeRadiusAdornment
+local function updateSafeRadiusVisual()
+    if not Config.GenESP.ShowSafeRadius then
+        if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
+        return
+    end
+    if not safeRadiusAdornment and rootPart then
+        safeRadiusAdornment = Instance.new("CylinderHandleAdornment")
+        safeRadiusAdornment.Name = "SafeRadiusVisual"
+        safeRadiusAdornment.Radius = Config.Teleport.SafeRadius
+        safeRadiusAdornment.Height = 0.1
+        safeRadiusAdornment.Color3 = Color3.fromRGB(255, 50, 50)
+        safeRadiusAdornment.Transparency = 0.5
+        safeRadiusAdornment.CFrame = CFrame.Angles(math.rad(90), 0, 0)
+        safeRadiusAdornment.ZIndex = 0
+        safeRadiusAdornment.AlwaysOnTop = true 
+        safeRadiusAdornment.Adornee = rootPart
+        safeRadiusAdornment.Parent = rootPart
+    end
+end
+
+local function isMachineOccupied(generator, radius)
+    local inGamePlayers = Workspace:FindFirstChild("InGamePlayers")
+    if inGamePlayers then
+        for _, otherPlayer in ipairs(inGamePlayers:GetChildren()) do
+            if otherPlayer.Name ~= player.Name then
+                local otherRoot = otherPlayer:FindFirstChild("HumanoidRootPart")
+                if otherRoot and generator.PrimaryPart then
+                    if (otherRoot.Position - generator.PrimaryPart.Position).Magnitude <= radius then 
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function updateGeneratorESP()
+    if not Config.GenESP.Enable then return end
+    local map = getMap()
+    if not map then return end
+    local generatorsFolder = map:FindFirstChild("Generators")
+    if generatorsFolder then
+        for _, gen in pairs(generatorsFolder:GetChildren()) do
+            if gen:IsA("Model") then
+                local highlight = gen:FindFirstChild("GenESP")
+                if not highlight then
+                    highlight = Instance.new("Highlight", gen)
+                    highlight.Name = "GenESP"
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.FillTransparency = 0.5
+                end
+                
+                local billboard = gen:FindFirstChild("GenText")
+                local label
+                if not billboard then
+                    billboard = Instance.new("BillboardGui", gen)
+                    billboard.Name = "GenText"
+                    billboard.Size = UDim2.new(0, 100, 0, 50)
+                    billboard.AlwaysOnTop = true
+                    label = Instance.new("TextLabel", billboard)
+                    label.Name = "Text"
+                    label.Size = UDim2.new(1, 0, 1, 0)
+                    label.BackgroundTransparency = 1
+                    label.Font = Enum.Font.Nunito
+                    label.TextStrokeTransparency = 0.5
+                    label.TextSize = 16
+                else label = billboard.Text end
+
+                local stats = gen:FindFirstChild("Stats")
+                if stats then
+                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
+                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
+                    local current = stats:FindFirstChild("CurrentAmount") and math.floor(stats.CurrentAmount.Value + 0.5) or 0
+                    local required = stats:FindFirstChild("RequiredAmount") and stats.RequiredAmount.Value or 0
+                    
+                    local genName = gen.Name
+                    if connie then
+                        label.TextColor3 = Config.GenESP.PossessedColor
+                        highlight.FillColor = Config.GenESP.PossessedColor
+                        genName = genName .. "\n[POSSESSED]"
+                    elseif completed then
+                        label.TextColor3 = Config.GenESP.CompletedColor
+                        highlight.FillColor = Config.GenESP.CompletedColor
+                    else
+                        label.TextColor3 = Config.GenESP.NormalColor
+                        highlight.FillColor = Config.GenESP.NormalColor
+                    end
+                    label.Text = genName .. "\n(" .. current .. " / " .. required .. ")"
+                end
+            end
+        end
+    end
+end
+
+local function forceTriggerGenerator(generator)
+    for _, descendant in ipairs(generator:GetDescendants()) do
+        if descendant:IsA("ProximityPrompt") then
+            descendant.RequiresLineOfSight = false
+            descendant.MaxActivationDistance = math.huge 
+            if fireproximityprompt then fireproximityprompt(descendant, 1)
+            else pcall(function() descendant:InputHoldBegin() end) end
+            return true
+        end
+    end
+    return false
+end
+
+local function moveToPositionGen(targetCFrame, usePlatform)
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    rootPart.Anchored = false
+    
+    if Config.Teleport.Mode == "Instant" then
+        rootPart.CFrame = targetCFrame
+        task.wait(0.05) 
+    else
+        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
+        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+        local duration = distance / (speed * Config.Teleport.TweenSpeed)
+        if duration <= 0 then duration = 0.1 end
+        local tween = TweenService:Create(rootPart, TweenInfo.new(duration, Enum.EasingStyle.Linear), { CFrame = targetCFrame })
+        tween:Play()
+        tween.Completed:Wait()
+    end
+    
+    if usePlatform then
+        rootPart.CFrame = targetCFrame
+        rootPart.Anchored = true 
+    end
+    Workspace.Gravity = originalGravity
+end
+
+local function getRealElevatorCFrame()
+    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
+    if elevatorsFolder then
+        for _, obj in ipairs(elevatorsFolder:GetChildren()) do
+            if obj.Name == "Elevator" and obj:IsA("Model") then
+                if obj.PrimaryPart then 
+                    return obj.PrimaryPart.CFrame * CFrame.new(0, 3, 0)
+                else
+                    local centerPos = getModelCenter(obj)
+                    if centerPos then return CFrame.new(centerPos) * CFrame.new(0, 3, 0) end
+                end
+            end
+        end
+        for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                return obj.CFrame * CFrame.new(0, 1.5, 2)
+            end
+        end
+    end
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+            local parentName = string.lower(obj.Parent and obj.Parent.Name or "")
+            if not string.find(parentName, "fake") then
+                return obj.CFrame * CFrame.new(0, 1.5, 2)
+            end
+        end
+    end
+    return nil
+end
+
+local function startAutoFarming()
+    local inElevatorStandby = false
+
+    task.spawn(function()
+        while isMasterFarming do
+            updateGeneratorESP()
+            updateMonsterESP() 
+            updateSafeRadiusVisual()
+            task.wait(0.1)
+        end
+        if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
+    end)
+
+    task.spawn(function()
+        while isMasterFarming do
+            pcall(function()
+                local events = ReplicatedStorage:FindFirstChild("Events")
+                if events then
+                    local su = events:FindFirstChild("SkillcheckUpdate")
+                    if su then su.OnClientInvoke = function() return true end end
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+
+    task.spawn(function()
+        while isMasterFarming do
+            if isItemFarmingActive then
+                task.wait(0.2)
+                continue
+            end
+
+            character = player.Character or player.CharacterAdded:Wait()
+            rootPart = character:WaitForChild("HumanoidRootPart")
+
+            if Config.Teleport.Enable then
+                local map = getMap()
+                if map then
+                    local genFolder = map:FindFirstChild("Generators")
+                    if genFolder then
+                        
+                        local targetGen = nil
+                        local uncompletedCount = 0
+                        local anyEmptyGen = nil
+                        
+                        for _, gen in pairs(genFolder:GetChildren()) do
+                            if gen:IsA("Model") and gen.PrimaryPart then
+                                local stats = gen:FindFirstChild("Stats")
+                                if stats then
+                                    local completed = stats:FindFirstChild("Completed") and stats.Completed.Value
+                                    local connie = stats:FindFirstChild("Connie") and stats.Connie.Value
+                                    
+                                    if not completed then
+                                        uncompletedCount = uncompletedCount + 1
+                                        if not connie then
+                                            if not isThreatened(gen.PrimaryPart.Position, Config.Teleport.SafeRadius + 15) then
+                                                if not isMachineOccupied(gen, Config.Teleport.PlayerRadius) then
+                                                    if not anyEmptyGen then anyEmptyGen = gen end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        
+                        targetGen = anyEmptyGen 
+                        
+                        local curGenUI, totGenUI = getMachineProgress()
+                        local isFloorActuallyDone = false
+                        
+                        if curGenUI ~= -1 and totGenUI ~= -1 then
+                            isFloorActuallyDone = (curGenUI >= totGenUI)
+                        else
+                            isFloorActuallyDone = (uncompletedCount == 0)
+                        end
+                        
+                        if isFloorActuallyDone then
+                            if not inElevatorStandby then
+                                print("[INFO] Semua Mesin Selesai (Verified)! Menuju Real Elevator...")
+                                inElevatorStandby = true
+                            end
+                            
+                            local elevatorTarget = getRealElevatorCFrame()
+                            if elevatorTarget then
+                                local dist = (rootPart.Position - elevatorTarget.Position).Magnitude
+                                if dist > 7 then
+                                    moveToPositionGen(elevatorTarget, true)
+                                else
+                                    if rootPart.Anchored then rootPart.Anchored = false end
+                                end
+                            end
+                            task.wait(0.5) 
+                            
+                        elseif targetGen then
+                            inElevatorStandby = false
+                            local centerPos = getModelCenter(targetGen)
+                            if centerPos and targetGen.PrimaryPart then
+                                local targetCFrame = CFrame.new(centerPos.X, targetGen.PrimaryPart.Position.Y + Config.Teleport.UndergroundOffset, centerPos.Z)
+                                moveToPositionGen(targetCFrame, true)
+                                
+                                local isContested = false
+                                local monsterEvade = false
+                                local needSync = isTrinketActive()
+                                
+                                if needSync then
+                                    local minD = Config.Teleport.SyncDelayMin
+                                    local maxD = Config.Teleport.SyncDelayMax
+                                    local syncDelay = minD + (math.random() * (maxD - minD))
+                                    
+                                    print(string.format("[SYNC] Trinket 'Active'! Menunggu %.2f detik...", syncDelay))
+                                    
+                                    local elapsed = 0
+                                    while elapsed < syncDelay do
+                                        if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                                            monsterEvade = true
+                                            break
+                                        end
+                                        task.wait(0.1)
+                                        elapsed = elapsed + 0.1
+                                    end
+                                    
+                                    if not monsterEvade and isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                        isContested = true
+                                    end
+                                else
+                                    if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                                        monsterEvade = true
+                                    elseif isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                        isContested = true
+                                    end
+                                end
+                                
+                                if monsterEvade then
+                                    print("[SAFETY] Monster terdeteksi saat mendarat! Evade Instan!")
+                                    rootPart.Anchored = false
+                                    local safePos = getSafePlaceCFrame()
+                                    if safePos then teleportplr(safePos)
+                                    else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                                    task.wait(1.5)
+                                elseif isContested then
+                                    print("[SAFETY] Mesin direbut pemain lain. Batal ekstrak.")
+                                    rootPart.Anchored = false
+                                else
+                                    local hasStartedInteracting = false
+                                    local instantNext = false
+                                    local failTimer = 0 
+                                    
+                                    while isMasterFarming and targetGen.Parent and not isItemFarmingActive do
+                                        if isItemFarmingActive then
+                                            forceStop()
+                                            rootPart.Anchored = false
+                                            instantNext = true
+                                            break
+                                        end
+
+                                        local stats = targetGen:FindFirstChild("Stats")
+                                        if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
+                                            instantNext = true
+                                            break 
+                                        end
+                                        
+                                        if isThreatened(rootPart.Position, Config.Teleport.SafeRadius) then
+                                            forceStop()
+                                            rootPart.Anchored = false
+                                            
+                                            print("[SAFETY] Evade Instan! Ngungsi ke DandyShop/SafePlace...")
+                                            local safePos = getSafePlaceCFrame()
+                                            if safePos then teleportplr(safePos)
+                                            else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                                            instantNext = true
+                                            break
+                                        end
+                                        
+                                        if isMachineOccupied(targetGen, Config.Teleport.PlayerRadius) then
+                                            print("[SAFETY] Pemain lain mendekat saat ekstrak. Ngalah cabut.")
+                                            forceStop()
+                                            task.wait(0.1)
+                                            instantNext = true
+                                            break
+                                        end
+                                        
+                                        rootPart.CFrame = targetCFrame
+                                        local currentlyInteracting = isInteractingUI()
+                                        if currentlyInteracting then
+                                            hasStartedInteracting = true
+                                            failTimer = 0 
+                                        elseif hasStartedInteracting and not currentlyInteracting then
+                                            forceStop()
+                                            instantNext = true
+                                            break
+                                        else
+                                            forceTriggerGenerator(targetGen)
+                                            failTimer = failTimer + 1
+                                            if failTimer == 10 then
+                                                rootPart.CFrame = targetCFrame * CFrame.new(0, 1.5, 0)
+                                                task.wait(0.1)
+                                                rootPart.CFrame = targetCFrame
+                                            elseif failTimer >= 25 then
+                                                forceStop()
+                                                instantNext = true
+                                                break
+                                            end
+                                        end
+                                        task.wait(0.1)
+                                    end
+                                    
+                                    rootPart.Anchored = false
+                                    if instantNext then task.wait(0.05)
+                                    else task.wait(Config.Teleport.DelayNext) end
+                                end
+                            end
+                            
+                        else
+                            local progressText = (curGenUI ~= -1) and (" ("..curGenUI.."/"..totGenUI..")") or ""
+                            print("[INFO] Mesin belum selesai" .. progressText .. " tapi area tidak aman/hilang. Ngungsi ke DandyShop...")
+                            rootPart.Anchored = false
+                            local safePos = getSafePlaceCFrame()
+                            if safePos then teleportplr(safePos) end
+                            task.wait(1) 
+                        end
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- ==================== MASTER WATCHER & FAILSAFE ====================
+local hasSweptHeals = false
+local lastGenCount = -1
+local lastProgressTick = tick()
+
+task.spawn(function()
+    while task.wait(0.2) do 
+        if not isMasterFarming then 
+            lastProgressTick = tick()
+            continue 
+        end
+
+        local curGen, totGen = getMachineProgress()
+        
+        if curGen == 0 then
+            hasSweptHeals = false 
+        end
+        
+        if not isItemFarmingActive then
+            if curGen ~= lastGenCount then
+                lastGenCount = curGen
+                lastProgressTick = tick() 
+            end
+            
+            if tick() - lastProgressTick >= Config.failsafegenerator then
+                print("\n==============================================")
+                print("[FAILSAFE] Script stuck/bengong selama " .. Config.failsafegenerator .. " detik! Melakukan HARD REBOOT...")
+                print("==============================================")
+                
+                forceStop()
+                if rootPart then rootPart.Anchored = false end
+                local safePos = getSafePlaceCFrame()
+                if safePos then teleportplr(safePos) 
+                else teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0)) end
+                
+                isMasterFarming = false 
+                task.wait(2)
+                
+                print("[FAILSAFE] Reboot Selesai. Memulai ulang script...")
+                lastProgressTick = tick() 
+                isMasterFarming = true
+                startAutoFarming()
+                
+                continue
+            end
+        else
+            lastProgressTick = tick() 
+        end
+
+        if curGen > 0 and totGen > 0 and curGen == (totGen - 1) and not hasSweptHeals then
+            if getEmptyInventorySlots() > 0 then
+                local unblacklistedAny = false
+                local map = getMap()
+                local itemsFolder = map and map:FindFirstChild("Items")
+                if itemsFolder then
+                    for _, item in ipairs(itemsFolder:GetChildren()) do
+                        if isSecondPriority(item.Name) and item:GetAttribute("BlacklistLimbo") then
+                            item:SetAttribute("BlacklistLimbo", nil) 
+                            
+                            local highlight = item:FindFirstChild("ItemESP")
+                            if highlight then highlight.FillColor = Color3.fromRGB(255, 100, 255) end 
+                            
+                            unblacklistedAny = true
+                        end
+                    end
+                end
+                if unblacklistedAny then
+                    print("[SMART PICKUP] Sisa 1 Mesin & Tas Kosong! Menghapus Blacklist Healing Item...")
+                end
+            end
+            hasSweptHeals = true
+        end
+
+        local map = getMap()
+        if map then
+            local itemsFolder = map:FindFirstChild("Items")
+            if itemsFolder then
+                local hasValidItems = false
+                for _, item in ipairs(itemsFolder:GetChildren()) do
+                    if item:IsA("Model") and not isIgnored(item.Name) and not item:GetAttribute("BlacklistLimbo") then
+                        hasValidItems = true
+                        break
+                    end
+                end
+
+                if hasValidItems and not isItemFarmingActive then
+                    if isInteractingUI() then
+                        print("[SYSTEM] Item baru terdeteksi, TAPI mesin sedang diekstrak! Menunggu UI selesai...")
+                    end
+                    
+                    while isInteractingUI() and isMasterFarming do
+                        task.wait(0.2)
+                        lastProgressTick = tick()
+                    end
+                    
+                    isItemFarmingActive = true 
+                    
+                    print("\n==============================================")
+                    print("[SYSTEM] Mendeteksi Item / Lantai Baru!")
+                    print("[SYSTEM] Mesin aman/selesai. Mengambil item...")
+                    print("==============================================")
+                    
+                    forceStop()
+                    if rootPart then rootPart.Anchored = false end
+                    
+                    character = player.Character or player.CharacterAdded:Wait()
+                    rootPart = character:WaitForChild("HumanoidRootPart")
+                    
+                    local success, err = pcall(function()
+                        executePickup() 
+                    end)
+                    
+                    if not success then
+                        print("[WARNING] Error saat executePickup: ", err)
+                        isItemAuraActive = false
+                    end
+                    
+                    isItemFarmingActive = false
+                    lastProgressTick = tick() 
+                end
+            end
+        end
+    end
+end)
+
+-- ==================== UI TOGGLE ====================
+local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MasterFarmToggleUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = guiContainer
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 150, 0, 40)
+toggleBtn.Position = UDim2.new(0.5, -75, 0, 20)
+toggleBtn.Text = "START FARMING"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 20
+toggleBtn.Active = true
+toggleBtn.Draggable = true
+toggleBtn.Parent = screenGui
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if isMasterFarming then
+        isMasterFarming = false
+        rootPart.Anchored = false
+        forceStop() 
+        if safeRadiusAdornment then safeRadiusAdornment:Destroy(); safeRadiusAdornment = nil end
+        toggleBtn.Text = "START FARMING"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    else
+        isMasterFarming = true
+        toggleBtn.Text = "STOP FARMING"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        startAutoFarming()
+    end
+end)
+
+if Config.AutoStartFarming then
+    print("[SYSTEM] Auto-Start Enabled. Langsung memulai Farming...")
+    isMasterFarming = true
+    toggleBtn.Text = "STOP FARMING"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+    startAutoFarming()
+end
