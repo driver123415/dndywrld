@@ -35,7 +35,7 @@ local Config = {
         MovementMode = "Instant",   
         TweenSpeed = 1.25,          
         AuraRange = 30,             
-        PriorityList = {"ResearchCapsule", "HolidayCollectibleItem", "Holiday Collectible Item", "Tape"},
+        PriorityList = {"ResearchCapsule", "Tape"},--, "HolidayCollectibleItem", "Holiday Collectible Item"
         SecondPriorityList = {"Bandage", "HealthKit"}, 
         IgnoreList = {"Pop", "FakeCapsule"}
     },
@@ -51,7 +51,7 @@ local Config = {
         Enable = true,          
         Mode = "Instant",       
         TweenSpeed = 1.25,      
-        SafeRadius = 30,        
+        SafeRadius = 20,--angka aman 30       
         PlayerRadius = 8,       
         
         SyncDelayMin = 0.1,     
@@ -63,10 +63,10 @@ local Config = {
         -- [FITUR BARU] UI-BASED EVASION
         SuperSafeMonsterDetect = false,
         
-        LethalRadius = 60,
+        LethalRadius = 15,--angka aman 60
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
         
-        LooseRadius = 15,
+        LooseRadius = 10,--angka aman 15
         LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster", "ConnieMonster", "GourdyMonster" } 
     },
     GenESP = {
