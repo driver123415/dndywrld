@@ -1,5 +1,4 @@
-
-print("Optimizer Running test1")
+print("Optimizer Running test2")
 -- ==============================================================================
 -- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14 DYNAMIC HEADER)
 -- ==============================================================================
@@ -38,6 +37,7 @@ local stats = {
 
 -- Penambahan Tabel Stat Lobby
 local lobbyStats = {
+    UsedToon = "Mencari...",
     OwnedToons = "0",
     OwnedTrinkets = "0",
     OwnedSkins = "0",
@@ -150,10 +150,11 @@ textContainer.Visible = false
 textContainer.ZIndex = 2
 textContainer.Parent = screenGui
 
+-- HEADER LOBBY / IN GAME (Atas)
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Size = UDim2.new(1, 0, 0.2, 0)
 headerLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-headerLabel.Position = UDim2.new(0.5, 0, 0.2, 0)
+headerLabel.Position = UDim2.new(0.5, 0, 0.15, 0) -- Sedikit dinaikkan agar ruang tengah luas
 headerLabel.BackgroundTransparency = 1
 headerLabel.Text = locationStatus
 headerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -163,8 +164,9 @@ headerLabel.Font = Enum.Font.FredokaOne
 headerLabel.TextSize = 80
 headerLabel.Parent = textContainer
 
+-- STATS LABEL (Tengah)
 local statsLabel = Instance.new("TextLabel")
-statsLabel.Size = UDim2.new(0.5, 0, 0.6, 0) -- Diperlebar agar teks muat
+statsLabel.Size = UDim2.new(0.5, 0, 0.6, 0)
 statsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 statsLabel.Position = UDim2.new(0.5, 0, 0.55, 0) 
 statsLabel.BackgroundTransparency = 1
@@ -172,10 +174,24 @@ statsLabel.Text = "Memuat Data..."
 statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 statsLabel.TextXAlignment = Enum.TextXAlignment.Left
 statsLabel.TextYAlignment = Enum.TextYAlignment.Center
-statsLabel.Font = Enum.Font.RobotoMono -- DIGANTI KE ROBOTOMONO AGAR BOLD TERLIHAT JELAS
+statsLabel.Font = Enum.Font.RobotoMono
 statsLabel.TextSize = 22
 statsLabel.RichText = true
 statsLabel.Parent = textContainer
+
+-- PLAYER NAME LABEL (Bawah Tengah)
+local playerNameLabel = Instance.new("TextLabel")
+playerNameLabel.Size = UDim2.new(1, 0, 0.15, 0)
+playerNameLabel.AnchorPoint = Vector2.new(0.5, 1)
+playerNameLabel.Position = UDim2.new(0.5, 0, 0.98, 0) -- Paling bawah dengan sedikit margin
+playerNameLabel.BackgroundTransparency = 1
+playerNameLabel.Text = player.Name
+playerNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+playerNameLabel.TextXAlignment = Enum.TextXAlignment.Center
+playerNameLabel.TextYAlignment = Enum.TextYAlignment.Center
+playerNameLabel.Font = Enum.Font.FredokaOne
+playerNameLabel.TextSize = 80
+playerNameLabel.Parent = textContainer
 
 -- ==================== ELEGANT TOGGLE ====================
 local function CreateElegantToggle(config)
@@ -449,6 +465,24 @@ local function updateStatsVariables()
         end
 
     elseif locationStatus == "LOBBY" then
+        -- 1. Track Used Toon di Lobby
+        local wsPlayers = Workspace:FindFirstChild("Players")
+        if wsPlayers then
+            local myChar = wsPlayers:FindFirstChild(player.Name)
+            if myChar then
+                local conf = myChar:FindFirstChild("Config")
+                if conf then
+                    local charName = conf:FindFirstChild("CharacterName")
+                    if charName and charName:IsA("StringValue") then
+                        local fullName = charName.Value
+                        -- Mengambil nama sebelum underscore pertama
+                        local splitName = string.split(fullName, "_")[1]
+                        lobbyStats.UsedToon = splitName or fullName
+                    end
+                end
+            end
+        end
+
         local mainGui = pGui:FindFirstChild("MainGui")
         if mainGui then
             local statFrame = mainGui:FindFirstChild("StatFrame")
@@ -503,10 +537,9 @@ task.spawn(function()
             if locationStatus == "IN GAME" then
                 headerLabel.Text = "IN GAME (" .. stats.Floor .. ")"
                 
-                -- Konfigurasi tampilan In-Game
                 statsLabel.TextSize = 22 
                 statsLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
-                statsLabel.TextXAlignment = Enum.TextXAlignment.Left -- Kembalikan rata kiri agar rapi titik duanya
+                statsLabel.TextXAlignment = Enum.TextXAlignment.Left
                 
                 if stats.Machines > previousMachines then
                     previousMachines = stats.Machines
@@ -534,7 +567,6 @@ task.spawn(function()
                     end)
                 end
 
-                -- Menggunakan Font Color #FFFFFF (Putih Terang) untuk angka
                 statsLabel.Text = string.format(
                     "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
                     "👤 Used Toon        : <b><font color='#FFFFFF'>%s</font></b>\n" ..
@@ -553,13 +585,13 @@ task.spawn(function()
             elseif locationStatus == "LOBBY" then
                 headerLabel.Text = "LOBBY"
                 
-                -- Konfigurasi tampilan Lobby
                 statsLabel.TextSize = 45 
-                statsLabel.Size = UDim2.new(0.8, 0, 0.6, 0) -- Area diperlebar
-                statsLabel.TextXAlignment = Enum.TextXAlignment.Center -- Dibuat otomatis pas di tengah
+                statsLabel.Size = UDim2.new(0.8, 0, 0.6, 0)
+                statsLabel.TextXAlignment = Enum.TextXAlignment.Center
                 
-                -- Menggunakan Font Color #FFFFFF (Putih Terang) untuk angka
-                local lobbyText = "Toons Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedToons) .. "</font></b>\n"
+                -- Format Lobby yang baru dengan Used Toon di atas
+                local lobbyText = "👤 Used Toon: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.UsedToon) .. "</font></b>\n\n"
+                lobbyText = lobbyText .. "Toons Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedToons) .. "</font></b>\n"
                 lobbyText = lobbyText .. "Trinkets Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedTrinkets) .. "</font></b>\n"
                 lobbyText = lobbyText .. "Skins Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedSkins) .. "</font></b>\n"
                 
