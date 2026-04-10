@@ -1,7 +1,7 @@
 -- ==============================================================================
 -- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14 DYNAMIC HEADER)
 -- ==============================================================================
-print("Optimizer Running testa 1")
+
 local Config = {
     AutoOptimizer = true, 
     AutoStartDelay = 0.5 -- Set 0 untuk instan secepat kilat
@@ -435,8 +435,12 @@ local function updateStatsVariables()
             local myCharInfo = igp:FindFirstChild(player.Name)
             if myCharInfo then
                 local conf = myCharInfo:FindFirstChild("Config")
-                if conf and conf:FindFirstChild("CharacterName") and conf.CharacterName:IsA("StringValue") then
-                    stats.Toon = conf.CharacterName.Value
+                if conf then
+                    -- CEK GANDA: Cari CharacterName ATAU ModuleName
+                    local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+                    if charName and charName:IsA("StringValue") then
+                        stats.Toon = charName.Value
+                    end
                 end
             end
         end
@@ -464,27 +468,31 @@ local function updateStatsVariables()
         end
 
     elseif locationStatus == "LOBBY" then
-        -- PERBAIKAN: Memaksa script melihat ke Workspace.Players terlebih dahulu!
         local myCharInfo = nil
         local wsPlayers = Workspace:FindFirstChild("Players")
+        
         if wsPlayers then
             myCharInfo = wsPlayers:FindFirstChild(player.Name)
         end
-        
-        -- Coba juga cek di player.Character sebagai cadangan
         if not myCharInfo then
             myCharInfo = player.Character
+        end
+        if not myCharInfo then
+            myCharInfo = Workspace:FindFirstChild(player.Name)
         end
 
         if myCharInfo then
             local conf = myCharInfo:FindFirstChild("Config")
             if conf then
-                local charName = conf:FindFirstChild("CharacterName")
-                if charName and charName:IsA("StringValue") and charName.Value ~= "" then
+                -- CEK GANDA: Cari CharacterName ATAU ModuleName (Seperti Vee)
+                local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+                if charName and (charName:IsA("StringValue") or charName.ClassName == "StringValue") then
                     local fullName = charName.Value
-                    local splitName = string.split(fullName, "_")[1]
-                    if splitName and splitName ~= "" then
-                        lobbyStats.UsedToon = splitName
+                    if fullName and fullName ~= "" then
+                        local splitName = string.split(fullName, "_")[1]
+                        if splitName and splitName ~= "" then
+                            lobbyStats.UsedToon = splitName
+                        end
                     end
                 end
             end
