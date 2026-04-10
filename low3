@@ -1,7 +1,8 @@
+
+print("Optimizer Running test1")
 -- ==============================================================================
 -- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14 DYNAMIC HEADER)
 -- ==============================================================================
-print("Optimizer Running")
 
 local Config = {
     AutoOptimizer = true, 
@@ -163,7 +164,7 @@ headerLabel.TextSize = 80
 headerLabel.Parent = textContainer
 
 local statsLabel = Instance.new("TextLabel")
-statsLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
+statsLabel.Size = UDim2.new(0.5, 0, 0.6, 0) -- Diperlebar agar teks muat
 statsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 statsLabel.Position = UDim2.new(0.5, 0, 0.55, 0) 
 statsLabel.BackgroundTransparency = 1
@@ -171,9 +172,9 @@ statsLabel.Text = "Memuat Data..."
 statsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 statsLabel.TextXAlignment = Enum.TextXAlignment.Left
 statsLabel.TextYAlignment = Enum.TextYAlignment.Center
-statsLabel.Font = Enum.Font.Code
+statsLabel.Font = Enum.Font.RobotoMono -- DIGANTI KE ROBOTOMONO AGAR BOLD TERLIHAT JELAS
 statsLabel.TextSize = 22
-statsLabel.RichText = true -- MENGAKTIFKAN FITUR BOLD (HTML TAGS)
+statsLabel.RichText = true
 statsLabel.Parent = textContainer
 
 -- ==================== ELEGANT TOGGLE ====================
@@ -450,12 +451,10 @@ local function updateStatsVariables()
     elseif locationStatus == "LOBBY" then
         local mainGui = pGui:FindFirstChild("MainGui")
         if mainGui then
-            -- 1. Track Stats (Toons/Towers, Trinkets, Skins)
             local statFrame = mainGui:FindFirstChild("StatFrame")
             if statFrame then
                 local scrollFrame = statFrame:FindFirstChild("ScrollingFrame")
                 if scrollFrame then
-                    
                     local function getStatValue(statName)
                         local statUI = scrollFrame:FindFirstChild(statName)
                         if statUI then
@@ -475,7 +474,6 @@ local function updateStatsVariables()
                 end
             end
 
-            -- 2. Track Dynamic Currencies
             local infoFrame = mainGui:FindFirstChild("Info")
             if infoFrame then
                 lobbyStats.Currencies = {} 
@@ -504,7 +502,11 @@ task.spawn(function()
             
             if locationStatus == "IN GAME" then
                 headerLabel.Text = "IN GAME (" .. stats.Floor .. ")"
+                
+                -- Konfigurasi tampilan In-Game
                 statsLabel.TextSize = 22 
+                statsLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
+                statsLabel.TextXAlignment = Enum.TextXAlignment.Left -- Kembalikan rata kiri agar rapi titik duanya
                 
                 if stats.Machines > previousMachines then
                     previousMachines = stats.Machines
@@ -532,17 +534,17 @@ task.spawn(function()
                     end)
                 end
 
-                -- Menggunakan <b> untuk menebalkan text angka via RichText
+                -- Menggunakan Font Color #FFFFFF (Putih Terang) untuk angka
                 statsLabel.Text = string.format(
                     "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
-                    "👤 Used Toon        : <b>%s</b>\n" ..
-                    "🏢 Current Floor    : <b>%s</b>\n" ..
-                    "🎒 Items Taken      : <b>%d</b>\n" ..
-                    "🍔 Items Consumed   : <b>%d</b>\n" ..
-                    "⚙️ Handled by You   : <b>%d</b>\n" ..
-                    "💰 Ichor            : <b>%s</b>\n" ..
-                    "🎟️ Holiday Event    : <b>%s</b>\n" ..
-                    "⭐ Mastery Status   : <b>%s</b>\n\n" ..
+                    "👤 Used Toon        : <b><font color='#FFFFFF'>%s</font></b>\n" ..
+                    "🏢 Current Floor    : <b><font color='#FFFFFF'>%s</font></b>\n" ..
+                    "🎒 Items Taken      : <b><font color='#FFFFFF'>%d</font></b>\n" ..
+                    "🍔 Items Consumed   : <b><font color='#FFFFFF'>%d</font></b>\n" ..
+                    "⚙️ Handled by You   : <b><font color='#FFFFFF'>%d</font></b>\n" ..
+                    "💰 Ichor            : <b><font color='#FFFFFF'>%s</font></b>\n" ..
+                    "🎟️ Holiday Event    : <b><font color='#FFFFFF'>%s</font></b>\n" ..
+                    "⭐ Mastery Status   : <b><font color='#FFFFFF'>%s</font></b>\n\n" ..
                     "===================================\n" ..
                     "Tinggalkan perangkat dengan tenang.",
                     stats.Toon, stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Ichor, stats.Holiday, stats.Mastery
@@ -550,15 +552,19 @@ task.spawn(function()
                 
             elseif locationStatus == "LOBBY" then
                 headerLabel.Text = "LOBBY"
-                statsLabel.TextSize = 45 -- Size diturunkan ke 45 agar tidak nabrak Header tapi tetap terkesan raksasa
                 
-                -- Menggunakan <b> untuk menebalkan text angka via RichText
-                local lobbyText = "Toons Owned: <b>" .. tostring(lobbyStats.OwnedToons) .. "</b>\n"
-                lobbyText = lobbyText .. "Trinkets Owned: <b>" .. tostring(lobbyStats.OwnedTrinkets) .. "</b>\n"
-                lobbyText = lobbyText .. "Skins Owned: <b>" .. tostring(lobbyStats.OwnedSkins) .. "</b>\n"
+                -- Konfigurasi tampilan Lobby
+                statsLabel.TextSize = 45 
+                statsLabel.Size = UDim2.new(0.8, 0, 0.6, 0) -- Area diperlebar
+                statsLabel.TextXAlignment = Enum.TextXAlignment.Center -- Dibuat otomatis pas di tengah
+                
+                -- Menggunakan Font Color #FFFFFF (Putih Terang) untuk angka
+                local lobbyText = "Toons Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedToons) .. "</font></b>\n"
+                lobbyText = lobbyText .. "Trinkets Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedTrinkets) .. "</font></b>\n"
+                lobbyText = lobbyText .. "Skins Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedSkins) .. "</font></b>\n"
                 
                 for _, curr in ipairs(lobbyStats.Currencies) do
-                    lobbyText = lobbyText .. "Currency " .. curr.Name .. " : <b>" .. tostring(curr.Value) .. "</b>\n"
+                    lobbyText = lobbyText .. "Currency " .. curr.Name .. " : <b><font color='#FFFFFF'>" .. tostring(curr.Value) .. "</font></b>\n"
                 end
                 
                 statsLabel.Text = lobbyText
