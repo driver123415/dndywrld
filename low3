@@ -2,6 +2,7 @@ print("Optimizer Running test3")
 -- ==============================================================================
 -- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14 DYNAMIC HEADER)
 -- ==============================================================================
+
 local Config = {
     AutoOptimizer = true, 
     AutoStartDelay = 0.5 -- Set 0 untuk instan secepat kilat
@@ -464,17 +465,26 @@ local function updateStatsVariables()
         end
 
     elseif locationStatus == "LOBBY" then
-        local wsPlayers = Workspace:FindFirstChild("Players")
-        if wsPlayers then
-            local myChar = wsPlayers:FindFirstChild(player.Name)
-            if myChar then
-                local conf = myChar:FindFirstChild("Config")
-                if conf then
-                    local charName = conf:FindFirstChild("CharacterName")
-                    if charName and charName:IsA("StringValue") then
-                        local fullName = charName.Value
-                        local splitName = string.split(fullName, "_")[1]
-                        lobbyStats.UsedToon = splitName or fullName
+        -- PERBAIKAN: Gunakan player.Character secara langsung sebagai prioritas utama
+        local myChar = player.Character
+        
+        -- Fallback jika tidak ditemukan (jaga-jaga saat baru spawn)
+        if not myChar then
+            local wsPlayers = Workspace:FindFirstChild("Players")
+            if wsPlayers then
+                myChar = wsPlayers:FindFirstChild(player.Name)
+            end
+        end
+
+        if myChar then
+            local conf = myChar:FindFirstChild("Config")
+            if conf then
+                local charName = conf:FindFirstChild("CharacterName")
+                if charName and charName:IsA("StringValue") then
+                    local fullName = charName.Value
+                    local splitName = string.split(fullName, "_")[1]
+                    if splitName and splitName ~= "" then
+                        lobbyStats.UsedToon = splitName
                     end
                 end
             end
@@ -586,7 +596,6 @@ task.spawn(function()
                 statsLabel.Size = UDim2.new(0.8, 0, 0.6, 0)
                 statsLabel.TextXAlignment = Enum.TextXAlignment.Center
                 
-                -- PERBAIKAN: Menghapus \n ekstra di akhir baris Used Toon
                 local lobbyText = "👤 Used Toon: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.UsedToon) .. "</font></b>\n"
                 lobbyText = lobbyText .. "Toons Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedToons) .. "</font></b>\n"
                 lobbyText = lobbyText .. "Trinkets Owned: <b><font color='#FFFFFF'>" .. tostring(lobbyStats.OwnedTrinkets) .. "</font></b>\n"
