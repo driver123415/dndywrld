@@ -1,0 +1,31 @@
+-- Toon OP after misi
+
+wait (0.5)
+local args = {
+	"Astro"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Pebble"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Shelly"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Vee"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"Sprout"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTower"):InvokeServer(unpack(args))
