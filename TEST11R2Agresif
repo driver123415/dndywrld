@@ -37,7 +37,7 @@ local Config = {
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "Tape"},--, "HolidayCollectibleItem", "Holiday Collectible Item"
         SecondPriorityList = {"Bandage", "HealthKit"}, 
-        IgnoreList = {"Pop", "FakeCapsule"}
+        IgnoreList = {"Pop", "FakeCapsule", "HolidayCollectibleItem", "Holiday Collectible Item"}
     },
     ItemESP = { Enable = true },
     
