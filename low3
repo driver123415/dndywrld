@@ -1,6 +1,7 @@
 -- ==============================================================================
 -- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14 DYNAMIC HEADER)
 -- ==============================================================================
+print("Optimizer Running")
 
 local Config = {
     AutoOptimizer = true, 
@@ -172,6 +173,7 @@ statsLabel.TextXAlignment = Enum.TextXAlignment.Left
 statsLabel.TextYAlignment = Enum.TextYAlignment.Center
 statsLabel.Font = Enum.Font.Code
 statsLabel.TextSize = 22
+statsLabel.RichText = true -- MENGAKTIFKAN FITUR BOLD (HTML TAGS)
 statsLabel.Parent = textContainer
 
 -- ==================== ELEGANT TOGGLE ====================
@@ -412,7 +414,6 @@ local function updateStatsVariables()
     if not pGui then return end
 
     if locationStatus == "IN GAME" then
-        -- Logika IN GAME Orisinal
         local igp = Workspace:FindFirstChild("InGamePlayers")
         if igp then
             local myCharInfo = igp:FindFirstChild(player.Name)
@@ -447,7 +448,6 @@ local function updateStatsVariables()
         end
 
     elseif locationStatus == "LOBBY" then
-        -- Logika LOBBY Dinamis (Menggunakan DEX StatFrame)
         local mainGui = pGui:FindFirstChild("MainGui")
         if mainGui then
             -- 1. Track Stats (Toons/Towers, Trinkets, Skins)
@@ -459,13 +459,10 @@ local function updateStatsVariables()
                     local function getStatValue(statName)
                         local statUI = scrollFrame:FindFirstChild(statName)
                         if statUI then
-                            -- Ambil teks langsung jika itu TextLabel, atau cari child bernama StatName
                             local targetText = statUI:IsA("TextLabel") and statUI.Text or ""
                             if statUI:FindFirstChild("StatName") and statUI.StatName:IsA("TextLabel") then
                                 targetText = statUI.StatName.Text
                             end
-                            
-                            -- Ekstrak hanya angkanya saja agar rapi
                             local numberOnly = string.match(targetText, "%d+")
                             return numberOnly or targetText
                         end
@@ -481,7 +478,7 @@ local function updateStatsVariables()
             -- 2. Track Dynamic Currencies
             local infoFrame = mainGui:FindFirstChild("Info")
             if infoFrame then
-                lobbyStats.Currencies = {} -- Reset array
+                lobbyStats.Currencies = {} 
                 for _, currFrame in ipairs(infoFrame:GetChildren()) do
                     if currFrame:IsA("Frame") and currFrame.Name ~= "SprintIcon" then
                         local textLabel = currFrame:FindFirstChild("TextLabel")
@@ -535,16 +532,17 @@ task.spawn(function()
                     end)
                 end
 
+                -- Menggunakan <b> untuk menebalkan text angka via RichText
                 statsLabel.Text = string.format(
                     "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
-                    "👤 Used Toon        : %s\n" ..
-                    "🏢 Current Floor    : %s\n" ..
-                    "🎒 Items Taken      : %d\n" ..
-                    "🍔 Items Consumed   : %d\n" ..
-                    "⚙️ Handled by You   : %d\n" ..
-                    "💰 Ichor            : %s\n" ..
-                    "🎟️ Holiday Event    : %s\n" ..
-                    "⭐ Mastery Status   : %s\n\n" ..
+                    "👤 Used Toon        : <b>%s</b>\n" ..
+                    "🏢 Current Floor    : <b>%s</b>\n" ..
+                    "🎒 Items Taken      : <b>%d</b>\n" ..
+                    "🍔 Items Consumed   : <b>%d</b>\n" ..
+                    "⚙️ Handled by You   : <b>%d</b>\n" ..
+                    "💰 Ichor            : <b>%s</b>\n" ..
+                    "🎟️ Holiday Event    : <b>%s</b>\n" ..
+                    "⭐ Mastery Status   : <b>%s</b>\n\n" ..
                     "===================================\n" ..
                     "Tinggalkan perangkat dengan tenang.",
                     stats.Toon, stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Ichor, stats.Holiday, stats.Mastery
@@ -552,15 +550,15 @@ task.spawn(function()
                 
             elseif locationStatus == "LOBBY" then
                 headerLabel.Text = "LOBBY"
-                statsLabel.TextSize = 80 
+                statsLabel.TextSize = 45 -- Size diturunkan ke 45 agar tidak nabrak Header tapi tetap terkesan raksasa
                 
-                -- Menyusun format string Lobby sesuai permintaan
-                local lobbyText = "Toons Owned: " .. tostring(lobbyStats.OwnedToons) .. "\n"
-                lobbyText = lobbyText .. "Trinkets Owned: " .. tostring(lobbyStats.OwnedTrinkets) .. "\n"
-                lobbyText = lobbyText .. "Skins Owned: " .. tostring(lobbyStats.OwnedSkins) .. "\n"
+                -- Menggunakan <b> untuk menebalkan text angka via RichText
+                local lobbyText = "Toons Owned: <b>" .. tostring(lobbyStats.OwnedToons) .. "</b>\n"
+                lobbyText = lobbyText .. "Trinkets Owned: <b>" .. tostring(lobbyStats.OwnedTrinkets) .. "</b>\n"
+                lobbyText = lobbyText .. "Skins Owned: <b>" .. tostring(lobbyStats.OwnedSkins) .. "</b>\n"
                 
                 for _, curr in ipairs(lobbyStats.Currencies) do
-                    lobbyText = lobbyText .. "Currency " .. curr.Name .. " : " .. tostring(curr.Value) .. "\n"
+                    lobbyText = lobbyText .. "Currency " .. curr.Name .. " : <b>" .. tostring(curr.Value) .. "</b>\n"
                 end
                 
                 statsLabel.Text = lobbyText
