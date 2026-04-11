@@ -1,0 +1,15 @@
+--ringan
+local LobbyID = 16116270224 -- ID Lobby tujuan
+local TeleportService = game:GetService("TeleportService")
+local GuiService = game:GetService("GuiService")
+
+print("Anti-DC: Auto-Rejoin ke Lobby Aktif")
+
+-- Fungsi untuk menangani deteksi error/kick
+GuiService.ErrorMessageChanged:Connect(function()
+    -- Memberi jeda 2 detik agar client benar-benar siap melakukan teleportasi
+    task.wait(2)
+    
+    -- Melakukan teleportasi paksa ke Lobby, bukan ke tempat saat ini (game)
+    TeleportService:Teleport(LobbyID)
+end)
