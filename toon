@@ -251,16 +251,16 @@ local args = {
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
 
+--use ichor 1200
+
 wait (0.5)
 local args = {
-	"StillHip" -- ini bayar Ichor
+	"PastelPorcelain" --use ichor 1200
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
 
 wait (0.5)
 local args = {
-	"PastelPorcelain" -- ini bayar 1k Ichor
+	"StillHip" --use ichor 1200
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
-
-
