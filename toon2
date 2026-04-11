@@ -1,0 +1,41 @@
+--claim all
+local args = {
+	"ClaimHolidaySkinReward",
+	"PostEventCalendar"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
+
+
+local args = {
+	"SoothingPollen"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+
+local args = {
+	"DawnClouds"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+
+local args = {
+	"EggThief"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+--use ichor 1200
+
+local args = {
+	"CrinkledConfetti" --use ichor 1200
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+local args = {
+	"FancyFrosting" --use ichor 1200
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+local args = {
+	"PastelPatterns" --use ichor 1200
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
