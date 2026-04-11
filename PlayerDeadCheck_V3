@@ -1,0 +1,94 @@
+-- ==================== Configuration ====================
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game (Run)
+local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
+-- =======================================================
+
+-- Pastikan game sudah ter-load sepenuhnya sebelum script berjalan
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+if game.PlaceId == INGAME_PLACE_ID then
+    print("[DEBUG] In-game detected. Memantau DeathGui -> SpectateButton...")
+
+    local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local isTeleporting = false
+
+    -- Fungsi untuk mengeksekusi teleportasi dengan pcall dan retry
+    local function teleportToLobby()
+        if isTeleporting then return end
+        isTeleporting = true 
+        
+        print("[SUCCESS] SpectateButton.Visible = true terdeteksi!")
+        
+        -- Sistem Retry jika teleport gagal (mencegah script mati/nyangkut)
+        task.spawn(function()
+            local success, errorMessage
+            local attempt = 0
+            local maxAttempts = 5
+            
+            repeat
+                attempt = attempt + 1
+                print("[INFO] Mencoba teleport ke Lobby... (Percobaan " .. attempt .. ")")
+                
+                success, errorMessage = pcall(function()
+                    TeleportService:Teleport(LOBBY_PLACE_ID, player)
+                end)
+                
+                if not success then
+                    warn("[ERROR] Teleport gagal: " .. tostring(errorMessage) .. ". Menunggu 5 detik sebelum mencoba lagi...")
+                    task.wait(5)
+                end
+            until success or attempt >= maxAttempts
+            
+            if not success then
+                warn("[FATAL] Gagal teleport setelah " .. maxAttempts .. " percobaan.")
+                isTeleporting = false -- Buka kunci agar bisa dipicu lagi nanti jika perlu
+            end
+        end)
+    end
+
+    -- Fungsi untuk memantau DeathGui secara akurat
+    local function monitorDeathGui(gui)
+        if gui.Name == "DeathGui" then
+            print("[DEBUG] DeathGui ditemukan! Mencari SpectateButton...")
+            
+            local spectateButton = gui:WaitForChild("SpectateButton", 10)
+            
+            if spectateButton then
+                print("[DEBUG] SpectateButton ditemukan. Memantau properti 'Visible'...")
+                
+                -- 1. Pantau jika game mengubah centang Visible pada tombol tersebut
+                spectateButton:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if spectateButton.Visible == true then
+                        teleportToLobby()
+                    end
+                end)
+                
+                -- 2. Cek saat ini juga (jaga-jaga jika tombolnya sudah Visible saat script di-load)
+                if spectateButton.Visible == true then
+                    teleportToLobby()
+                end
+            else
+                print("[ERROR] SpectateButton tidak ditemukan di dalam DeathGui (Waktu tunggu habis).")
+            end
+        end
+    end
+
+    -- Pantau GUI yang sudah ada di layar saat ini
+    for _, child in ipairs(playerGui:GetChildren()) do
+        monitorDeathGui(child)
+    end
+
+    -- Pantau GUI jika game baru membuat (clone) DeathGui setelah player mati
+    playerGui.ChildAdded:Connect(function(child)
+        monitorDeathGui(child)
+    end)
+
+else
+    print("[INFO] Not in-game (Place ID mismatch). Auto-Teleport to Lobby is disabled.")
+end
