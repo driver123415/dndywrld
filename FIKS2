@@ -18,9 +18,9 @@ local scripts = {
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/joinsolokey2",--solo
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Join",--solo/multi
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST9",--coba bisa sih    
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11",--coba  lebih perfect
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11",--coba  lebih perfect
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2",--coba  lebih perfect  mati 
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif",--super agresif
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif",--super agresif
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V3",--
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheck",--PlayerCheck 4
