@@ -13,12 +13,12 @@ end
 local scripts = {
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Join",--solo/multi
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/toon",--beli beli
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/toon",--beli beli
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/toon2",--beli beli
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/toonOP",--beli beli
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/toonOP",--beli beli
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low4",--grapik low
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/trinket",--trinket
-    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/misi",--toddles use 
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/trinket",--trinket
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/misi",--toddles use
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi"--ready
 }
 
