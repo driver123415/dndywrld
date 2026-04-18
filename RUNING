@@ -8,7 +8,7 @@
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/FIKS3"))()--Mastery
 
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Rodger2"))()--Mastery
+--loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Rodger2"))()--Mastery
 
 wait(1)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/FIKS2"))()--Brightney (rumah 2)
