@@ -7,7 +7,10 @@
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/FIKSC2"))()--script nox ini manual
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/FIKS3"))()--Mastery
 
-wait(1)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Rodger"))()--Mastery
+
+wait(5)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/FIKS2"))()--Brightney (rumah 2)
 
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Claim"))()--claim claim
