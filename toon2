@@ -1,10 +1,11 @@
 --claim all
 wait (0.5)
 local args = {
-	"ClaimHolidaySkinReward",
-	"PostEventCalendar"
+	"ClaimEventReward",
+	"PostEventCalendar",
+	5
 }
-game:GetService("ReplicatedStorage"):WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction"):InvokeServer(unpack(args))
+game:GetService("ReplicatedStorage"):WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteEvent"):FireServer(unpack(args))
 
 wait (0.5)
 local args = {
