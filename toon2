@@ -24,6 +24,49 @@ local args = {
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
 
+wait (0.5)
+local args = {
+	"PerfectPetals"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"GardenBlossoms"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"FloralSuds"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"VioletDebonair"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"GardenBouquet"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+wait (0.5)
+local args = {
+	"PaintedEggshells"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+
+local args = {
+	"TeaPartyGuest"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyHolidaySkin"):InvokeServer(unpack(args))
+
+
 --use ichor 1200
 
 wait (0.5)
