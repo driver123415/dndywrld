@@ -18,7 +18,7 @@ local args = {
 }
 game:GetService("ReplicatedStorage"):WaitForChild("BuyTrinket"):InvokeServer(unpack(args))
 
-wait(2)
+task.wait(5)
 local args = {
 	"Wrench",
 	"Equip"
