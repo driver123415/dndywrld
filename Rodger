@@ -11,3 +11,11 @@ local args = {
 	game:GetService("ReplicatedStorage"):WaitForChild("SharedData"):WaitForChild("TowerData"):WaitForChild("Rodger")
 }
 game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("ChangeChar"):FireServer(unpack(args))
+
+wait(1)
+local args = {
+	"Wrench"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("BuyTrinket"):InvokeServer(unpack(args))
+
+wait(2)
