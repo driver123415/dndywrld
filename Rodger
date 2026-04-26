@@ -19,3 +19,8 @@ local args = {
 game:GetService("ReplicatedStorage"):WaitForChild("BuyTrinket"):InvokeServer(unpack(args))
 
 wait(2)
+local args = {
+	"Wrench",
+	"Equip"
+}
+game:GetService("ReplicatedStorage"):WaitForChild("EquipTrinket"):InvokeServer(unpack(args))
