@@ -24,7 +24,7 @@ local Config = {
         "Brightney"
     },
 
-    -- Loadstring URL jika target twisted belum terpenuhi
+    -- Loadstring URL akan SELALU BERJALAN di akhir script, apapun kondisi targetnya
     FallbackURL = "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Join" 
 }
 
@@ -94,127 +94,135 @@ if currentTwisted >= Config.TargetTwistedCount then
     targetMet = true
 end
 
--- Jika Target Twisted BELUM Terpenuhi -> Jalankan Loadstring Fallback dan abaikan sisanya
-if not targetMet then
-    print("Target Twisted (" .. currentTwisted .. "/" .. Config.TargetTwistedCount .. ") belum terpenuhi. Menjalankan Loadstring...")
-    loadstring(game:HttpGet(Config.FallbackURL))()
-    return -- Hentikan script di sini
-end
+-- ==========================================
+-- =     EKSEKUSI STEP 3 - 7 JIKA MEMENUHI  =
+-- ==========================================
 
-print("Target Twisted (" .. currentTwisted .. "/" .. Config.TargetTwistedCount .. ") Terpenuhi! Memulai eksekusi step 3-7...")
+if targetMet then
+    print("Target Twisted (" .. currentTwisted .. "/" .. Config.TargetTwistedCount .. ") Terpenuhi! Memulai eksekusi step 3-7...")
 
--- 3. Script Claim Twisted (Dibuat Paralel agar Cepat)
-local EarnMonsterTrinket = ReplicatedStorage:WaitForChild("EarnMonsterTrinket")
-local monsterList = {
-    "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
-    "GoobMonster", "VeeMonster", "DandyMonster", "ScrapsMonster", 
-    "ShrimpoMonster", "AstroMonster", "BrightneyMonster", "RazzleDazzleMonster", 
-    "ToodlesMonster", "TishaMonster", "TeaganMonster", "ShellyMonster", 
-    "FlutterMonster", "CosmoMonster", "SproutMonster", "FinnMonster", 
-    "GlistenMonster", "GigiMonster", "ConnieMonster", "LooeyMonster", 
-    "BobetteMonster", "CoalMonster", "RudieMonster", "GingerMonster", 
-    "YattaMonster", "BassieMonster", "EggsonMonster", "CocoaMonster", 
-    "FlyteMonster", "BlottMonster", "DyleMonster", "BrushaMonster", 
-    "RabeccaMonster", "SoulvesterMonster", "GourdyMonster", "EclipseMonster", 
-    "SquirmMonster"
-}
+    -- 3. Script Claim Twisted (Dibuat Paralel agar Cepat)
+    local EarnMonsterTrinket = ReplicatedStorage:WaitForChild("EarnMonsterTrinket")
+    local monsterList = {
+        "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
+        "GoobMonster", "VeeMonster", "DandyMonster", "ScrapsMonster", 
+        "ShrimpoMonster", "AstroMonster", "BrightneyMonster", "RazzleDazzleMonster", 
+        "ToodlesMonster", "TishaMonster", "TeaganMonster", "ShellyMonster", 
+        "FlutterMonster", "CosmoMonster", "SproutMonster", "FinnMonster", 
+        "GlistenMonster", "GigiMonster", "ConnieMonster", "LooeyMonster", 
+        "BobetteMonster", "CoalMonster", "RudieMonster", "GingerMonster", 
+        "YattaMonster", "BassieMonster", "EggsonMonster", "CocoaMonster", 
+        "FlyteMonster", "BlottMonster", "DyleMonster", "BrushaMonster", 
+        "RabeccaMonster", "SoulvesterMonster", "GourdyMonster", "EclipseMonster", 
+        "SquirmMonster"
+    }
 
-print("Mengklaim semua Monster Trinket...")
-for _, monsterName in ipairs(monsterList) do
-    task.spawn(function()
-        pcall(function()
-            EarnMonsterTrinket:InvokeServer(monsterName)
+    print("Mengklaim semua Monster Trinket...")
+    for _, monsterName in ipairs(monsterList) do
+        task.spawn(function()
+            pcall(function()
+                EarnMonsterTrinket:InvokeServer(monsterName)
+            end)
         end)
-    end)
-end
-
--- 4. Script Claim Journal (Dibuat Paralel agar Cepat)
-local RemoteFunction = ReplicatedStorage:WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction")
-local achievementList = {
-    "ID_1_SpeedWalker", "ID_2_LongDistanceRunner", "ID_3_MarathonRunner", 
-    "ID_4_MachineEnthusiast", "ID_5_MachineMaster", "ID_6_THEMachine", 
-    "ID_7_ItemFinder", "ID_8_ItemTracker", "ID_9_ItemHunter", 
-    "ID_10_HissyFit", "ID_11_Sightseer", "ID_12_ClockedIn", 
-    "ID_13_Overtime", "ID_21_GossipBud", "ID_22_GossipTime", 
-    "ID_23_Only90MoreToGo", "ID_24_Only75More", "ID_25_Halfway50More", 
-    "ID_26_TwistedsFearMe", "ID_31_FineDining", "ID_32_StealthMission", 
-    "ID_33_SpeedRunner", "ID_34_CenterOfAttention", "ID_35_MasterOfMany", 
-    "ID_36_WhatADeal", "ID_37_GearedUp", "ID_38_MainCharacter"
-}
-
-print("Mengklaim semua Journal Achievement...")
-for _, achievementID in ipairs(achievementList) do
-    task.spawn(function()
-        pcall(function()
-            RemoteFunction:InvokeServer("AttemptRedeemAchievement", achievementID)
-        end)
-    end)
-end
-
--- Beri jeda sedikit agar semua claim request server yang dieksekusi serentak tadi terselesaikan
-task.wait(2.5)
-print("Claiming selesai!")
-
--- 5. Equip Trinkets Sesuai Urutan Config
-print("Mulai Equip Trinkets...")
-local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
-for _, trinketName in ipairs(Config.TrinketsToUse) do
-    pcall(function()
-        EquipTrinket:InvokeServer(trinketName, "Equip")
-    end)
-    task.wait(1) -- Jeda 1 detik per trinket sesuai permintaan
-end
-
--- 6. Check & Beli Toon
-print("Mengecek ketersediaan Toon...")
-local charScrollFrame = MainGui:WaitForChild("CharacterFrame"):WaitForChild("ScrollingFrame")
-local BuyTower = ReplicatedStorage:WaitForChild("BuyTower")
-
-for _, toonName in ipairs(Config.ToonsToBuy) do
-    local toonUI = charScrollFrame:FindFirstChild(toonName)
-    -- Jika toonUI ada di GUI tapi Visible false, berarti belum dibeli
-    if toonUI and toonUI.Visible == false then
-        print("Membeli toon: " .. toonName)
-        pcall(function()
-            BuyTower:InvokeServer(toonName)
-        end)
-        task.wait(0.5)
     end
-end
 
--- 7. Check Mastery & Equip Toon (HANYA BERJALAN DI LOBBY)
-if game.PlaceId == LOBBY_PLACE_ID then
-    print("Berada di Lobby. Memeriksa Mastery Toon untuk di-equip...")
-    
-    local ChangeCharEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeChar")
-    local TowerDataFolder = ReplicatedStorage:WaitForChild("SharedData"):WaitForChild("TowerData")
+    -- 4. Script Claim Journal (Dibuat Paralel agar Cepat)
+    local RemoteFunction = ReplicatedStorage:WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction")
+    local achievementList = {
+        "ID_1_SpeedWalker", "ID_2_LongDistanceRunner", "ID_3_MarathonRunner", 
+        "ID_4_MachineEnthusiast", "ID_5_MachineMaster", "ID_6_THEMachine", 
+        "ID_7_ItemFinder", "ID_8_ItemTracker", "ID_9_ItemHunter", 
+        "ID_10_HissyFit", "ID_11_Sightseer", "ID_12_ClockedIn", 
+        "ID_13_Overtime", "ID_21_GossipBud", "ID_22_GossipTime", 
+        "ID_23_Only90MoreToGo", "ID_24_Only75More", "ID_25_Halfway50More", 
+        "ID_26_TwistedsFearMe", "ID_31_FineDining", "ID_32_StealthMission", 
+        "ID_33_SpeedRunner", "ID_34_CenterOfAttention", "ID_35_MasterOfMany", 
+        "ID_36_WhatADeal", "ID_37_GearedUp", "ID_38_MainCharacter"
+    }
 
-    -- Looping menggunakan ipairs akan otomatis berjalan dari kiri ke kanan (Sesuai Prioritas Config)
-    for _, toonName in ipairs(Config.ToonsToUse) do
+    print("Mengklaim semua Journal Achievement...")
+    for _, achievementID in ipairs(achievementList) do
+        task.spawn(function()
+            pcall(function()
+                RemoteFunction:InvokeServer("AttemptRedeemAchievement", achievementID)
+            end)
+        end)
+    end
+
+    -- Beri jeda sedikit agar semua claim request server yang dieksekusi serentak tadi terselesaikan
+    task.wait(2.5)
+    print("Claiming selesai!")
+
+    -- 5. Equip Trinkets Sesuai Urutan Config
+    print("Mulai Equip Trinkets...")
+    local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
+    for _, trinketName in ipairs(Config.TrinketsToUse) do
+        pcall(function()
+            EquipTrinket:InvokeServer(trinketName, "Equip")
+        end)
+        task.wait(1) -- Jeda 1 detik per trinket sesuai permintaan
+    end
+
+    -- 6. Check & Beli Toon
+    print("Mengecek ketersediaan Toon...")
+    local charScrollFrame = MainGui:WaitForChild("CharacterFrame"):WaitForChild("ScrollingFrame")
+    local BuyTower = ReplicatedStorage:WaitForChild("BuyTower")
+
+    for _, toonName in ipairs(Config.ToonsToBuy) do
         local toonUI = charScrollFrame:FindFirstChild(toonName)
-        
-        -- Cek jika toon tersebut sudah dimiliki (Visible == true)
-        if toonUI and toonUI.Visible == true then
-            local masteryStar = toonUI:FindFirstChild("MasteryStar")
-            
-            -- Jika MasteryStar belum selesai (Visible == false)
-            if masteryStar and masteryStar.Visible == false then
-                print("Prioritas ditemukan: " .. toonName .. " (Mastery belum selesai). Meng-equip...")
-                
-                local toonData = TowerDataFolder:FindFirstChild(toonName)
-                if toonData then
-                    pcall(function()
-                        ChangeCharEvent:FireServer(toonData)
-                    end)
-                end
-                
-                -- BREAK loop karena sudah menemukan dan menggunakan toon prioritas paling depan yang belum max mastery
-                break 
-            end
+        -- Jika toonUI ada di GUI tapi Visible false, berarti belum dibeli
+        if toonUI and toonUI.Visible == false then
+            print("Membeli toon: " .. toonName)
+            pcall(function()
+                BuyTower:InvokeServer(toonName)
+            end)
+            task.wait(0.5)
         end
     end
+
+    -- 7. Check Mastery & Equip Toon (HANYA BERJALAN DI LOBBY)
+    if game.PlaceId == LOBBY_PLACE_ID then
+        print("Berada di Lobby. Memeriksa Mastery Toon untuk di-equip...")
+        
+        local ChangeCharEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeChar")
+        local TowerDataFolder = ReplicatedStorage:WaitForChild("SharedData"):WaitForChild("TowerData")
+
+        -- Looping menggunakan ipairs akan otomatis berjalan dari kiri ke kanan (Sesuai Prioritas Config)
+        for _, toonName in ipairs(Config.ToonsToUse) do
+            local toonUI = charScrollFrame:FindFirstChild(toonName)
+            
+            -- Cek jika toon tersebut sudah dimiliki (Visible == true)
+            if toonUI and toonUI.Visible == true then
+                local masteryStar = toonUI:FindFirstChild("MasteryStar")
+                
+                -- Jika MasteryStar belum selesai (Visible == false)
+                if masteryStar and masteryStar.Visible == false then
+                    print("Prioritas ditemukan: " .. toonName .. " (Mastery belum selesai). Meng-equip...")
+                    
+                    local toonData = TowerDataFolder:FindFirstChild(toonName)
+                    if toonData then
+                        pcall(function()
+                            ChangeCharEvent:FireServer(toonData)
+                        end)
+                    end
+                    
+                    -- BREAK loop karena sudah menemukan dan menggunakan toon prioritas paling depan yang belum max mastery
+                    break 
+                end
+            end
+        end
+    else
+        print("Script Equip Toon di-skip. (Bukan berada di Lobby Game ID)")
+    end
+
 else
-    print("Script Equip Toon di-skip. (Bukan berada di Lobby Game ID)")
+    -- JIKA TARGET BELUM TERPENUHI
+    print("Target Twisted (" .. currentTwisted .. "/" .. Config.TargetTwistedCount .. ") BELUM terpenuhi. Mengabaikan step 3-7...")
 end
 
-print("Seluruh proses otomasi berhasil diselesaikan.")
+-- ==========================================
+-- =         SELALU JALANKAN DI AKHIR       =
+-- ==========================================
+
+print("Menjalankan Loadstring Join...")
+loadstring(game:HttpGet(Config.FallbackURL))()
