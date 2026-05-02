@@ -1,0 +1,347 @@
+-- ==========================================
+-- =             CONFIG UTAMA               =
+-- ==========================================
+local Config = {
+    TargetTwistedCount = 29,       -- Target twisted yang harus dicapai
+    ShopTrinketsBought = 1,        -- Jumlah trinket yang dibeli manual dari shop untuk mengurangi gap
+    
+    TrinketsToUse = {              -- Urutan trinket yang akan di-equip (Jika memenuhi target)
+        "VeeRemote", 
+        "StressBall"
+    },
+    
+    ToonsToBuy = {                 -- List Toon yang akan dibeli jika belum punya
+        "Toodles", 
+        "Tisha", 
+        "Brightney", 
+        "Cosmo"
+    },
+    
+    ToonsToUse = {                 -- Prioritas penggunaan Toon berdasarkan urutan dari kiri ke kanan (Mastery Check)
+        "Toodles", 
+        "Tisha", 
+        "Cosmo", 
+        "Brightney"
+    },
+
+    -- Loadstring URL akan SELALU BERJALAN di akhir script, apapun kondisi targetnya
+    FallbackURL = "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Join" 
+}
+
+-- ==========================================
+-- =         CONFIG FALLBACK/NEWBIE         =
+-- ==========================================
+local FallbackConfig = {
+    ToonToBuy = "Rodger",
+    ToonCost = 1000,
+    TrinketToBuy = "Wrench",
+    TrinketCost = 325
+}
+
+-- ==========================================
+-- =            MAIN SCRIPT LOGIC           =
+-- ==========================================
+
+local INGAME_PLACE_ID = 16552821455
+local LOBBY_PLACE_ID = 16116270224
+
+-- 1. Keamanan Game ID
+if game.PlaceId == INGAME_PLACE_ID then
+    warn("Script dimatikan: Berada di dalam In-Game Place.")
+    return
+end
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tunggu Gui Load
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local MainGui = PlayerGui:WaitForChild("MainGui")
+
+-- ==========================================
+-- =    FUNGSI: AMBIL NAMA TOON SAAT INI    =
+-- ==========================================
+local function getCurrentlyUsedToon()
+    local myCharInfo = nil
+    local wsPlayers = Workspace:FindFirstChild("Players")
+    
+    if wsPlayers then
+        myCharInfo = wsPlayers:FindFirstChild(LocalPlayer.Name)
+    end
+    if not myCharInfo then
+        myCharInfo = LocalPlayer.Character
+    end
+    if not myCharInfo then
+        myCharInfo = Workspace:FindFirstChild(LocalPlayer.Name)
+    end
+
+    if myCharInfo then
+        local conf = myCharInfo:FindFirstChild("Config")
+        if conf then
+            local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+            if charName and (charName:IsA("StringValue") or charName.ClassName == "StringValue") then
+                local fullName = charName.Value
+                if fullName and fullName ~= "" then
+                    local splitName = string.split(fullName, "_")[1]
+                    if splitName and splitName ~= "" then
+                        return splitName
+                    end
+                end
+            end
+        end
+    end
+    return "Unknown"
+end
+
+-- 2. Check Complete All Twisted Research
+local currentTwisted = 0
+local targetMet = false
+
+local function extractNumber(text)
+    if text and type(text) == "string" then
+        local cleanText = string.gsub(text, ",", "")
+        local num = string.match(cleanText, "%d+")
+        return num and tonumber(num) or nil
+    end
+    return nil
+end
+
+-- Cek Path 2 Terlebih Dahulu (Trinkets Owned)
+local statName = MainGui:FindFirstChild("StatFrame") 
+    and MainGui.StatFrame:FindFirstChild("ScrollingFrame") 
+    and MainGui.StatFrame.ScrollingFrame:FindFirstChild("Trinkets") 
+    and MainGui.StatFrame.ScrollingFrame.Trinkets:FindFirstChild("StatName")
+
+if statName and statName.Text ~= "" then
+    local totalTrinkets = extractNumber(statName.Text)
+    if totalTrinkets then
+        currentTwisted = totalTrinkets - Config.ShopTrinketsBought
+    end
+else
+    -- Jika Path 2 gagal, Coba Path 1 (MonsterButton Indicator)
+    local indicatorLabel = MainGui:FindFirstChild("Menu")
+        and MainGui.Menu:FindFirstChild("LeftSide")
+        and MainGui.Menu.LeftSide:FindFirstChild("MonsterButton")
+        and MainGui.Menu.LeftSide.MonsterButton:FindFirstChild("NewIndicator")
+        and MainGui.Menu.LeftSide.MonsterButton.NewIndicator:FindFirstChild("TextLabel")
+        
+    if indicatorLabel and indicatorLabel.Text ~= "" then
+        local indicatorNum = extractNumber(indicatorLabel.Text)
+        if indicatorNum then
+            currentTwisted = indicatorNum
+        end
+    end
+end
+
+if currentTwisted >= Config.TargetTwistedCount then
+    targetMet = true
+end
+
+-- ==========================================
+-- =     FUNGSI SMART EQUIP TRINKET         =
+-- ==========================================
+local function SmartEquipTrinkets(trinketList)
+    local slot1 = MainGui:FindFirstChild("Slot1") and MainGui.Slot1:FindFirstChild("ItemImage")
+    local slot2 = MainGui:FindFirstChild("Slot2") and MainGui.Slot2:FindFirstChild("ItemImage")
+    
+    local equippedCount = 0
+    if slot1 and slot1.Visible then equippedCount = equippedCount + 1 end
+    if slot2 and slot2.Visible then equippedCount = equippedCount + 1 end
+    
+    if equippedCount < #trinketList then
+        print("Trinket belum terpasang sesuai target. Menjalankan UnEquipAll...")
+        local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
+        
+        pcall(function() EquipTrinket:InvokeServer("None", "UnEquipAll") end)
+        task.wait(1)
+        
+        for _, trinketName in ipairs(trinketList) do
+            pcall(function() EquipTrinket:InvokeServer(trinketName, "Equip") end)
+            task.wait(1)
+        end
+        print("Trinket berhasil di-equip!")
+    else
+        print("Trinket sudah terpasang di UI Slot, skip equip untuk mencegah spam.")
+    end
+end
+
+-- ==========================================
+-- =     EKSEKUSI UTAMA ATAU FALLBACK       =
+-- ==========================================
+
+local charScrollFrame = MainGui:WaitForChild("CharacterFrame"):WaitForChild("ScrollingFrame")
+local BuyTower = ReplicatedStorage:WaitForChild("BuyTower")
+
+if targetMet then
+    print("Target Twisted (" .. currentTwisted .. "/" .. Config.TargetTwistedCount .. ") Terpenuhi! Memulai eksekusi step 3-7...")
+
+    -- 3. Script Claim Twisted
+    local EarnMonsterTrinket = ReplicatedStorage:WaitForChild("EarnMonsterTrinket")
+    local monsterList = {
+        "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
+        "GoobMonster", "VeeMonster", "DandyMonster", "ScrapsMonster", 
+        "ShrimpoMonster", "AstroMonster", "BrightneyMonster", "RazzleDazzleMonster", 
+        "ToodlesMonster", "TishaMonster", "TeaganMonster", "ShellyMonster", 
+        "FlutterMonster", "CosmoMonster", "SproutMonster", "FinnMonster", 
+        "GlistenMonster", "GigiMonster", "ConnieMonster", "LooeyMonster", 
+        "BobetteMonster", "CoalMonster", "RudieMonster", "GingerMonster", 
+        "YattaMonster", "BassieMonster", "EggsonMonster", "CocoaMonster", 
+        "FlyteMonster", "BlottMonster", "DyleMonster", "BrushaMonster", 
+        "RabeccaMonster", "SoulvesterMonster", "GourdyMonster", "EclipseMonster", 
+        "SquirmMonster"
+    }
+
+    for _, monsterName in ipairs(monsterList) do
+        task.spawn(function()
+            pcall(function() EarnMonsterTrinket:InvokeServer(monsterName) end)
+        end)
+    end
+
+    -- 4. Script Claim Journal
+    local RemoteFunction = ReplicatedStorage:WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction")
+    local achievementList = {
+        "ID_1_SpeedWalker", "ID_2_LongDistanceRunner", "ID_3_MarathonRunner", 
+        "ID_4_MachineEnthusiast", "ID_5_MachineMaster", "ID_6_THEMachine", 
+        "ID_7_ItemFinder", "ID_8_ItemTracker", "ID_9_ItemHunter", 
+        "ID_10_HissyFit", "ID_11_Sightseer", "ID_12_ClockedIn", 
+        "ID_13_Overtime", "ID_21_GossipBud", "ID_22_GossipTime", 
+        "ID_23_Only90MoreToGo", "ID_24_Only75More", "ID_25_Halfway50More", 
+        "ID_26_TwistedsFearMe", "ID_31_FineDining", "ID_32_StealthMission", 
+        "ID_33_SpeedRunner", "ID_34_CenterOfAttention", "ID_35_MasterOfMany", 
+        "ID_36_WhatADeal", "ID_37_GearedUp", "ID_38_MainCharacter"
+    }
+
+    for _, achievementID in ipairs(achievementList) do
+        task.spawn(function()
+            pcall(function() RemoteFunction:InvokeServer("AttemptRedeemAchievement", achievementID) end)
+        end)
+    end
+
+    task.wait(2.5)
+    print("Claiming selesai!")
+
+    -- 5. Equip Trinkets Utama
+    SmartEquipTrinkets(Config.TrinketsToUse)
+
+    -- 6. Check & Beli Toon
+    for _, toonName in ipairs(Config.ToonsToBuy) do
+        local toonUI = charScrollFrame:FindFirstChild(toonName)
+        if toonUI and toonUI.Visible == false then
+            print("Membeli toon: " .. toonName)
+            pcall(function() BuyTower:InvokeServer(toonName) end)
+            task.wait(0.5)
+        end
+    end
+
+    -- 7. Check Mastery & Equip Toon (HANYA BERJALAN DI LOBBY)
+    if game.PlaceId == LOBBY_PLACE_ID then
+        local ChangeCharEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeChar")
+        local TowerDataFolder = ReplicatedStorage:WaitForChild("SharedData"):WaitForChild("TowerData")
+        local currentToon = getCurrentlyUsedToon()
+
+        for _, toonName in ipairs(Config.ToonsToUse) do
+            local toonUI = charScrollFrame:FindFirstChild(toonName)
+            if toonUI and toonUI.Visible == true then
+                local masteryStar = toonUI:FindFirstChild("MasteryStar")
+                
+                -- Cari toon yang belum Max Mastery
+                if masteryStar and masteryStar.Visible == false then
+                    print("Toon prioritas belum max mastery: " .. toonName)
+                    
+                    -- Cek apakah sudah dipakai atau belum
+                    if currentToon ~= toonName then
+                        print("Meng-equip toon: " .. toonName)
+                        local toonData = TowerDataFolder:FindFirstChild(toonName)
+                        if toonData then
+                            pcall(function() ChangeCharEvent:FireServer(toonData) end)
+                        end
+                    else
+                        print("Toon " .. toonName .. " sudah aktif digunakan. Skip equip.")
+                    end
+                    break -- Berhenti di prioritas paling kiri yang memenuhi syarat
+                end
+            end
+        end
+    end
+
+else
+    -- ==========================================
+    -- =     LOGIKA FALLBACK & ATURAN NABUNG    =
+    -- ==========================================
+    print("Target Twisted (" .. currentTwisted .. "/" .. Config.TargetTwistedCount .. ") BELUM terpenuhi. Mengecek kondisi Newbie...")
+    
+    if game.PlaceId == LOBBY_PLACE_ID then
+        local rodgerUI = charScrollFrame:FindFirstChild(FallbackConfig.ToonToBuy)
+        local ownsRodger = (rodgerUI and rodgerUI.Visible == true)
+        
+        -- Ambil data Ichor saat ini
+        local ichorTextLabel = MainGui:FindFirstChild("Info") 
+            and MainGui.Info:FindFirstChild("IchorFrame") 
+            and MainGui.Info.IchorFrame:FindFirstChild("TextLabel")
+        
+        local currentIchor = 0
+        if ichorTextLabel then
+            currentIchor = extractNumber(ichorTextLabel.Text) or 0
+        end
+
+        local ChangeCharEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("ChangeChar")
+        local currentToon = getCurrentlyUsedToon()
+
+        -- 1. ATURAN NABUNG: Cek Kepemilikan Rodger
+        if not ownsRodger then
+            if currentIchor >= FallbackConfig.ToonCost then
+                print("Membeli Toon: " .. FallbackConfig.ToonToBuy)
+                pcall(function() BuyTower:InvokeServer(FallbackConfig.ToonToBuy) end)
+                task.wait(1)
+                
+                currentIchor = currentIchor - FallbackConfig.ToonCost
+                ownsRodger = true -- Update status kepemilikan
+                
+                -- Langsung Equip karena baru beli
+                local toonData = ReplicatedStorage:WaitForChild("SharedData"):WaitForChild("TowerData"):FindFirstChild(FallbackConfig.ToonToBuy)
+                if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
+                task.wait(1)
+            else
+                -- HARAM BELI TRINKET JIKA BELUM PUNYA RODGER DAN UANG TIDAK CUKUP
+                print("Ichor belum cukup untuk beli Rodger (" .. currentIchor .. "/1000). NABUNG DULU, dilarang beli Wrench!")
+            end
+        end
+
+        -- 2. CEK TRINKET & EQUIP (Hanya dijalankan jika SUDAH PUNYA Rodger)
+        if ownsRodger then
+            -- Pastikan Rodger di-equip jika dia meleset pakai toon lain (misal Boxten)
+            if currentToon ~= FallbackConfig.ToonToBuy then
+                print("Punya Rodger tapi sedang pakai " .. currentToon .. ". Memaksa Equip Rodger...")
+                local toonData = ReplicatedStorage:WaitForChild("SharedData"):WaitForChild("TowerData"):FindFirstChild(FallbackConfig.ToonToBuy)
+                if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
+                task.wait(1)
+            end
+
+            -- Cek Slot Trinket
+            local slot1 = MainGui:FindFirstChild("Slot1") and MainGui.Slot1:FindFirstChild("ItemImage")
+            local isTrinketEquipped = (slot1 and slot1.Visible)
+            
+            if not isTrinketEquipped then
+                if currentIchor >= FallbackConfig.TrinketCost then
+                    print("Membeli Trinket: " .. FallbackConfig.TrinketToBuy)
+                    pcall(function() ReplicatedStorage:WaitForChild("BuyTrinket"):InvokeServer(FallbackConfig.TrinketToBuy) end)
+                    task.wait(1)
+                    
+                    SmartEquipTrinkets({FallbackConfig.TrinketToBuy})
+                else
+                    print("Ichor belum cukup untuk beli Trinket Wrench (" .. currentIchor .. "/325).")
+                end
+            else
+                print("Trinket sudah terpasang di Slot.")
+            end
+        end
+    end
+end
+
+-- ==========================================
+-- =         SELALU JALANKAN DI AKHIR       =
+-- ==========================================
+print("Pengecekan selesai. Menjalankan Loadstring Join...")
+loadstring(game:HttpGet(Config.FallbackURL))()
