@@ -37,7 +37,7 @@ local Config = {
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "Tape"},--, "HolidayCollectibleItem", "Holiday Collectible Item"
         SecondPriorityList = {"Bandage", "HealthKit"}, 
-        IgnoreList = {"Pop", "FakeCapsule", "HolidayCollectibleItem", "Holiday Collectible Item"}
+        IgnoreList = {"Pop", "PopBottle", "JumperCable", "Valve", "SmokeBomb", "EjectButton", "Box chocolates", "ChocolateBox", "AirHorn", "EnigmaCandy", "FakeCapsule", "HolidayCollectibleItem", "Holiday Collectible Item"}
     },
     ItemESP = { Enable = true },
     
@@ -66,7 +66,7 @@ local Config = {
         LethalRadius = 15,--angka aman 60
         AvoidmoreradiusMonsters = { "DandyMonster", "DyleMonster" },
         
-        LooseRadius = 10,--angka aman 15
+        LooseRadius = 5,--angka aman 15
         LooseMonsters = { "SquirmMonster", "BlottMonster", "RazzleDazzleMonster", "RodgerMonster", "ConnieMonster", "GourdyMonster" } 
     },
     GenESP = {
