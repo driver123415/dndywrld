@@ -2,7 +2,7 @@
 -- =      CONFIG UTAMA (Pilih New Player) WORK  =
 -- ==========================================
 local Config = {
-    TargetTwistedCount = 17,       -- Target twisted yang harus dicapai
+    TargetTwistedCount = 29,       -- Target twisted yang harus dicapai
     ShopTrinketsBought = 1,        -- Jumlah trinket yang dibeli manual dari shop untuk mengurangi gap
     
     TrinketsToUse = {              -- Urutan trinket yang akan di-equip (Jika memenuhi target)
