@@ -1,5 +1,5 @@
 -- ==========================================
--- =      CONFIG UTAMA (Pilih New Player)   =
+-- =      CONFIG UTAMA (Pilih New Player) WORK  =
 -- ==========================================
 local Config = {
     TargetTwistedCount = 17,       -- Target twisted yang harus dicapai
