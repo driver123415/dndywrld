@@ -179,10 +179,9 @@ end
 -- ==========================================
 -- =  FUNGSI SMART EQUIP TRINKET (BLOCKING) =
 -- ==========================================
--- Fungsi ini akan terus mengulang sampai slot UI benar-benar terisi (Menahan Loadstring)
 local function SmartEquipTrinkets(trinketList)
     local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
-    local maxRetries = 25 -- Batas maksimal pengulangan agar tidak stuck selamanya jika game nge-bug
+    local maxRetries = 25 
     local attempts = 0
     
     repeat
@@ -196,7 +195,7 @@ local function SmartEquipTrinkets(trinketList)
         
         if equippedCount >= #trinketList then
             print("Trinket target berhasil terdeteksi terpasang di UI Slot!")
-            break -- Keluar dari loop karena syarat terpenuhi
+            break 
         end
         
         print("[Percobaan " .. attempts .. "] Trinket belum terpasang di UI. Menjalankan UnEquip & Equip...")
@@ -225,7 +224,7 @@ local BuyTower = ReplicatedStorage:WaitForChild("BuyTower")
 if targetMet then
     print("Target Twisted (" .. currentTwisted .. "/" .. Config.TargetTwistedCount .. ") Terpenuhi! Memulai eksekusi step 3-7...")
 
-    -- 3. Script Claim Twisted
+    -- 3. Script Claim Twisted (MENGGUNAKAN LOGIKA LAMA YANG WORK)
     local EarnMonsterTrinket = ReplicatedStorage:WaitForChild("EarnMonsterTrinket")
     local monsterList = {
         "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
@@ -241,15 +240,23 @@ if targetMet then
         "SquirmMonster"
     }
 
-    print("Mengklaim Monster...")
-    for _, monsterName in ipairs(monsterList) do
-        task.spawn(function()
-            pcall(function() EarnMonsterTrinket:InvokeServer(monsterName) end)
+    print("Mulai Claim Monster...")
+    for index, monsterName in ipairs(monsterList) do
+        local args = { monsterName }
+        local success, err = pcall(function()
+            EarnMonsterTrinket:InvokeServer(unpack(args))
         end)
-        task.wait(0.03) 
+        
+        if success then
+            print("[" .. index .. "/" .. #monsterList .. "] success claim: " .. monsterName)
+        else
+            warn("Fail claim: " .. monsterName .. " | Error: " .. tostring(err))
+        end
+        task.wait(0.5)
     end
+    print("Monster Claim is Complete!")
 
-    -- 4. Script Claim Journal
+    -- 4. Script Claim Journal (MENGGUNAKAN LOGIKA LAMA YANG WORK)
     local RemoteFunction = ReplicatedStorage:WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction")
     local achievementList = {
         "ID_1_SpeedWalker", "ID_2_LongDistanceRunner", "ID_3_MarathonRunner", 
@@ -263,18 +270,29 @@ if targetMet then
         "ID_36_WhatADeal", "ID_37_GearedUp", "ID_38_MainCharacter"
     }
 
-    print("Mengklaim Journal...")
-    for _, achievementID in ipairs(achievementList) do
-        task.spawn(function()
-            pcall(function() RemoteFunction:InvokeServer("AttemptRedeemAchievement", achievementID) end)
+    print("Mulai Claim Journal...")
+    for index, achievementID in ipairs(achievementList) do
+        local args = {
+            "AttemptRedeemAchievement",
+            achievementID
+        }
+        local success, err = pcall(function()
+            RemoteFunction:InvokeServer(unpack(args))
         end)
-        task.wait(0.03) 
+        
+        if success then
+            print("[" .. index .. "/" .. #achievementList .. "] success claim: " .. achievementID)
+        else
+            warn("Fail claim: " .. achievementID .. " | Error: " .. tostring(err))
+        end
+        task.wait(0.5)
     end
+    print("Journal Claim is Complete!")
 
     -- ========================================================
     -- = FITUR MENAHAN SCRIPT SAMPAI SERVER SELESAI CLAIM     =
     -- ========================================================
-    print("MENGUNCI LOADSTRING: Menunggu antrean server claim selesai (Indikator <= 1)...")
+    print("MENGUNCI LOADSTRING: Mengecek apakah sisa antrean claim sudah bersih...")
     local waitTime = 0
     repeat
         task.wait(1)
@@ -292,8 +310,8 @@ if targetMet then
                 currentInd = extractNumber(txtLbl.Text) or 0
             end
         end
-    until currentInd <= 1 or waitTime > 60 -- Maksimal nunggu 1 menit jika game nyangkut
-    print("Server sukses memproses claim! Lanjut ke tahap Equip...")
+    until currentInd <= 1 or waitTime > 30 -- Menunggu maksimal 30 detik
+    print("Sisa claim aman! Lanjut ke tahap Equip...")
 
     -- 5. Equip Trinkets Utama (Akan ditahan oleh fungsi sampai sukses)
     SmartEquipTrinkets(Config.TrinketsToUse)
