@@ -16,6 +16,7 @@ local Config = {
         "Brightney", 
         "Cosmo",
         "Scraps",
+        "Poppy",
         "Yatta"
     },
 
@@ -26,6 +27,7 @@ local Config = {
         "Cosmo", 
         "Brightney",
         "Scraps",
+        "Poppy",
         "Yatta"
     },
 
