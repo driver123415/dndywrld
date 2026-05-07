@@ -1,5 +1,5 @@
 -- ==========================================
--- =      CONFIG UTAMA (Pilih New Player new ver)   =
+-- =      CONFIG UTAMA (Pilih New Player new ver include fix bug claim claim)   =
 -- ==========================================
 local Config = {
     TargetTwistedCount = 29,       -- Target twisted yang harus dicapai
