@@ -364,15 +364,16 @@ if targetMet then
         end
     end
 
-    -- ========================================================
-    -- = 7. AUTO BUY MAIN CHARACTER (SYARAT MASTERY STAR)     =
-    -- ========================================================
+-- ========================================================
+-- = 7. AUTO BUY MAIN CHARACTER (SYARAT MASTERY STAR)     =
+-- ========================================================
     if game.PlaceId == LOBBY_PLACE_ID then
         local totalMasteryStars = 0
         
         -- Hitung berapa Toon yang sudah max mastery (Visible == true)
         for _, child in ipairs(charScrollFrame:GetChildren()) do
-            if child:IsA("Frame") and child.Visible == true then
+            -- PERBAIKAN: Menggunakan GuiObject agar ImageButton/TextButton karakter tetap terbaca
+            if child:IsA("GuiObject") and child.Visible == true then
                 local mStar = child:FindFirstChild("MasteryStar")
                 if mStar and mStar.Visible == true then
                     totalMasteryStars = totalMasteryStars + 1
@@ -396,7 +397,7 @@ if targetMet then
                     
                     -- Pengecekan keamanan: Apakah berhasil terbeli?
                     if mainToonUI.Visible == false then
-                        print("❌ GAGAL MEMBELI " .. mainToon .. " (Ichor tidak cukup). Pembelian dihentikan agar Ichor tertabung.")
+                        print("❌ GAGAL MEMBELI " .. mainToon .. " (Ichor tidak cukup atau Mastery Toon target belum selesai). Pembelian dihentikan.")
                         break -- BERHENTI SECARA KETAT! Jangan lirik daftar di bawahnya.
                     else
                         print("✅ BERHASIL MEMBELI " .. mainToon .. "!")
