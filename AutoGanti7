@@ -61,14 +61,15 @@ local Config = {
         "Vee"
     },
     LastToonsToBuy = {              -- Pembelian berurutan ketat sisa karakter
-        "Squirm", 
-        "Blot", 
+        "Squirm",  
         "Goob", 
         "Brusha",
         "Flutter",
         "Connie",
         "Teagan",
         "Gigi",
+        "Blot",
+        "Glisten",
         "RazzleDazzle"
     },
 
