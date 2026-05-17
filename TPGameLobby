@@ -1,0 +1,37 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local INGAME_PLACE_ID = 16552821455
+
+if game.PlaceId == INGAME_PLACE_ID then
+	local player = Players.LocalPlayer
+
+	task.spawn(function()
+		while task.wait(1) do
+			local playerGui = player:FindFirstChild("PlayerGui")
+			if not playerGui then continue end
+
+			local deathGui = playerGui:FindFirstChild("DeathGui")
+			if deathGui then
+				local deathScreen = deathGui:FindFirstChild("DeathScreen")
+				
+				-- Cek apakah DeathScreen sudah muncul dan kotaknya tercentang (Visible = true)
+				if deathScreen and deathScreen.Visible then
+					print("Karakter mati dan DeathScreen Visible! Mengirim remote Teleport...")
+					
+					-- Menggunakan pcall agar script tidak crash jika sewaktu-waktu remote gamenya belum ter-load sempurna
+					local success, err = pcall(function()
+						ReplicatedStorage.Events.Teleport:FireServer()
+					end)
+					
+					if not success then
+						warn("Gagal mengeksekusi remote: ", err)
+					end
+					
+					-- Jeda 10 detik agar tidak terjadi spam remote yang bisa membuat akun di-kick/disconnect
+					task.wait(10)
+				end
+			end
+		end
+	end)
+end
