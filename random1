@@ -1,31 +1,74 @@
+-- ==========================================
+-- CONFIGURATION
+-- ==========================================
+local Config = {
+	TargetPlaceId = 15458578861,
+	AutoOn = true,
+	DefaultSpeed = 0.1,
+	AutoBuyVIP = false -- Default untuk VIP: false (tidak beli VIP) / true (beli VIP)
+}
+
+if game.PlaceId ~= Config.TargetPlaceId then
+	warn("[Auto Farm] Dibatalkan: Game ID tidak sesuai.")
+	return
+end
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
+
+-- Remotes Folder Setup
 local events = ReplicatedStorage:WaitForChild("Events")
+local functions = ReplicatedStorage:WaitForChild("Functions")
+
+-- Event & Function References
 local colorMeEvent = events:WaitForChild("ColorMe")
 local activeColorEvent = events:WaitForChild("ActiveColor")
+local toCacheEvent = events:WaitForChild("toCache")
+local generateModelFunc = functions:WaitForChild("GenerateModel")
+local interactItemFunc = ReplicatedStorage:WaitForChild("InteractItem")
+local isPaintingEvent = events:WaitForChild("IsPainting")
+local updateStarsFunc = functions:WaitForChild("UpdateStars")
+local boomColorsEvent = events:WaitForChild("BoomColors")
+local danceEvent = events:WaitForChild("Dance")
+local dymekEvent = events:WaitForChild("Dymek")
 
--- Flag utama untuk script
-local isRunning = false
+-- Status Script
+local isRunning = Config.AutoOn
 local scriptActive = true 
+local currentSpeed = Config.DefaultSpeed
+local buyVIP = Config.AutoBuyVIP
 
 -- ==========================================
--- FUNGSI BANTUAN UNTUK MEMBACA DATA VOXEL
+-- HELPER FUNCTIONS
 -- ==========================================
--- Karena "Colored" dan "kolor" biasanya berupa Attribute atau Value object di Roblox
 local function getVoxelData(voxel, dataName)
-	-- Cek apakah datanya ada di Attribute
 	local attr = voxel:GetAttribute(dataName)
 	if attr ~= nil then return attr end
-	
-	-- Cek apakah datanya berupa objek Value di dalam Voxel
 	local child = voxel:FindFirstChild(dataName)
 	if child and child:IsA("ValueBase") then return child.Value end
-	
 	return nil
+end
+
+-- Fungsi untuk memicu klik pada tombol GUI secara virtual
+local function fireVirtualClick(button)
+	if not button then return end
+	if firesignal then
+		firesignal(button.MouseButton1Click)
+	elseif getconnections then
+		for _, conn in pairs(getconnections(button.MouseButton1Click)) do
+			conn:Fire()
+		end
+	end
+end
+
+-- Mengambil angka dari text (contoh: "⭐ 140" menjadi 140)
+local function parseNumber(text)
+	local str = tostring(text):gsub("%D", "") -- Hapus semua karakter kecuali angka
+	return tonumber(str) or 0
 end
 
 -- ==========================================
@@ -34,7 +77,7 @@ end
 local AutoFarmGui = Instance.new("ScreenGui")
 AutoFarmGui.Name = "AkbarAutoFarmUI"
 AutoFarmGui.ResetOnSpawn = false
--- Proteksi GUI agar tidak terdeteksi game (jika didukung executor)
+
 if syn and syn.protect_gui then
 	syn.protect_gui(AutoFarmGui)
 	AutoFarmGui.Parent = CoreGui
@@ -44,30 +87,21 @@ else
 	AutoFarmGui.Parent = CoreGui
 end
 
--- Frame Utama
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 120)
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -60)
+MainFrame.Size = UDim2.new(0, 250, 0, 230) -- Diperbesar untuk menampung fitur baru
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -115)
 MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = AutoFarmGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
-
--- Top Bar (Untuk Dragging)
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 30)
 TopBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 TopBar.BorderSizePixel = 0
 TopBar.Parent = MainFrame
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 8)
 
-local TopBarCorner = Instance.new("UICorner")
-TopBarCorner.CornerRadius = UDim.new(0, 8)
-TopBarCorner.Parent = TopBar
-
--- Menutupi sudut bawah TopBar agar rata dengan MainFrame
 local TopBarHider = Instance.new("Frame")
 TopBarHider.Size = UDim2.new(1, 0, 0, 8)
 TopBarHider.Position = UDim2.new(0, 0, 1, -8)
@@ -79,14 +113,13 @@ local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, -70, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "Auto Farm Voxel"
+Title.Text = "Auto Farm & Buy"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.GothamBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Tombol Minimize
 local MinButton = Instance.new("TextButton")
 MinButton.Size = UDim2.new(0, 30, 0, 30)
 MinButton.Position = UDim2.new(1, -60, 0, 0)
@@ -97,7 +130,6 @@ MinButton.TextSize = 18
 MinButton.Font = Enum.Font.GothamBold
 MinButton.Parent = TopBar
 
--- Tombol Close
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(0, 30, 0, 30)
 CloseButton.Position = UDim2.new(1, -30, 0, 0)
@@ -108,32 +140,100 @@ CloseButton.TextSize = 14
 CloseButton.Font = Enum.Font.GothamBold
 CloseButton.Parent = TopBar
 
--- Container Konten (Bisa disembunyikan saat minimize)
 local ContentContainer = Instance.new("Frame")
 ContentContainer.Size = UDim2.new(1, 0, 1, -30)
 ContentContainer.Position = UDim2.new(0, 0, 0, 30)
 ContentContainer.BackgroundTransparency = 1
 ContentContainer.Parent = MainFrame
 
--- Tombol Toggle ON/OFF
+-- Tombol Toggle Utama
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 200, 0, 50)
-ToggleBtn.Position = UDim2.new(0.5, -100, 0.5, -25)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-ToggleBtn.Text = "START FARM: OFF"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Size = UDim2.new(0, 200, 0, 40)
+ToggleBtn.Position = UDim2.new(0.5, -100, 0, 10)
 ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.TextSize = 16
 ToggleBtn.Parent = ContentContainer
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
-local ToggleCorner = Instance.new("UICorner")
-ToggleCorner.CornerRadius = UDim.new(0, 6)
-ToggleCorner.Parent = ToggleBtn
+-- Input Kecepatan
+local SpeedFrame = Instance.new("Frame")
+SpeedFrame.Size = UDim2.new(0, 200, 0, 30)
+SpeedFrame.Position = UDim2.new(0.5, -100, 0, 60)
+SpeedFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SpeedFrame.Parent = ContentContainer
+Instance.new("UICorner", SpeedFrame).CornerRadius = UDim.new(0, 6)
 
--- ==========================================
--- FUNGSI INTERAKSI GUI
--- ==========================================
--- Dragging UI
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0.6, 0, 1, 0)
+SpeedLabel.Position = UDim2.new(0, 10, 0, 0)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Text = "Speed Jeda (s):"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Font = Enum.Font.Gotham
+SpeedLabel.TextSize = 13
+SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+SpeedLabel.Parent = SpeedFrame
+
+local SpeedInput = Instance.new("TextBox")
+SpeedInput.Size = UDim2.new(0.4, -10, 1, 0)
+SpeedInput.Position = UDim2.new(0.6, 0, 0, 0)
+SpeedInput.BackgroundTransparency = 1
+SpeedInput.Text = tostring(currentSpeed)
+SpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedInput.Font = Enum.Font.GothamBold
+SpeedInput.TextSize = 13
+SpeedInput.TextXAlignment = Enum.TextXAlignment.Right
+SpeedInput.Parent = SpeedFrame
+
+-- Tombol Toggle VIP
+local VIPToggleBtn = Instance.new("TextButton")
+VIPToggleBtn.Size = UDim2.new(0, 200, 0, 30)
+VIPToggleBtn.Position = UDim2.new(0.5, -100, 0, 100)
+VIPToggleBtn.Font = Enum.Font.GothamBold
+VIPToggleBtn.TextSize = 13
+VIPToggleBtn.Parent = ContentContainer
+Instance.new("UICorner", VIPToggleBtn).CornerRadius = UDim.new(0, 6)
+
+-- Tracker Status Bar
+local StatusFrame = Instance.new("Frame")
+StatusFrame.Size = UDim2.new(0, 200, 0, 45)
+StatusFrame.Position = UDim2.new(0.5, -100, 0, 140)
+StatusFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+StatusFrame.Parent = ContentContainer
+Instance.new("UICorner", StatusFrame).CornerRadius = UDim.new(0, 6)
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -10, 1, 0)
+StatusLabel.Position = UDim2.new(0, 5, 0, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "Status: Idle"
+StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 12
+StatusLabel.TextWrapped = true
+StatusLabel.Parent = StatusFrame
+
+local function updateUI()
+	if isRunning then
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+		ToggleBtn.Text = "SCRIPT: ON"
+	else
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		ToggleBtn.Text = "SCRIPT: OFF"
+		StatusLabel.Text = "Status: Berhenti"
+	end
+	
+	if buyVIP then
+		VIPToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+		VIPToggleBtn.Text = "Buy VIP Art: YES"
+	else
+		VIPToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+		VIPToggleBtn.Text = "Buy VIP Art: NO"
+	end
+end
+updateUI()
+
+-- GUI Interactions
 local dragging, dragInput, dragStart, startPos
 TopBar.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -155,93 +255,211 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- Fungsi Minimize
 local minimized = false
 MinButton.MouseButton1Click:Connect(function()
 	minimized = not minimized
 	ContentContainer.Visible = not minimized
-	if minimized then
-		MainFrame.Size = UDim2.new(0, 250, 0, 30)
-	else
-		MainFrame.Size = UDim2.new(0, 250, 0, 120)
-	end
+	MainFrame.Size = minimized and UDim2.new(0, 250, 0, 30) or UDim2.new(0, 250, 0, 230)
 end)
 
--- Fungsi Close
 CloseButton.MouseButton1Click:Connect(function()
 	scriptActive = false
 	isRunning = false
 	AutoFarmGui:Destroy()
 end)
 
--- Fungsi Toggle
 ToggleBtn.MouseButton1Click:Connect(function()
 	isRunning = not isRunning
-	if isRunning then
-		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-		ToggleBtn.Text = "START FARM: ON"
+	updateUI()
+end)
+
+VIPToggleBtn.MouseButton1Click:Connect(function()
+	buyVIP = not buyVIP
+	updateUI()
+end)
+
+SpeedInput.FocusLost:Connect(function()
+	local newSpeed = tonumber(SpeedInput.Text)
+	if newSpeed and newSpeed >= 0 then
+		currentSpeed = newSpeed
 	else
-		ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-		ToggleBtn.Text = "START FARM: OFF"
+		SpeedInput.Text = tostring(currentSpeed)
 	end
 end)
 
+local function setStatus(msg)
+	if StatusLabel then StatusLabel.Text = "Status: " .. msg end
+end
+
 -- ==========================================
--- LOGIKA UTAMA (AUTO FARM LOOP)
+-- CORE LOGIC 1: AUTO FARM VOXEL (BACKGROUND LOOP)
 -- ==========================================
+-- Loop ini akan terus siaga dan mewarnai jika ada Voxel yang belum diwarnai
 task.spawn(function()
 	while scriptActive do
-		task.wait(0.1) -- Mencegah crash (Safe Loop)
-		
+		task.wait(0.05)
 		if isRunning then
-			-- Pengecekan aman menggunakan pcall agar tidak error jika map belum ter-load
 			pcall(function()
-				local plotsFolder = workspace:FindFirstChild("Plots")
-				if not plotsFolder then return end
+				local myPlot = workspace:FindFirstChild("Plots") and workspace.Plots:FindFirstChild(player.Name)
+				local voxelsFolder = myPlot and myPlot:FindFirstChild("VX_Model") and myPlot.VX_Model:FindFirstChild("Voxels")
 				
-				local myPlot = plotsFolder:FindFirstChild(player.Name)
-				if not myPlot then return end
-				
-				local voxelsFolder = myPlot:FindFirstChild("VX_Model") and myPlot.VX_Model:FindFirstChild("Voxels")
-				if not voxelsFolder then return end
-
-				-- Loop setiap Voxel di dalam folder
-				for _, voxel in ipairs(voxelsFolder:GetChildren()) do
-					if not isRunning or not scriptActive then break end
-					
-					-- 1. Cek apakah sudah diwarnai
-					local isColored = getVoxelData(voxel, "Colored")
-					
-					if isColored == false or isColored == nil then
-						-- 2. Dapatkan indeks/kode warna yang dibutuhkan (bisa 1, 2, 3, dst secara dinamis)
-						-- Catatan: Ganti "kolor" dengan nama properti yang tepat di game (misal: "ColorIndex", "Warna")
-						local requiredColorIndex = getVoxelData(voxel, "kolor") 
+				if voxelsFolder then
+					for _, voxel in ipairs(voxelsFolder:GetChildren()) do
+						if not isRunning or not scriptActive then break end
 						
-						if requiredColorIndex then
-							requiredColorIndex = tostring(requiredColorIndex) -- Pastikan jadi string untuk mencari UI
-							
-							-- 3. Cari UI Paleta sesuai dengan kode warnanya
-							local paletaUI = player.PlayerGui.ScreenGui:FindFirstChild("Paleta")
-							if paletaUI then
-								local targetColorUI = paletaUI:FindFirstChild(requiredColorIndex)
+						local isColored = getVoxelData(voxel, "Colored")
+						if isColored == false or isColored == nil then
+							local requiredColorIndex = getVoxelData(voxel, "kolor") 
+							if requiredColorIndex then
+								local paletaUI = player.PlayerGui.ScreenGui:FindFirstChild("Paleta")
+								local targetColorUI = paletaUI and paletaUI:FindFirstChild(tostring(requiredColorIndex))
 								
 								if targetColorUI and targetColorUI:IsA("GuiObject") then
-									-- Ambil nilai Color3 dari UI (biasanya dari BackgroundColor3)
-									local activeColor3 = targetColorUI.BackgroundColor3
-									
-									-- 4. Kirim Remote untuk set warna aktif
-									activeColorEvent:FireServer(tonumber(requiredColorIndex), activeColor3)
-									task.wait(0.05) -- Jeda kecil antar-remote
-									
-									-- 5. Kirim Remote untuk menginjak Voxel
+									activeColorEvent:FireServer(tonumber(requiredColorIndex), targetColorUI.BackgroundColor3)
 									colorMeEvent:FireServer(voxel)
-									task.wait(0.1) -- Jeda agar server tidak menganggap spam
+									task.wait(currentSpeed) 
 								end
 							end
 						end
 					end
 				end
 			end)
+		end
+	end
+end)
+
+-- ==========================================
+-- CORE LOGIC 2: MACRO AUTO BUY & PLAY
+-- ==========================================
+-- Fungsi untuk menunggu sampai semua lantai selesai diwarnai
+local function waitForPaintingFinished(voxelsFolder)
+	while scriptActive and isRunning do
+		task.wait(1)
+		local allDone = true
+		local children = voxelsFolder:GetChildren()
+		
+		if #children == 0 then allDone = false end
+		for _, voxel in ipairs(children) do
+			local colored = getVoxelData(voxel, "Colored")
+			if colored == false or colored == nil then
+				allDone = false
+				break
+			end
+		end
+		
+		if allDone and #children > 0 then return true end
+	end
+	return false
+end
+
+-- Fungsi mencari Art yang bisa dibeli
+local function findNextArt()
+	local shopGui = player.PlayerGui:FindFirstChild("ShopGui")
+	if not shopGui then return nil end
+	
+	local container = shopGui:FindFirstChild("Container")
+	local itemsFrame = container and container:FindFirstChild("ItemsFrame")
+	local starsLabel = container and container:FindFirstChild("Stars")
+	
+	if not itemsFrame or not starsLabel then return nil end
+	
+	local currentMoney = parseNumber(starsLabel.Text)
+	
+	for _, item in ipairs(itemsFrame:GetChildren()) do
+		if item:IsA("Frame") or item:IsA("GuiObject") then
+			local statusLabel = item:FindFirstChild("Status")
+			local titleLabel = item:FindFirstChild("Title")
+			
+			if statusLabel then
+				local statusText = statusLabel.Text
+				
+				-- Cek Rule 2: Skip yang sudah DONE
+				if statusText ~= "⚝👍⚝" then
+					
+					-- Cek Rule 1: VIP Logic
+					local isVIP = titleLabel and string.find(titleLabel.Text, "VIP")
+					if (not isVIP) or (isVIP and buyVIP) then
+						
+						-- Cek Harga
+						local price = parseNumber(statusText)
+						if price > 0 and currentMoney >= price then
+							return item.Name -- Kembalikan nama Art
+						end
+					end
+				end
+			end
+		end
+	end
+	return nil
+end
+
+-- Loop Utama Macro
+task.spawn(function()
+	while scriptActive do
+		task.wait(1)
+		
+		if isRunning then
+			setStatus("Mencari Art di Shop...")
+			local nextArtName = findNextArt()
+			
+			if nextArtName then
+				setStatus("Membeli: " .. nextArtName)
+				
+				-- Remote 1 & 2
+				toCacheEvent:FireServer()
+				task.wait(0.5)
+				generateModelFunc:InvokeServer(nextArtName, "NEW")
+				task.wait(0.5)
+				
+				-- Remote 3
+				setStatus("Memulai Art...")
+				interactItemFunc:InvokeServer(nextArtName)
+				task.wait(1.5)
+				
+				-- Klik tombol GO jika ada
+				local screenGui = player.PlayerGui:FindFirstChild("ScreenGui")
+				local startUI = screenGui and screenGui:FindFirstChild("Start")
+				if startUI and startUI:FindFirstChild("Go") then
+					fireVirtualClick(startUI.Go)
+					task.wait(1)
+				end
+				
+				setStatus("Mewarnai " .. nextArtName .. "...")
+				-- Background Loop (Core 1) sedang bekerja, kita tunggu di sini
+				local myPlot = workspace:WaitForChild("Plots"):WaitForChild(player.Name)
+				local voxelsFolder = myPlot:WaitForChild("VX_Model"):WaitForChild("Voxels")
+				
+				local finished = waitForPaintingFinished(voxelsFolder)
+				
+				if finished and isRunning then
+					setStatus("Menyelesaikan Art & Klaim...")
+					
+					-- Remote 4 s/d 8
+					isPaintingEvent:FireServer(myPlot.VX_Model, false, "DONE")
+					task.wait(0.5)
+					updateStarsFunc:InvokeServer(nextArtName)
+					task.wait(0.2)
+					boomColorsEvent:FireServer()
+					task.wait(0.2)
+					danceEvent:FireServer(7)
+					task.wait(0.2)
+					dymekEvent:FireServer(nextArtName)
+					
+					task.wait(1.5)
+					
+					-- Klik tombol OK (Claim)
+					local victoryUI = screenGui and screenGui:FindFirstChild("Victory")
+					if victoryUI and victoryUI:FindFirstChild("Claim") then
+						fireVirtualClick(victoryUI.Claim)
+					end
+					
+					setStatus("Sukses! Melanjutkan cycle...")
+					task.wait(2) -- Jeda sebelum mencari art baru
+				end
+			else
+				setStatus("Tidak ada Art / Uang tidak cukup")
+				task.wait(3) -- Tunggu sebentar sebelum scan toko lagi
+			end
 		end
 	end
 end)
