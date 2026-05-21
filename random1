@@ -1,0 +1,247 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+local events = ReplicatedStorage:WaitForChild("Events")
+local colorMeEvent = events:WaitForChild("ColorMe")
+local activeColorEvent = events:WaitForChild("ActiveColor")
+
+-- Flag utama untuk script
+local isRunning = false
+local scriptActive = true 
+
+-- ==========================================
+-- FUNGSI BANTUAN UNTUK MEMBACA DATA VOXEL
+-- ==========================================
+-- Karena "Colored" dan "kolor" biasanya berupa Attribute atau Value object di Roblox
+local function getVoxelData(voxel, dataName)
+	-- Cek apakah datanya ada di Attribute
+	local attr = voxel:GetAttribute(dataName)
+	if attr ~= nil then return attr end
+	
+	-- Cek apakah datanya berupa objek Value di dalam Voxel
+	local child = voxel:FindFirstChild(dataName)
+	if child and child:IsA("ValueBase") then return child.Value end
+	
+	return nil
+end
+
+-- ==========================================
+-- MEMBUAT GUI
+-- ==========================================
+local AutoFarmGui = Instance.new("ScreenGui")
+AutoFarmGui.Name = "AkbarAutoFarmUI"
+AutoFarmGui.ResetOnSpawn = false
+-- Proteksi GUI agar tidak terdeteksi game (jika didukung executor)
+if syn and syn.protect_gui then
+	syn.protect_gui(AutoFarmGui)
+	AutoFarmGui.Parent = CoreGui
+elseif gethui then
+	AutoFarmGui.Parent = gethui()
+else
+	AutoFarmGui.Parent = CoreGui
+end
+
+-- Frame Utama
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 120)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -60)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = AutoFarmGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Top Bar (Untuk Dragging)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+-- Menutupi sudut bawah TopBar agar rata dengan MainFrame
+local TopBarHider = Instance.new("Frame")
+TopBarHider.Size = UDim2.new(1, 0, 0, 8)
+TopBarHider.Position = UDim2.new(0, 0, 1, -8)
+TopBarHider.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TopBarHider.BorderSizePixel = 0
+TopBarHider.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Auto Farm Voxel"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- Tombol Minimize
+local MinButton = Instance.new("TextButton")
+MinButton.Size = UDim2.new(0, 30, 0, 30)
+MinButton.Position = UDim2.new(1, -60, 0, 0)
+MinButton.BackgroundTransparency = 1
+MinButton.Text = "-"
+MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinButton.TextSize = 18
+MinButton.Font = Enum.Font.GothamBold
+MinButton.Parent = TopBar
+
+-- Tombol Close
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseButton.TextSize = 14
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Parent = TopBar
+
+-- Container Konten (Bisa disembunyikan saat minimize)
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Size = UDim2.new(1, 0, 1, -30)
+ContentContainer.Position = UDim2.new(0, 0, 0, 30)
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Parent = MainFrame
+
+-- Tombol Toggle ON/OFF
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 200, 0, 50)
+ToggleBtn.Position = UDim2.new(0.5, -100, 0.5, -25)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleBtn.Text = "START FARM: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = ContentContainer
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = ToggleBtn
+
+-- ==========================================
+-- FUNGSI INTERAKSI GUI
+-- ==========================================
+-- Dragging UI
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- Fungsi Minimize
+local minimized = false
+MinButton.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	ContentContainer.Visible = not minimized
+	if minimized then
+		MainFrame.Size = UDim2.new(0, 250, 0, 30)
+	else
+		MainFrame.Size = UDim2.new(0, 250, 0, 120)
+	end
+end)
+
+-- Fungsi Close
+CloseButton.MouseButton1Click:Connect(function()
+	scriptActive = false
+	isRunning = false
+	AutoFarmGui:Destroy()
+end)
+
+-- Fungsi Toggle
+ToggleBtn.MouseButton1Click:Connect(function()
+	isRunning = not isRunning
+	if isRunning then
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+		ToggleBtn.Text = "START FARM: ON"
+	else
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		ToggleBtn.Text = "START FARM: OFF"
+	end
+end)
+
+-- ==========================================
+-- LOGIKA UTAMA (AUTO FARM LOOP)
+-- ==========================================
+task.spawn(function()
+	while scriptActive do
+		task.wait(0.1) -- Mencegah crash (Safe Loop)
+		
+		if isRunning then
+			-- Pengecekan aman menggunakan pcall agar tidak error jika map belum ter-load
+			pcall(function()
+				local plotsFolder = workspace:FindFirstChild("Plots")
+				if not plotsFolder then return end
+				
+				local myPlot = plotsFolder:FindFirstChild(player.Name)
+				if not myPlot then return end
+				
+				local voxelsFolder = myPlot:FindFirstChild("VX_Model") and myPlot.VX_Model:FindFirstChild("Voxels")
+				if not voxelsFolder then return end
+
+				-- Loop setiap Voxel di dalam folder
+				for _, voxel in ipairs(voxelsFolder:GetChildren()) do
+					if not isRunning or not scriptActive then break end
+					
+					-- 1. Cek apakah sudah diwarnai
+					local isColored = getVoxelData(voxel, "Colored")
+					
+					if isColored == false or isColored == nil then
+						-- 2. Dapatkan indeks/kode warna yang dibutuhkan (bisa 1, 2, 3, dst secara dinamis)
+						-- Catatan: Ganti "kolor" dengan nama properti yang tepat di game (misal: "ColorIndex", "Warna")
+						local requiredColorIndex = getVoxelData(voxel, "kolor") 
+						
+						if requiredColorIndex then
+							requiredColorIndex = tostring(requiredColorIndex) -- Pastikan jadi string untuk mencari UI
+							
+							-- 3. Cari UI Paleta sesuai dengan kode warnanya
+							local paletaUI = player.PlayerGui.ScreenGui:FindFirstChild("Paleta")
+							if paletaUI then
+								local targetColorUI = paletaUI:FindFirstChild(requiredColorIndex)
+								
+								if targetColorUI and targetColorUI:IsA("GuiObject") then
+									-- Ambil nilai Color3 dari UI (biasanya dari BackgroundColor3)
+									local activeColor3 = targetColorUI.BackgroundColor3
+									
+									-- 4. Kirim Remote untuk set warna aktif
+									activeColorEvent:FireServer(tonumber(requiredColorIndex), activeColor3)
+									task.wait(0.05) -- Jeda kecil antar-remote
+									
+									-- 5. Kirim Remote untuk menginjak Voxel
+									colorMeEvent:FireServer(voxel)
+									task.wait(0.1) -- Jeda agar server tidak menganggap spam
+								end
+							end
+						end
+					end
+				end
+			end)
+		end
+	end
+end)
