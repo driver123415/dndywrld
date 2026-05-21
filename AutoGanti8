@@ -37,7 +37,7 @@ local Config = {
     -- ==========================================
     MasteryStarRequirement = 8,    -- Syarat jumlah Toon yang sudah max mastery (Bintang) untuk fitur ini jalan
     MainToonsToBuy = {             -- List Toon prioritas (Pembelian berurutan ketat)
-        "Astro", 
+
         "Pebble", 
         "Shelly", 
         "Sprout",
@@ -46,7 +46,8 @@ local Config = {
         "Shrimpo",
         "Poppy",
         "Boxten",
-        "Yatta"
+        "Yatta",
+        "Astro"
     },
 
     -- ==========================================
