@@ -1,0 +1,298 @@
+-- ==========================================
+-- CONFIGURATION
+-- ==========================================
+local Config = {
+	TargetPlaceId = 15458578861, -- Script hanya berjalan di Game ID ini
+	AutoOn = true,               -- true = langsung jalan saat dieksekusi, false = manual via GUI
+	DefaultSpeed = 0.1           -- Kecepatan jeda bawaan (dalam detik)
+}
+
+-- 1. Pengecekan Game ID
+if game.PlaceId ~= Config.TargetPlaceId then
+	warn("[Auto Farm] Dibatalkan: Game ID tidak sesuai. ID saat ini: " .. tostring(game.PlaceId))
+	return
+end
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+local events = ReplicatedStorage:WaitForChild("Events")
+local colorMeEvent = events:WaitForChild("ColorMe")
+local activeColorEvent = events:WaitForChild("ActiveColor")
+
+-- Status dan Kecepatan saat ini
+local isRunning = Config.AutoOn
+local scriptActive = true 
+local currentSpeed = Config.DefaultSpeed
+
+-- ==========================================
+-- FUNGSI BANTUAN UNTUK MEMBACA DATA VOXEL
+-- ==========================================
+local function getVoxelData(voxel, dataName)
+	local attr = voxel:GetAttribute(dataName)
+	if attr ~= nil then return attr end
+	
+	local child = voxel:FindFirstChild(dataName)
+	if child and child:IsA("ValueBase") then return child.Value end
+	
+	return nil
+end
+
+-- ==========================================
+-- MEMBUAT GUI
+-- ==========================================
+local AutoFarmGui = Instance.new("ScreenGui")
+AutoFarmGui.Name = "AkbarAutoFarmUI"
+AutoFarmGui.ResetOnSpawn = false
+
+if syn and syn.protect_gui then
+	syn.protect_gui(AutoFarmGui)
+	AutoFarmGui.Parent = CoreGui
+elseif gethui then
+	AutoFarmGui.Parent = gethui()
+else
+	AutoFarmGui.Parent = CoreGui
+end
+
+-- Frame Utama (Diperbesar sedikit untuk menampung input speed)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = AutoFarmGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Top Bar (Untuk Dragging)
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 30)
+TopBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TopBarCorner = Instance.new("UICorner")
+TopBarCorner.CornerRadius = UDim.new(0, 8)
+TopBarCorner.Parent = TopBar
+
+local TopBarHider = Instance.new("Frame")
+TopBarHider.Size = UDim2.new(1, 0, 0, 8)
+TopBarHider.Position = UDim2.new(0, 0, 1, -8)
+TopBarHider.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TopBarHider.BorderSizePixel = 0
+TopBarHider.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Auto Farm Voxel"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+-- Tombol Minimize
+local MinButton = Instance.new("TextButton")
+MinButton.Size = UDim2.new(0, 30, 0, 30)
+MinButton.Position = UDim2.new(1, -60, 0, 0)
+MinButton.BackgroundTransparency = 1
+MinButton.Text = "-"
+MinButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinButton.TextSize = 18
+MinButton.Font = Enum.Font.GothamBold
+MinButton.Parent = TopBar
+
+-- Tombol Close
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.BackgroundTransparency = 1
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseButton.TextSize = 14
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.Parent = TopBar
+
+-- Container Konten
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Size = UDim2.new(1, 0, 1, -30)
+ContentContainer.Position = UDim2.new(0, 0, 0, 30)
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Parent = MainFrame
+
+-- Tombol Toggle ON/OFF
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 200, 0, 45)
+ToggleBtn.Position = UDim2.new(0.5, -100, 0, 15)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 16
+ToggleBtn.Parent = ContentContainer
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = ToggleBtn
+
+-- Mengatur tampilan tombol awal sesuai Config.AutoOn
+if isRunning then
+	ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+	ToggleBtn.Text = "START FARM: ON"
+else
+	ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	ToggleBtn.Text = "START FARM: OFF"
+end
+
+-- Frame untuk mengatur Kecepatan
+local SpeedFrame = Instance.new("Frame")
+SpeedFrame.Size = UDim2.new(0, 200, 0, 30)
+SpeedFrame.Position = UDim2.new(0.5, -100, 0, 75)
+SpeedFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+SpeedFrame.Parent = ContentContainer
+
+local SpeedCorner = Instance.new("UICorner")
+SpeedCorner.CornerRadius = UDim.new(0, 6)
+SpeedCorner.Parent = SpeedFrame
+
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(0.6, 0, 1, 0)
+SpeedLabel.Position = UDim2.new(0, 10, 0, 0)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Text = "Speed Jeda (s):"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+SpeedLabel.Font = Enum.Font.Gotham
+SpeedLabel.TextSize = 13
+SpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+SpeedLabel.Parent = SpeedFrame
+
+local SpeedInput = Instance.new("TextBox")
+SpeedInput.Size = UDim2.new(0.4, -10, 1, 0)
+SpeedInput.Position = UDim2.new(0.6, 0, 0, 0)
+SpeedInput.BackgroundTransparency = 1
+SpeedInput.Text = tostring(currentSpeed)
+SpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpeedInput.Font = Enum.Font.GothamBold
+SpeedInput.TextSize = 13
+SpeedInput.TextXAlignment = Enum.TextXAlignment.Right
+SpeedInput.Parent = SpeedFrame
+
+-- ==========================================
+-- FUNGSI INTERAKSI GUI
+-- ==========================================
+-- Dragging UI
+local dragging, dragInput, dragStart, startPos
+TopBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = MainFrame.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+TopBar.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- Minimize & Close
+local minimized = false
+MinButton.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	ContentContainer.Visible = not minimized
+	if minimized then
+		MainFrame.Size = UDim2.new(0, 250, 0, 30)
+	else
+		MainFrame.Size = UDim2.new(0, 250, 0, 150)
+	end
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+	scriptActive = false
+	isRunning = false
+	AutoFarmGui:Destroy()
+end)
+
+-- Toggle & Speed Input
+ToggleBtn.MouseButton1Click:Connect(function()
+	isRunning = not isRunning
+	if isRunning then
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+		ToggleBtn.Text = "START FARM: ON"
+	else
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+		ToggleBtn.Text = "START FARM: OFF"
+	end
+end)
+
+SpeedInput.FocusLost:Connect(function()
+	local newSpeed = tonumber(SpeedInput.Text)
+	if newSpeed and newSpeed >= 0 then
+		currentSpeed = newSpeed -- Memperbarui kecepatan
+	else
+		SpeedInput.Text = tostring(currentSpeed) -- Kembalikan ke angka sebelumnya jika input tidak valid
+	end
+end)
+
+-- ==========================================
+-- LOGIKA UTAMA (AUTO FARM LOOP)
+-- ==========================================
+task.spawn(function()
+	while scriptActive do
+		task.wait(0.05) -- Jeda ringan agar UI tidak freeze
+		
+		if isRunning then
+			pcall(function()
+				local plotsFolder = workspace:FindFirstChild("Plots")
+				if not plotsFolder then return end
+				
+				local myPlot = plotsFolder:FindFirstChild(player.Name)
+				if not myPlot then return end
+				
+				local voxelsFolder = myPlot:FindFirstChild("VX_Model") and myPlot.VX_Model:FindFirstChild("Voxels")
+				if not voxelsFolder then return end
+
+				for _, voxel in ipairs(voxelsFolder:GetChildren()) do
+					if not isRunning or not scriptActive then break end
+					
+					local isColored = getVoxelData(voxel, "Colored")
+					
+					if isColored == false or isColored == nil then
+						local requiredColorIndex = getVoxelData(voxel, "kolor") 
+						
+						if requiredColorIndex then
+							requiredColorIndex = tostring(requiredColorIndex)
+							local paletaUI = player.PlayerGui.ScreenGui:FindFirstChild("Paleta")
+							
+							if paletaUI then
+								local targetColorUI = paletaUI:FindFirstChild(requiredColorIndex)
+								
+								if targetColorUI and targetColorUI:IsA("GuiObject") then
+									local activeColor3 = targetColorUI.BackgroundColor3
+									
+									activeColorEvent:FireServer(tonumber(requiredColorIndex), activeColor3)
+									-- Menginjak lantai langsung setelah warna diaktifkan
+									colorMeEvent:FireServer(voxel)
+									
+									-- Jeda Dinamis (Menggunakan kecepatan dari Config / GUI)
+									task.wait(currentSpeed) 
+								end
+							end
+						end
+					end
+				end
+			end)
+		end
+	end
+end)
