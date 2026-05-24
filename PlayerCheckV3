@@ -18,14 +18,7 @@ local player = Players.LocalPlayer
 -- ===================== KONFIGURASI =====================
 local Config = {
     TargetToon = {             
-        "Toodles", 
-        "Tisha", 
-        "Brightney", 
-        "Cosmo",
-        "Scraps",
-        "Poppy",
-        "Looey",
-        "Yatta"
+        "Cosmo"
         -- Tambahkan "All" ke dalam list ini jika ingin berjalan di semua karakter
     },
     MinPlayerInGame    = 4,       -- Jika total player di bawah angka ini, tembak remote Teleport
