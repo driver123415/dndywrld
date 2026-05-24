@@ -1,0 +1,168 @@
+-- ==============================================================================
+-- SMART AUTO DETECT (LOW HEALTH & MIN PLAYER) DENGAN REMOTE TELEPORT
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455
+
+-- [1] PROTEKSI SCRIPT: Memastikan script HANYA berjalan di In-Game
+if game.PlaceId ~= INGAME_PLACE_ID then
+    warn("[SYSTEM] Script dibatalkan: Kamu sedang tidak berada di INGAME_PLACE_ID")
+    return
+end
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- ===================== KONFIGURASI =====================
+local Config = {
+    TargetToon = {             
+        "Toodles", 
+        "Tisha", 
+        "Brightney", 
+        "Cosmo",
+        "Scraps",
+        "Poppy",
+        "Looey",
+        "Yatta"
+        -- Tambahkan "All" ke dalam list ini jika ingin berjalan di semua karakter
+    },
+    MinPlayerInGame    = 4,       -- Jika total player di bawah angka ini, tembak remote Teleport
+    LowHealthThreshold = 1,       -- Jika HP <= angka ini, tembak remote Teleport
+    UpdateInterval     = 1        -- Kecepatan scan (detik)
+}
+-- =======================================================
+
+print("[SYSTEM] Smart Auto-Deteksi Berjalan! Menggunakan Remote Teleport...")
+
+local isTeleporting = false
+
+-- ===================== FUNGSI PENGAMBILAN DATA =====================
+
+-- Fungsi Mengecek Apakah Toon Termasuk Dalam List
+local function isToonValid(usedUnit)
+    for _, toonName in ipairs(Config.TargetToon) do
+        if string.lower(toonName) == "all" then
+            return true
+        end
+        if string.lower(usedUnit) == string.lower(toonName) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Fungsi Deteksi Total Player
+local function getPlayerCount()
+    return #Players:GetPlayers()
+end
+
+-- Fungsi Deteksi Unit / Karakter
+local function getUsedUnit()
+    local unitName = "Unknown"
+    local igp = Workspace:FindFirstChild("InGamePlayers")
+    if igp then
+        local myCharInfo = igp:FindFirstChild(player.Name)
+        if myCharInfo then
+            local conf = myCharInfo:FindFirstChild("Config")
+            if conf then
+                local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+                if charName and (charName:IsA("StringValue") or charName.ClassName == "StringValue") then
+                    local fullName = charName.Value
+                    if fullName and fullName ~= "" then
+                        unitName = string.split(fullName, "_")[1]
+                    end
+                end
+            end
+        end
+    end
+    return unitName
+end
+
+-- Fungsi Deteksi HP / Darah (Dinamis)
+local function getHealthData()
+    local currentHP = 0
+    local maxHP = 0
+    
+    pcall(function()
+        local PlayerGui = player:WaitForChild("PlayerGui")
+        local menu = PlayerGui.ScreenGui.Menu
+        local content = menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar.Content
+        
+        for i = 1, 10 do 
+            local heart = content:FindFirstChild("Heart" .. i)
+            if heart then
+                maxHP = i
+                if heart:FindFirstChild("Pulse") and heart.Pulse.Visible then
+                    currentHP = i
+                end
+            end
+        end
+    end)
+    
+    return currentHP, maxHP
+end
+
+-- Fungsi Eksekusi Teleport Menggunakan RemoteEvent
+local function teleportToLobby(reason)
+    if isTeleporting then return end
+    isTeleporting = true
+    
+    print("[SYSTEM WARNING] Memicu Auto Rejoin! Alasan: " .. reason)
+    print("Mengirim remote Teleport ke server...")
+    
+    local success, err = pcall(function()
+        ReplicatedStorage.Events.Teleport:FireServer()
+    end)
+    
+    if not success then
+        warn("Gagal mengeksekusi remote: ", err)
+    end
+    
+    -- Jeda 10 detik agar tidak terjadi spam remote yang bisa membuat akun di-kick
+    task.wait(10)
+    isTeleporting = false
+end
+
+-- ===================== MAIN LOOP DETEKSI =====================
+
+task.spawn(function()
+    while true do
+        if player.Character and not isTeleporting then
+            
+            local usedUnit = getUsedUnit()
+            
+            if isToonValid(usedUnit) then
+                local totalPlayers = getPlayerCount()
+                local hp, maxHealth = getHealthData()
+
+                -- 1. CEK TOTAL PLAYER
+                if totalPlayers < Config.MinPlayerInGame then
+                    teleportToLobby("Kekurangan Player (" .. totalPlayers .. "/" .. Config.MinPlayerInGame .. ")")
+                
+                -- 2. CEK DARAH / HP
+                elseif maxHealth > 0 and hp <= Config.LowHealthThreshold then
+                    teleportToLobby("Low Health Terdeteksi (" .. hp .. "/" .. maxHealth .. ")")
+                end
+            end
+            
+        end
+        
+        task.wait(Config.UpdateInterval)
+    end
+end)
+
+-- Auto deteksi saat player keluar agar lebih responsif
+Players.PlayerRemoving:Connect(function(playerLeaving)
+    if isTeleporting then return end
+    task.wait(0.5) 
+    
+    local usedUnit = getUsedUnit()
+    if isToonValid(usedUnit) then
+        local totalPlayers = getPlayerCount()
+        if totalPlayers < Config.MinPlayerInGame then
+            teleportToLobby("Kekurangan Player setelah seseorang keluar (" .. totalPlayers .. "/" .. Config.MinPlayerInGame .. ")")
+        end
+    end
+end)
