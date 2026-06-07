@@ -1,0 +1,190 @@
+-- ==============================================================================
+-- SMART AUTO DETECT (FIXED HP DETECTION & ANTI FALSE ALARM)
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    warn("[SYSTEM] Script dibatalkan: Kamu sedang tidak berada di INGAME_PLACE_ID")
+    return
+end
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- ===================== KONFIGURASI =====================
+local Config = {
+    TargetToon = {"Cosmo"},
+    MaxHealth          = 3,       -- [DIPERBAIKI] Batas maksimal darah karakter (Cosmo = 3)
+    AbsoluteMinPlayer  = 1,       -- MUTLAK KABUR: Jika jumlah player <= angka ini 
+    MinPlayerInGame    = 4,       -- BATAS NORMAL: Kabur jika kurang dari ini (KECUALI darah penuh/punya item heal)
+    LowHealthThreshold = 1,       -- BATAS SEKARAT: Kabur jika darah <= angka ini 
+    UpdateInterval     = 1        -- Kecepatan scan (detik)
+}
+
+local HealingItems = {"Bandage", "HealthKit"}
+-- =======================================================
+
+print("[SYSTEM] Smart Auto-Deteksi Berjalan! Menggunakan Logika MaxHealth Fix...")
+
+local isTeleporting = false
+
+-- ===================== HELPER FUNCTIONS =====================
+
+local function inList(val, list)
+    local low = string.lower(val)
+    for _, v in ipairs(list) do
+        if string.find(low, string.lower(v), 1, true) then return true end
+    end
+    return false
+end
+
+local function hasHealingItem()
+    local char = player.Character
+    if not char then return false end
+    
+    local inv = char:FindFirstChild("Inventory")
+    if not inv then return false end
+    
+    for i = 1, 4 do
+        local slot = inv:FindFirstChild("Slot" .. i)
+        if slot and slot.Value and slot.Value ~= "" and slot.Value ~= "None" then
+            if inList(slot.Value, HealingItems) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function isToonValid(usedUnit)
+    for _, toonName in ipairs(Config.TargetToon) do
+        if string.lower(toonName) == "all" then return true end
+        if string.lower(usedUnit) == string.lower(toonName) then return true end
+    end
+    return false
+end
+
+local function getPlayerCount()
+    return #Players:GetPlayers()
+end
+
+local function getUsedUnit()
+    local unitName = "Unknown"
+    local igp = Workspace:FindFirstChild("InGamePlayers")
+    if igp then
+        local myCharInfo = igp:FindFirstChild(player.Name)
+        if myCharInfo then
+            local conf = myCharInfo:FindFirstChild("Config")
+            if conf then
+                local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+                if charName and (charName:IsA("StringValue") or charName.ClassName == "StringValue") then
+                    local fullName = charName.Value
+                    if fullName and fullName ~= "" then
+                        unitName = string.split(fullName, "_")[1]
+                    end
+                end
+            end
+        end
+    end
+    return unitName
+end
+
+local function getHealthData()
+    -- [DIPERBAIKI] Menggunakan logika dari script referensi ShowHPMonitor
+    local currentHP = Config.MaxHealth 
+    pcall(function()
+        local PlayerGui = player:WaitForChild("PlayerGui")
+        local menu = PlayerGui.ScreenGui.Menu
+        local content = menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar.Content
+        
+        local hp = 0
+        for i = 1, Config.MaxHealth do 
+            local heart = content:FindFirstChild("Heart" .. i)
+            if heart and heart:FindFirstChild("Pulse") and heart.Pulse.Visible then
+                hp = i
+            end
+        end
+        currentHP = hp
+    end)
+    return currentHP, Config.MaxHealth
+end
+
+local function teleportToLobby(reason)
+    if isTeleporting then return end
+    isTeleporting = true
+    
+    print("[SYSTEM WARNING] Memicu Auto Rejoin! Alasan: " .. reason)
+    
+    local success, err = pcall(function()
+        ReplicatedStorage.Events.Teleport:FireServer()
+    end)
+    
+    if not success then
+        warn("Gagal mengeksekusi remote: ", err)
+    end
+    
+    task.wait(10)
+    isTeleporting = false
+end
+
+-- ===================== MAIN LOOP =====================
+
+task.spawn(function()
+    while true do
+        if player.Character and not isTeleporting then
+            
+            local usedUnit = getUsedUnit()
+            
+            if isToonValid(usedUnit) then
+                local totalPlayers = getPlayerCount()
+                local hp, maxHealth = getHealthData()
+                local hasHeal = hasHealingItem()
+
+                -- PRIORITAS 1: Kondisi Absolut (Misal: Sisa sendirian)
+                if totalPlayers <= Config.AbsoluteMinPlayer then
+                    teleportToLobby("Game Sepi / Terlalu Sedikit Player (" .. totalPlayers .. " player)")
+                
+                -- PRIORITAS 2: Kondisi Kekurangan Player
+                elseif totalPlayers < Config.MinPlayerInGame then
+                    if hp == maxHealth or hasHeal then
+                        -- Tetap di game karena darah penuh / ada heal
+                    else
+                        teleportToLobby("Kekurangan Player (" .. totalPlayers .. "/" .. Config.MinPlayerInGame .. ") dan Tidak Bisa Survive")
+                    end
+                
+                -- PRIORITAS 3: Cek Darah Sekarat (Walaupun player banyak)
+                -- [DIPERBAIKI] Ditambah hp > 0 untuk mencegah false-alarm (teleport) saat UI darah loading di detik-detik awal
+                elseif maxHealth > 0 and hp > 0 and hp <= Config.LowHealthThreshold then
+                    if not hasHeal then
+                        teleportToLobby("Low Health & Tidak Punya Item Heal (" .. hp .. "/" .. maxHealth .. ")")
+                    end
+                end
+            end
+        end
+        
+        task.wait(Config.UpdateInterval)
+    end
+end)
+
+-- Antisipasi instan saat player keluar dari game
+Players.PlayerRemoving:Connect(function()
+    if isTeleporting then return end
+    task.wait(0.5) 
+    
+    if isToonValid(getUsedUnit()) then
+        local totalPlayers = getPlayerCount()
+        local hp, maxHealth = getHealthData()
+        local hasHeal = hasHealingItem()
+
+        if totalPlayers <= Config.AbsoluteMinPlayer then
+            teleportToLobby("Game Sepi (" .. totalPlayers .. " player) setelah seseorang keluar")
+        elseif totalPlayers < Config.MinPlayerInGame then
+            if not (hp == maxHealth or hasHeal) then
+                teleportToLobby("Kekurangan Player setelah ada yang keluar (" .. totalPlayers .. ") & Tidak Bisa Survive")
+            end
+        end
+    end
+end)
