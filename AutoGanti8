@@ -75,7 +75,7 @@ local Config = {
     },
 
     -- Loadstring URL akan SELALU BERJALAN di akhir script, apapun kondisi targetnya
-    FallbackURL = "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Join" 
+    FallbackURL = "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Join3" 
 }
 
 -- ==========================================
