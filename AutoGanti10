@@ -157,12 +157,13 @@ if game.PlaceId == LOBBY_PLACE_ID then
     
     if not ownsTutToon then
         print("Pemain Baru Terdeteksi! Toon (" .. tutToon .. ") belum dimiliki. Memulai Auto Claim & Skip...")
-        
+
         local function claimToon(toonName)
-            task.spawn(function()
-                local earnEvent = ReplicatedStorage:WaitForChild("EarnTutorialTower", 5)
-                if earnEvent then earnEvent:InvokeServer(toonName) end
-            end)
+            -- Menghapus task.spawn agar script MENUNGGU jawaban server (Anti-Gagal/Lag)
+            local earnEvent = ReplicatedStorage:WaitForChild("EarnTutorialTower", 5)
+            if earnEvent then 
+                pcall(function() earnEvent:InvokeServer(toonName) end) 
+            end
         end
 
         local function teleportToTutorialArea()
