@@ -81,7 +81,7 @@ local Config = {
 -- =         CONFIG FALLBACK/NEWBIE         =
 -- ==========================================
 local FallbackConfig = {
-    TutorialToon = "Both",         -- Toon default untuk akun baru (Bisa diganti "Boxten", "Poppy", "Both")
+    TutorialToon = "Poppy",         -- Toon default untuk akun baru (Bisa diganti "Boxten", "Poppy", "Both")
     ToonToBuy = "Rodger",
     ToonCost = 1000,
     TrinketToBuy = "Wrench",
