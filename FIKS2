@@ -22,7 +22,8 @@ local scripts = {
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST9",--coba bisa sih    
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11",--coba  lebih perfect
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2",--coba  lebih perfect  mati 
-    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif",--super agresif blok all item
+    --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif",--super agresif blok all item tanpa event burung
+    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif7",--super agresif blok all item event burung new
     --"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif2",--super agresif masih ambil event
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V3",--
     "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
