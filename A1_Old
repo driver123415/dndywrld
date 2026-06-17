@@ -56,11 +56,14 @@ local scriptsByPlaceId = {
         "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi",
    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low5",--grapik low
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV3",--
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up   
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif7",--super agresif blok all item event burung new
+    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/BuyV2",--beli lah
+    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up
+ 	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11",--coba    
+    	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif7",--super agresif blok all item event burung new
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote2",--vote  
+    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheckV5",--PlayerCheck 4 cosmo
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V3",--old
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TPGameLobby",--TPGameLobby mati gui baru
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC"--Anti DC
@@ -69,6 +72,7 @@ local scriptsByPlaceId = {
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low5",--grapik low
   	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AutoGanti10",--GANTI GANTI
 	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
+    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC"--Anti DC
     }
 }
