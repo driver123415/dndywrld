@@ -1,5 +1,5 @@
 wait(1)
---print("script run")
+--print("script run OLD")
 print("Full Script Is Running")
 local function executeScripts(scripts)
     for _, script in ipairs(scripts) do
