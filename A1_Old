@@ -66,14 +66,16 @@ local scriptsByPlaceId = {
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheckV5",--PlayerCheck 4 cosmo
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V3",--old
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TPGameLobby",--TPGameLobby mati gui baru
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC"--Anti DC
+    	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC",--Anti DC
+    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/0"--print
     },
     [LOBBY_PLACE_ID] = {
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low5",--grapik low
-  	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AutoGanti10",--GANTI GANTI
-	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
+  		"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AutoGanti10",--GANTI GANTI
+		"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC"--Anti DC
+		--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC",--Anti DC
+    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/0"--print
     }
 }
 
