@@ -54,11 +54,11 @@ local LOBBY_PLACE_ID = 16116270224
 local scriptsByPlaceId = {
     [INGAME_PLACE_ID] = {
         "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi",
-   	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low5",--grapik low
+   	    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low5",--grapik low
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV3",--
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/BuyV2",--beli lah
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up
- 	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11",--coba    
+ 		"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST12Flap",--coba    
     	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif7",--super agresif blok all item event burung new
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use
