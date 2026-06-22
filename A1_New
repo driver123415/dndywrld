@@ -61,8 +61,9 @@ local scriptsByPlaceId = {
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote2",--vote  
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V3",--old
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TPGameLobby",--TPGameLobby mati gui baru
+    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V4",--New
+    	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V3",--old
+    	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TPGameLobby",--TPGameLobby mati gui baru
     	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC",--Anti DC
     	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/0"--print
     },
