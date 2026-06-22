@@ -1,0 +1,119 @@
+-- ==================== Configuration ====================
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game
+local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
+local MAX_RETRY_BEFORE_KICK = 3     -- Berapa kali siklus teleport boleh gagal sebelum di-kick
+local RETRY_COOLDOWN = 6            -- Waktu tunggu (detik) untuk mengecek apakah teleport berhasil
+-- =======================================================
+
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+if game.PlaceId == INGAME_PLACE_ID then
+    print("[ULTIMATE] In-game detected. Memantau UI kematian secara pasif...")
+
+    local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local isTeleporting = false
+
+    -- Fungsi Eksekusi Teleportasi Hibrida
+    local function executeTeleport()
+        if isTeleporting then return end
+        isTeleporting = true 
+        
+        task.spawn(function()
+            local attempt = 0
+            
+            while attempt < MAX_RETRY_BEFORE_KICK do
+                attempt = attempt + 1
+                print("[INFO] Siklus Teleportasi ke-" .. attempt .. " dari " .. MAX_RETRY_BEFORE_KICK)
+                
+                -- Tahap 1: Mencoba menggunakan metode Script 1 (Client Teleport)
+                print("[1/2] Mengeksekusi TeleportService (Client-Side)...")
+                local success1, err1 = pcall(function()
+                    TeleportService:Teleport(LOBBY_PLACE_ID, player)
+                end)
+                
+                if not success1 then
+                    warn("[WARN] TeleportService Error: " .. tostring(err1))
+                end
+                
+                -- Jeda untuk menunggu game memproses perpindahan server
+                task.wait(RETRY_COOLDOWN)
+                
+                -- Jika Player sudah berhasil pindah, hentikan eksekusi
+                if game.PlaceId ~= INGAME_PLACE_ID then return end
+                
+                -- Tahap 2: Jika masih di in-game, gunakan metode Script 2 (Server Remote)
+                print("[2/2] Player masih di In-Game. Menembak RemoteEvent (Server-Side)...")
+                local success2, err2 = pcall(function()
+                    if ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("Teleport") then
+                        ReplicatedStorage.Events.Teleport:FireServer()
+                    else
+                        error("RemoteEvent Teleport tidak ditemukan di ReplicatedStorage")
+                    end
+                end)
+                
+                if not success2 then
+                    warn("[WARN] RemoteEvent Error: " .. tostring(err2))
+                end
+                
+                -- Jeda lagi untuk menunggu eksekusi dari Server
+                task.wait(RETRY_COOLDOWN)
+                
+                if game.PlaceId ~= INGAME_PLACE_ID then return end
+            end
+            
+            -- Failsafe: Jika loop selesai tapi PlaceId masih in-game
+            if game.PlaceId == INGAME_PLACE_ID then
+                warn("[FATAL] Gagal berteleportasi setelah " .. MAX_RETRY_BEFORE_KICK .. " siklus maksimal.")
+                player:Kick("Auto-Failsafe: Gagal berteleportasi ke Lobby. Koneksi diputus untuk keamanan akun.")
+            end
+        end)
+    end
+
+    -- Fungsi Pemantauan GUI (Sistem Event-Driven / Anti-Lag)
+    local function monitorDeathGui(gui)
+        if gui.Name == "DeathGui" then
+            print("[DEBUG] DeathGui terdeteksi! Memantau status Visible...")
+            
+            -- Mencari elemen UI yang muncul saat mati (Bisa DeathScreen atau SpectateButton)
+            local targetUI = gui:WaitForChild("DeathScreen", 10) or gui:WaitForChild("SpectateButton", 10)
+            
+            if targetUI then
+                -- Event listener: Hanya aktif berjalan SAAT nilai Visible berubah
+                targetUI:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if targetUI.Visible == true then
+                        print("[SUCCESS] Layar Kematian Muncul!")
+                        executeTeleport()
+                    end
+                end)
+                
+                -- Cek instan berjaga-jaga jika UI sudah terlanjur Visible saat script berjalan
+                if targetUI.Visible == true then
+                    print("[SUCCESS] Layar Kematian sudah Visible!")
+                    executeTeleport()
+                end
+            else
+                warn("[ERROR] Komponen DeathScreen/SpectateButton tidak ditemukan di dalam DeathGui.")
+            end
+        end
+    end
+
+    -- 1. Pantau GUI yang sudah ada (in case script dieksekusi terlambat)
+    for _, child in ipairs(playerGui:GetChildren()) do
+        monitorDeathGui(child)
+    end
+
+    -- 2. Pantau GUI yang baru masuk/diciptakan oleh game (Event-Driven)
+    playerGui.ChildAdded:Connect(function(child)
+        monitorDeathGui(child)
+    end)
+
+else
+    print("[INFO] Not in-game (Place ID mismatch). Auto-Teleport Ultimate dinonaktifkan.")
+end
