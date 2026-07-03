@@ -13,17 +13,17 @@ local isAutoDiscovering = false
 
 -- ==================== CONFIGURATION ====================
 local Config = {
-    AutoStart = false,
+    AutoStart = true,
     
     -- Tampilkan atau Sembunyikan Log di Console (F9)
-    ConsoleCommand = true, 
+    ConsoleCommand = false, 
 
     -- Jarak aman untuk menatap monster
     DistanceToMonster = 15, 
     HeightOffset = 3,       
 
     -- Toggle Monster Event
-    IncludeEventMonsters = false, 
+    IncludeEventMonsters = false, --false mati atau gk include
 
     -- List Monster Biasa (Pasti ada di game reguler)
     StandardMonsters = {
