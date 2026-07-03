@@ -1,0 +1,370 @@
+-- ==============================================================================
+-- 👁️ AUTO-DISCOVER MONSTER (SMART HIT & RUN) - REVISI FINAL + CONSOLE LOG 👁️
+-- ==============================================================================
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+
+local player = Players.LocalPlayer
+local userId = tostring(player.UserId)
+local isAutoDiscovering = false
+
+-- ==================== CONFIGURATION ====================
+local Config = {
+    AutoStart = false,
+    
+    -- Tampilkan atau Sembunyikan Log di Console (F9)
+    ConsoleCommand = true, 
+
+    -- Jarak aman untuk menatap monster
+    DistanceToMonster = 15, 
+    HeightOffset = 3,       
+
+    -- Toggle Monster Event
+    IncludeEventMonsters = false, 
+
+    -- List Monster Biasa (Pasti ada di game reguler)
+    StandardMonsters = {
+        "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
+        "GoobMonster", "VeeMonster", "DandyMonster", "ScrapsMonster", 
+        "ShrimpoMonster", "AstroMonster", "BrightneyMonster", "RazzleDazzleMonster", 
+        "ToodlesMonster", "TishaMonster", "TeaganMonster", "ShellyMonster", 
+        "FlutterMonster", "CosmoMonster", "SproutMonster", "FinnMonster", 
+        "GlistenMonster", "GigiMonster", "ConnieMonster", "LooeyMonster", 
+        "YattaMonster", "BlottMonster", "DyleMonster", "BrushaMonster", 
+        "SquirmMonster"
+    },
+
+    -- List Monster Event
+    EventMonsters = {
+        "BobetteMonster", "CoalMonster", "RudieMonster", "GingerMonster",
+        "BassieMonster", "EggsonMonster", "CocoaMonster", "FlyteMonster",
+        "RabeccaMonster", "SoulvesterMonster", "GourdyMonster", "EclipseMonster"
+    }
+}
+
+-- ==================== SHARED FUNCTIONS ====================
+-- Fungsi Print Kustom untuk fitur ConsoleCommand
+local function cprint(message)
+    if Config.ConsoleCommand then
+        print(message)
+    end
+end
+
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
+
+local function getModelCenter(model)
+    if not model or not model:IsA("Model") then return nil end
+    local parts = {}
+    for _, part in pairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then table.insert(parts, part) end
+    end
+    if #parts == 0 then return nil end
+    local totalPos = Vector3.zero
+    for _, part in pairs(parts) do totalPos = totalPos + part.Position end
+    return totalPos / #parts
+end
+
+local function getSafePlaceCFrame()
+    local elevators = Workspace:FindFirstChild("Elevators")
+    if elevators then
+        for _, el in ipairs(elevators:GetChildren()) do
+            if el.Name == "Elevator" and el:IsA("Model") then
+                local dandyStore = el:FindFirstChild("DandyStore")
+                if dandyStore then
+                    local dandyShop = dandyStore:FindFirstChild("DandyShop")
+                    if dandyShop then
+                        local root = dandyShop:FindFirstChild("RootPart")
+                        if root then
+                            return root.CFrame * CFrame.new(0, 3, 0)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    local map = getMap()
+    if map then
+        local freeArea = map:FindFirstChild("FreeArea")
+        if freeArea then
+            local fakeElevator = freeArea:FindFirstChild("FakeElevator")
+            if fakeElevator and fakeElevator:IsA("Model") then 
+                local center = getModelCenter(fakeElevator)
+                if center then return CFrame.new(center) end
+            end
+        end
+    end
+    return nil
+end
+
+local function teleportplr(cf)
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+    character:PivotTo(cf)
+    Workspace.Gravity = originalGravity
+end
+
+-- ==================== DISCOVER LOGIC ====================
+local function getUndiscoveredMonsters()
+    local undiscovered = {}
+    
+    local PlayerData = ReplicatedStorage:FindFirstChild("PlayerData")
+    if not PlayerData then return undiscovered end
+    
+    local UserFolder = PlayerData:FindFirstChild(userId)
+    if not UserFolder then return undiscovered end
+    
+    local ResearchFolder = UserFolder:FindFirstChild("Research")
+    if not ResearchFolder then return undiscovered end
+
+    local targetList = {}
+    for _, m in ipairs(Config.StandardMonsters) do table.insert(targetList, m) end
+    if Config.IncludeEventMonsters then
+        for _, m in ipairs(Config.EventMonsters) do table.insert(targetList, m) end
+    end
+
+    for _, monsterName in ipairs(targetList) do
+        local found = false
+        for _, researchData in ipairs(ResearchFolder:GetChildren()) do
+            if researchData.Name == monsterName then
+                local progressValue = tostring(researchData.Value)
+                local cleanValue = string.gsub(progressValue, "%%", "") 
+                local numericValue = tonumber(cleanValue)
+                
+                if numericValue and numericValue > 0 then
+                    found = true
+                end
+                break
+            end
+        end
+        
+        if not found then
+            table.insert(undiscovered, monsterName)
+        end
+    end
+    
+    return undiscovered
+end
+
+local function isMonsterDiscoveredInRealTime(monsterName)
+    local pGui = player:FindFirstChild("PlayerGui")
+    local screenGui = pGui and pGui:FindFirstChild("ScreenGui")
+    local monsterIcon = screenGui and screenGui:FindFirstChild("MonsterIcon")
+    
+    if monsterIcon and type(monsterIcon.ImageTransparency) == "number" then
+        if monsterIcon.ImageTransparency < 0.99 then
+            return true 
+        end
+    end
+
+    local PlayerData = ReplicatedStorage:FindFirstChild("PlayerData")
+    local UserFolder = PlayerData and PlayerData:FindFirstChild(userId)
+    local ResearchFolder = UserFolder and UserFolder:FindFirstChild("Research")
+    
+    if ResearchFolder then
+        local monsterData = ResearchFolder:FindFirstChild(monsterName)
+        if monsterData then
+            local val = tonumber((string.gsub(tostring(monsterData.Value), "%%", "")))
+            if val and val > 0 then return true end
+        end
+    end
+    
+    return false
+end
+
+-- Cek apakah monster ada di Config (Untuk filter log)
+local function isMonsterInConfig(monsterName)
+    for _, m in ipairs(Config.StandardMonsters) do
+        if m == monsterName then return true end
+    end
+    if Config.IncludeEventMonsters then
+        for _, m in ipairs(Config.EventMonsters) do
+            if m == monsterName then return true end
+        end
+    end
+    return false
+end
+
+local function executeHitAndRun(monsterModel)
+    if not monsterModel or not monsterModel.PrimaryPart then return end
+    
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    local monsterPos = monsterModel.PrimaryPart.Position
+    local myTargetPos = monsterPos + Vector3.new(Config.DistanceToMonster, Config.HeightOffset, Config.DistanceToMonster)
+    local lookAtCFrame = CFrame.lookAt(myTargetPos, monsterPos)
+
+    cprint("[AUTO-DISCOVER] 🎯 Target dikunci: " .. monsterModel.Name)
+    
+    -- TELEPORT & KUNCI POSISI
+    teleportplr(lookAtCFrame)
+    rootPart.Anchored = true 
+
+    -- SMART TRIGGER
+    local timeout = 40 
+    local success = false
+    while timeout > 0 do
+        if isMonsterDiscoveredInRealTime(monsterModel.Name) then
+            cprint("[AUTO-DISCOVER] 🎯 Target dikunci: " .. monsterModel.Name .. " berhasil terdiscover ✔")
+            success = true
+            break
+        end
+        task.wait(0.1)
+        timeout = timeout - 1
+    end
+
+    if not success then
+        cprint("[AUTO-DISCOVER] ⚠️ Timeout! Memaksa mundur untuk keamanan.")
+    end
+
+    cprint("[AUTO-DISCOVER] 💨 Ngungsi ke Safe Place...")
+    rootPart.Anchored = false
+    local safePos = getSafePlaceCFrame()
+    
+    if safePos then
+        teleportplr(safePos)
+    else
+        teleportplr(rootPart.CFrame * CFrame.new(0, 50, 0))
+    end
+    
+    task.wait(1.5)
+end
+
+local currentMapInstance = nil
+local notifiedDiscoveredMonsters = {}
+
+local function startAutoDiscover()
+    task.spawn(function()
+        while isAutoDiscovering do
+            local character = player.Character
+            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+            
+            if not rootPart then
+                task.wait(1)
+                continue
+            end
+
+            local undiscoveredList = getUndiscoveredMonsters()
+            
+            if #undiscoveredList == 0 then
+                cprint("==================================================")
+                cprint("🎉 SELAMAT! Semua Monster di Config sudah ter-Discover!")
+                cprint("==================================================")
+                isAutoDiscovering = false
+                
+                local pGui = player:FindFirstChild("PlayerGui")
+                local screenGui = pGui and pGui:FindFirstChild("AutoDiscoverUI")
+                local toggleBtn = screenGui and screenGui:FindFirstChild("ToggleBtn")
+                if toggleBtn then
+                    toggleBtn.Text = "SEMUA SELESAI"
+                    toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+                end
+                break
+            end
+            
+            local map = getMap()
+            if map then
+                -- ANTI-SPAM LOGIC: Reset log kalau pindah lantai/map baru
+                if map ~= currentMapInstance then
+                    currentMapInstance = map
+                    notifiedDiscoveredMonsters = {} 
+                end
+
+                local monstersFolder = map:FindFirstChild("Monsters")
+                if monstersFolder then
+                    for _, monsterModel in pairs(monstersFolder:GetChildren()) do
+                        if monsterModel:IsA("Model") and monsterModel.PrimaryPart then
+                            local isTarget = false
+                            for _, targetName in ipairs(undiscoveredList) do
+                                if monsterModel.Name == targetName then
+                                    isTarget = true
+                                    break
+                                end
+                            end
+                            
+                            if isTarget then
+                                executeHitAndRun(monsterModel)
+                                break -- Supaya nge-scan ulang data (jaga-jaga progress nambah)
+                            else
+                                -- Jika BUKAN target (Berarti sudah pernah di-discover)
+                                if isMonsterInConfig(monsterModel.Name) then
+                                    -- Cek apakah sudah diprint di lantai ini? Kalau belum, print.
+                                    if not notifiedDiscoveredMonsters[monsterModel.Name] then
+                                        notifiedDiscoveredMonsters[monsterModel.Name] = true
+                                        cprint("[AUTO-DISCOVER] 🎯 Target " .. monsterModel.Name .. " sudah terdiscover ✔")
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(2) 
+        end
+    end)
+end
+
+-- ==================== UI TOGGLE ====================
+local guiContainer = pcall(function() return CoreGui end) and CoreGui or player:WaitForChild("PlayerGui")
+
+if guiContainer:FindFirstChild("AutoDiscoverUI") then
+    guiContainer.AutoDiscoverUI:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoDiscoverUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = guiContainer
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "ToggleBtn"
+toggleBtn.Size = UDim2.new(0, 160, 0, 40)
+toggleBtn.Position = UDim2.new(0.5, 90, 0, 20)
+toggleBtn.Text = "START DISCOVER"
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 150)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Font = Enum.Font.SourceSansBold
+toggleBtn.TextSize = 18
+toggleBtn.Active = true
+toggleBtn.Draggable = true
+toggleBtn.Parent = screenGui
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if isAutoDiscovering then
+        isAutoDiscovering = false
+        local char = player.Character
+        local rp = char and char:FindFirstChild("HumanoidRootPart")
+        if rp then rp.Anchored = false end
+        
+        toggleBtn.Text = "START DISCOVER"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 150)
+        cprint("[AUTO-DISCOVER] Dimatikan.")
+    else
+        isAutoDiscovering = true
+        toggleBtn.Text = "STOP DISCOVER"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+        cprint("[AUTO-DISCOVER] Mulai mencari monster yang belum ditemui...")
+        startAutoDiscover()
+    end
+end)
+
+if Config.AutoStart then
+    isAutoDiscovering = true
+    toggleBtn.Text = "STOP DISCOVER"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+    startAutoDiscover()
+end
+
+print("👁️ Auto-Discover Script v3 (Smart + Console) Loaded! Klik tombol UI untuk mulai.")
