@@ -8,7 +8,7 @@ local function executeScripts(scripts)
     
     -- TAHAP 1: Download dan pastikan SEMUA script aman
     for _, scriptUrl in ipairs(scripts) do
-        -- Coba download isi text dari github
+        -- Coba download isi text dari github/jsdelivr
         local success, result = pcall(function()
             return game:HttpGet(scriptUrl)
         end)
@@ -21,7 +21,7 @@ local function executeScripts(scripts)
             return -- Ini akan menghentikan seluruh fungsi, tidak ada yang dijalankan
         end
         
-        -- Cek apakah text dari github bisa dijadikan kode lua yang valid (compile)
+        -- Cek apakah text bisa dijadikan kode lua yang valid (compile)
         local scriptFunction, compileError = loadstring(result)
         if not scriptFunction then
             warn("🚨 [CRITICAL ERROR] Script rusak / gagal dicompile!")
@@ -34,7 +34,7 @@ local function executeScripts(scripts)
         -- Jika aman, simpan dulu fungsinya, jangan dijalankan dulu
         table.insert(readyToRun, scriptFunction)
         
-        -- Beri jeda sangat kecil agar tidak kena rate-limit GitHub saat download massal
+        -- Beri jeda sangat kecil (sekarang pakai jsDelivr jadi lebih aman)
         task.wait(0.1) 
     end
     
@@ -53,30 +53,30 @@ local LOBBY_PLACE_ID = 16116270224
 -- Membuat tabel yang memetakan Place ID ke list script masing-masing
 local scriptsByPlaceId = {
     [INGAME_PLACE_ID] = {
-        "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/redi",
-   	    "https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low5",--grapik low
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/UseV3",--
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/BuyV2",--beli lah
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/pop",--Anti Pop up
- 		"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST12Flap",--coba    
-    	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TEST11R2Agresif7",--super agresif blok all item event burung new
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Run",--mesin lari
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Auto_Skill_V2",--Skill use
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Vote2",--vote  
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerCheckV5",--PlayerCheck 4 cosmo
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V4",--New
-    	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerDeadCheck_V3",--old
-    	--"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/TPGameLobby",--TPGameLobby mati gui baru
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC",--Anti DC
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/0"--print
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/redi",
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/low5",--grapik low
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/UseV3",--
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/BuyV2",--beli lah
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/pop",--Anti Pop up
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/TEST12Flap",--coba    
+        --"https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/TEST11R2Agresif7",--super agresif blok all item event burung new
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/Run",--mesin lari
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/Auto_Skill_V2",--Skill use
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/Vote2",--vote  
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/PlayerCheckV5",--PlayerCheck 4 cosmo
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/PlayerDeadCheck_V4",--New
+        --"https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/PlayerDeadCheck_V3",--old
+        --"https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/TPGameLobby",--TPGameLobby mati gui baru
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/AntiDC",--Anti DC
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/0"--print
     },
     [LOBBY_PLACE_ID] = {
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/low5",--grapik low
-  		"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AutoGanti11",--GANTI GANTI
-		"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/PlayerLobbyCheck",--kick localplayer bengong di lobby
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/ClaimFIX",
-		"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/AntiDC",--Anti DC
-    	"https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/0"--print
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/low5",--grapik low
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/AutoGanti11",--GANTI GANTI
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/PlayerLobbyCheck",--kick localplayer bengong di lobby
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/ClaimFIX",
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/AntiDC",--Anti DC
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/0"--print
     }
 }
 
