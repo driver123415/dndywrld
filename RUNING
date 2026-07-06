@@ -15,9 +15,9 @@ task.wait(1)
 
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/FIKS2R"))()--Brightney (rumah 2) OLD 
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/A1_New"))()--Brightney (rumah 2) new
+--loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/A1_New"))()--Brightney (rumah 2) new
 
---loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/A1_Old"))()--Brightney (rumah 2) Old
+loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/A1_Old"))()--Brightney (rumah 2) Old
 
 
 --loadstring(game:HttpGet("https://raw.githubusercontent.com/driver123415/dndywrld/refs/heads/main/Claim"))()--claim claim
