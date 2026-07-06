@@ -1,0 +1,90 @@
+task.wait(1)
+print("Memulai pengecekan sistem NEW...")
+
+local function executeScripts(scripts)
+    if not scripts or #scripts == 0 then return end
+    
+    local readyToRun = {} -- Tabel untuk menyimpan script yang sudah siap eksekusi
+    
+    -- TAHAP 1: Download dan pastikan SEMUA script aman
+    for _, scriptUrl in ipairs(scripts) do
+        -- Coba download isi text dari github
+        local success, result = pcall(function()
+            return game:HttpGet(scriptUrl)
+        end)
+        
+        -- Cek apakah gagal download atau link mati (404)
+        if not success or result == "" or string.find(result, "404: Not Found") then
+            warn("🚨 [CRITICAL ERROR] Gagal mendownload script!")
+            warn("Link bermasalah: " .. tostring(scriptUrl))
+            warn("❌ PROSES DIBATALKAN! Tidak ada satupun script yang dijalankan.")
+            return -- Ini akan menghentikan seluruh fungsi, tidak ada yang dijalankan
+        end
+        
+        -- Cek apakah text dari github bisa dijadikan kode lua yang valid (compile)
+        local scriptFunction, compileError = loadstring(result)
+        if not scriptFunction then
+            warn("🚨 [CRITICAL ERROR] Script rusak / gagal dicompile!")
+            warn("Link bermasalah: " .. tostring(scriptUrl))
+            warn("Error Code: " .. tostring(compileError))
+            warn("❌ PROSES DIBATALKAN! Tidak ada satupun script yang dijalankan.")
+            return -- Berhenti total
+        end
+        
+        -- Jika aman, simpan dulu fungsinya, jangan dijalankan dulu
+        table.insert(readyToRun, scriptFunction)
+        
+        -- Beri jeda sangat kecil agar tidak kena rate-limit GitHub saat download massal
+        task.wait(0.1) 
+    end
+    
+    -- TAHAP 2: Jika kode sampai di baris ini, artinya 100% SCRIPT AMAN. Waktunya eksekusi!
+    print("✅ Semua script berhasil di-download. Memulai eksekusi paralel...")
+    for _, func in ipairs(readyToRun) do
+        local co = coroutine.create(func)
+        coroutine.resume(co)
+    end
+end
+
+-- Mendefinisikan Place ID
+local INGAME_PLACE_ID = 16552821455
+local LOBBY_PLACE_ID = 16116270224
+
+-- Membuat tabel yang memetakan Place ID ke list script masing-masing
+local scriptsByPlaceId = {
+    [INGAME_PLACE_ID] = {
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/redi",
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/low5",--grapik low
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/UseV3",--
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/pop",--Anti Pop up   
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/TEST11R2Agresif7",--super agresif blok all item event burung new
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/Run",--mesin lari
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/Auto_Skill_V2",--Skill use
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/Vote2",--vote  
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/PlayerDeadCheck_V4",--New
+        --"https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/PlayerDeadCheck_V3",--old
+        --"https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/TPGameLobby",--TPGameLobby mati gui baru
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/AutoDiscoverV1",--Auto discovery
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/AntiDC",--Anti DC
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/0"--print
+    },
+    [LOBBY_PLACE_ID] = {
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/low5",--grapik low
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/AutoGanti11",--GANTI GANTI
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/PlayerLobbyCheck",--kick localplayer bengong di lobby
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/AntiDC",--Anti DC
+        "https://cdn.jsdelivr.net/gh/driver123415/dndywrld@main/0"--print
+    }
+}
+
+-- Mengambil PlaceId saat ini
+local currentPlaceId = game.PlaceId
+print("Current PlaceId: " .. tostring(currentPlaceId))
+
+-- Mengecek apakah PlaceId saat ini ada di dalam tabel script kita
+if scriptsByPlaceId[currentPlaceId] then
+    print("Mempersiapkan script khusus untuk PlaceId: " .. tostring(currentPlaceId))
+    executeScripts(scriptsByPlaceId[currentPlaceId])
+else
+    warn("Tidak ada list script yang diatur untuk PlaceId ini.")
+end
