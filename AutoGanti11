@@ -13,7 +13,7 @@ local Config = {
         "GlistenMonster", "GigiMonster", "ConnieMonster", "LooeyMonster", 
         "BobetteMonster", "CoalMonster", "RudieMonster", "GingerMonster", 
         "YattaMonster", "BassieMonster", "EggsonMonster", "CocoaMonster", 
-        "FlyteMonster", "BlottMonster", "DyleMonster", "BrushaMonster", 
+        "FlyteMonster", "BlottMonster", "DyleMonster", "WaxwellMonster", "BrushaMonster", 
         "RabeccaMonster", "SoulvesterMonster", "GourdyMonster", "EclipseMonster", 
         "SquirmMonster"
     },
@@ -59,13 +59,14 @@ local Config = {
         "Poppy",
         "Boxten",
         "Yatta",
-        "Astro"
+        "Astro",
+        "Goob"
     },
 
     -- ==========================================
     -- =    CONFIG AUTO BUY LAST ALL CHARACTER  =
     -- ==========================================
-    MasteryStarRequirementLast = 9, -- Syarat Bintang untuk fase End-Game / Last Farm
+    MasteryStarRequirementLast = 10, -- Syarat Bintang untuk fase End-Game / Last Farm
     ToonForLastFarm = {             -- Toon yang dipakai untuk farming Ichor lebih cepat
         "Vee"
     },
@@ -77,12 +78,12 @@ local Config = {
         "Squirm",
         "Blott",
         "Glisten",
-        "Goob",
         "Brusha",
         "Flutter",
         "Connie",
         "Teagan",
         "Gigi",
+        "Waxwell",
         "RazzleDazzle"
     },
 
