@@ -27,7 +27,7 @@ local Config = {
 
     -- List Monster Biasa (Pasti ada di game reguler)
     StandardMonsters = {
-        "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
+        "WaxwellMonster", "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
         "GoobMonster", "VeeMonster", "DandyMonster", "ScrapsMonster", 
         "ShrimpoMonster", "AstroMonster", "BrightneyMonster", "RazzleDazzleMonster", 
         "ToodlesMonster", "TishaMonster", "TeaganMonster", "ShellyMonster", 
