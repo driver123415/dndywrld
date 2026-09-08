@@ -50,7 +50,7 @@ local Config = {
     -- ==========================================
     -- =    CONFIG AUTO BUY MAIN CHARACTER      =
     -- ==========================================
-    MasteryStarRequirement = 9,    -- Syarat jumlah Toon yang sudah max mastery (Bintang) untuk fitur ini jalan
+    MasteryStarRequirement = 8,    -- Syarat jumlah Toon yang sudah max mastery (Bintang) untuk fitur ini jalan wajib 8 karna yatta
     MainToonsToBuy = {             -- List Toon prioritas (Pembelian berurutan ketat)
         "Pebble", 
         "Shelly", 
@@ -60,7 +60,7 @@ local Config = {
         "Shrimpo",
         "Poppy",
         "Boxten",
-        "Yatta",
+        "Yatta", -- perlu 15 toon
         "Astro"
     },
 
