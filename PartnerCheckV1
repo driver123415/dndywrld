@@ -1,0 +1,167 @@
+-- ==============================================================================
+-- SMART AUTO DETECT (SYNERGY / PARTNER CHECKER) - GOD TIER EDITION
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    warn("[SYSTEM] Script dibatalkan: Kamu sedang tidak berada di INGAME_PLACE_ID")
+    return
+end
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+-- ===================== KONFIGURASI =====================
+local Config = {
+    MinPlayerInGame = 4,    -- Batas minimum orang di server untuk memicu pengecekan
+    UpdateInterval  = 2     -- Kecepatan scan (detik)
+}
+
+-- Mapping Toon LocalPlayer ke Toon Partner yang WAJIB ADA di server
+local RequiredPartners = {
+    ["Yatta"] = "Looey",
+    ["Goob"]  = "Scraps"
+}
+-- =======================================================
+
+print("[SYSTEM] Synergy Checker (God-Tier Edition) Berjalan!")
+
+local isTeleporting = false
+
+-- ===================== HYBRID TOON DETECTOR =====================
+local function getToonName(playerObj)
+    if not playerObj then return "Unknown" end
+
+    -- Fungsi pembantu untuk membaca "Config" dari dalam fisik 3D
+    local function extractNameFromModel(charModel)
+        if charModel then
+            local conf = charModel:FindFirstChild("Config")
+            if conf then
+                local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+                if charName and (charName:IsA("StringValue") or charName.ClassName == "StringValue") and charName.Value ~= "" then
+                    return string.split(charName.Value, "_")[1]
+                end
+            end
+        end
+        return nil
+    end
+
+    -- LAPIS 1: Mode In-Game (Setelah Lift Turun)
+    local igp = Workspace:FindFirstChild("InGamePlayers")
+    if igp then
+        local foundName = extractNameFromModel(igp:FindFirstChild(playerObj.Name))
+        if foundName then return foundName end
+    end
+    
+    -- LAPIS 2: Mode Lift / Transisi (Fisik karakter di Workspace.Players)
+    local wsPlayers = Workspace:FindFirstChild("Players")
+    if wsPlayers then
+        local foundName = extractNameFromModel(wsPlayers:FindFirstChild(playerObj.Name))
+        if foundName then return foundName end
+    end
+    
+    -- LAPIS 3: Mode Fisik Langsung (Mengecek player.Character)
+    local foundNameDirect = extractNameFromModel(playerObj.Character)
+    if foundNameDirect then return foundNameDirect end
+    
+    -- LAPIS 4: Mode Data Cadangan (Membaca SelectedCharacter di memori Player)
+    local selectedCharValue = playerObj:FindFirstChild("SelectedCharacter")
+    if selectedCharValue and (selectedCharValue:IsA("StringValue") or selectedCharValue.ClassName == "StringValue") then
+        return selectedCharValue.Value
+    end
+    
+    local selectedCharAttr = playerObj:GetAttribute("SelectedCharacter")
+    if selectedCharAttr then
+        return selectedCharAttr
+    end
+    
+    return "Unknown"
+end
+
+-- ===================== TELEPORT FUNCTION =====================
+local function teleportToLobby(reason)
+    if isTeleporting then return end
+    isTeleporting = true
+    
+    print("[SYSTEM WARNING] Memicu Auto Rejoin! Alasan: " .. reason)
+    
+    pcall(function()
+        ReplicatedStorage.Events.Teleport:FireServer()
+    end)
+    
+    task.wait(10)
+    isTeleporting = false
+end
+
+-- ===================== MAIN LOOP (ANTI-BENGONG) =====================
+task.spawn(function()
+    while true do
+        if not isTeleporting then
+            
+            -- [FITUR ANTI-BENGONG]
+            local character = LocalPlayer.Character
+            if not character then
+                task.wait(0.5)
+                continue
+            end
+            
+            local myToon = getToonName(LocalPlayer)
+            local requiredPartnerToon = RequiredPartners[myToon]
+            
+            if requiredPartnerToon then
+                local partnerFound = false
+                local activePlayers = Players:GetPlayers()
+                local totalPlayers = #activePlayers
+                
+                for _, p in ipairs(activePlayers) do
+                    if p ~= LocalPlayer then
+                        if getToonName(p) == requiredPartnerToon then
+                            partnerFound = true
+                            break
+                        end
+                    end
+                end
+                
+                if not partnerFound and totalPlayers < Config.MinPlayerInGame then
+                    teleportToLobby("Kamu pakai " .. myToon .. " tapi tidak ada " .. requiredPartnerToon .. " & Player under " .. Config.MinPlayerInGame)
+                end
+            end
+        end
+        
+        task.wait(Config.UpdateInterval)
+    end
+end)
+
+-- ===================== AUTO EVACUATE (PLAYER LEAVE) =====================
+Players.PlayerRemoving:Connect(function(leavingPlayer)
+    if isTeleporting then return end
+    task.wait(0.5) 
+    
+    local character = LocalPlayer.Character
+    if not character then return end 
+    
+    local myToon = getToonName(LocalPlayer)
+    local requiredPartnerToon = RequiredPartners[myToon]
+    
+    if requiredPartnerToon then
+        local partnerFound = false
+        local activePlayers = Players:GetPlayers()
+        local totalPlayers = #activePlayers
+        
+        for _, p in ipairs(activePlayers) do
+            if p ~= LocalPlayer then
+                if getToonName(p) == requiredPartnerToon then
+                    partnerFound = true
+                    break
+                end
+            end
+        end
+        
+        if not partnerFound and totalPlayers < Config.MinPlayerInGame then
+            teleportToLobby("Partner " .. requiredPartnerToon .. " keluar/tidak ada & Player under " .. Config.MinPlayerInGame)
+        end
+    end
+end)
