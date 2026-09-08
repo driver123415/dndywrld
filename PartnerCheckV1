@@ -16,7 +16,7 @@ local LocalPlayer = Players.LocalPlayer
 
 -- ===================== KONFIGURASI =====================
 local Config = {
-    MinPlayerInGame = 4,    -- Batas minimum orang di server untuk memicu pengecekan
+    MinPlayerInGame = 3,    -- Batas minimum orang di server untuk memicu pengecekan
     UpdateInterval  = 2     -- Kecepatan scan (detik)
 }
 
