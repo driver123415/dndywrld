@@ -51,7 +51,7 @@ local Config = {
     
     Pickup = {
         Enable = true,              
-        MovementMode = "Instant",   
+        MovementMode = "Tween",   --Tween , Instant
         TweenSpeed = 1.25,          
         AuraRange = 30,             
         PriorityList = {"ResearchCapsule", "Tape"},--, "HolidayCollectibleItem", "Holiday Collectible Item"
