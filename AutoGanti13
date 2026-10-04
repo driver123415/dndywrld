@@ -288,11 +288,12 @@ local targetMet         = false
 if canClickUI then
     print("\n🔍 Membuka UI Monster untuk scan V4...")
 
-    local MonsterBtn = getMonsterButton()
-    if MonsterBtn then
-        fireButton(MonsterBtn)
-        task.wait(0.5)
-    end
+    local monsterBtn = getMonsterButton()
+    local indicator = monsterBtn and monsterBtn:FindFirstChild("NewIndicator")
+    print("🔍 Indicator exists:", indicator ~= nil)
+    print("🔍 Indicator visible:", indicator and indicator.Visible)
+    local label = indicator and indicator:FindFirstChild("TextLabel")
+    print("🔍 Label text:", label and label.Text)
 
     local MonsterFrame   = MainGui:FindFirstChild("MonsterFrame")
     local StatsFrame     = MonsterFrame and MonsterFrame:FindFirstChild("StatsFrame")
@@ -321,6 +322,10 @@ if canClickUI then
     end
 
     local CloseBtn = MonsterFrame and MonsterFrame:FindFirstChild("CloseButton")
+    if CloseBtn then
+        virtualClickButton(CloseBtn)
+        task.wait(0.3)
+    end
     if CloseBtn then fireButton(CloseBtn) end
 
     print("✅ Total Twisted Valid (100%): " .. validMonsterCount)
