@@ -1,6 +1,8 @@
 --Auto Claiming All Monster Trinket Script (Twisted Claim) + RETRY + AUTO OPEN
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
 local player = Players.LocalPlayer
 
 local EarnMonsterTrinket = ReplicatedStorage:WaitForChild("EarnMonsterTrinket")
@@ -33,7 +35,7 @@ local monsterList = {
     "PebbleMonster",
     "PoppyMonster",
     "RazzleDazzleMonster",
-    "RibeccaMonster",     -- ← fix dari RabeccaMonster
+    "RibeccaMonster",
     "RodgerMonster",
     "RudieMonster",
     "ScrapsMonster",
@@ -51,7 +53,7 @@ local monsterList = {
 }
 
 local MAX_RETRY = 3
-local WAIT_BETWEEN = 0.2 -- lebih cepat
+local WAIT_BETWEEN = 0.2
 local WAIT_RETRY = 1
 
 -- ==================== HELPER ====================
@@ -68,7 +70,6 @@ local function getUnclaimedCount()
     local btn = getMonsterButton()
     local indicator = btn and btn:FindFirstChild("NewIndicator")
     
-    -- Kalau NewIndicator gak ada atau tidak visible = 0
     if not indicator or not indicator.Visible then
         return 0
     end
@@ -83,11 +84,15 @@ end
 local function clickMonsterButton()
     local btn = getMonsterButton()
     if btn and btn:IsA("TextButton") then
-        if getconnections then
-            for _, conn in pairs(getconnections(btn.MouseButton1Click)) do
-                conn:Fire()
-            end
-        end
+        local inset = GuiService:GetGuiInset()
+        local pos = btn.AbsolutePosition
+        local size = btn.AbsoluteSize
+        local centerX = pos.X + size.X / 2
+        local centerY = pos.Y + size.Y / 2 + inset.Y
+
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+        task.wait(0.1)
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
         print("🖱️ MonsterButton diklik — trigger update GUI")
     else
         warn("⚠️ MonsterButton tidak ditemukan!")
@@ -102,7 +107,6 @@ local function runClaim()
 
     local failed = {}
 
-    -- PASS 1: Claim semua dulu tanpa cek notif
     print("🔁 PASS 1 - Claiming all monsters...")
     for index, monsterName in ipairs(monsterList) do
         local success, err = pcall(function()
@@ -117,7 +121,6 @@ local function runClaim()
         task.wait(WAIT_BETWEEN)
     end
 
-    -- RETRY
     local attempt = 1
     while #failed > 0 and attempt <= MAX_RETRY do
         print(string.format("🔁 RETRY #%d — %d monsters...", attempt, #failed))
@@ -139,12 +142,10 @@ local function runClaim()
         attempt = attempt + 1
     end
 
-    -- KLIK MONSTER BUTTON BUAT TRIGGER UPDATE
     task.wait(0.5)
     clickMonsterButton()
-    task.wait(1.5) -- tunggu GUI refresh
+    task.wait(1.5)
 
-    -- CEK AFTER
     local afterCount = getUnclaimedCount()
     print("==================================================")
     print(string.format("📊 NewIndicator sesudah claim: %d", afterCount))
