@@ -1,4 +1,4 @@
---Auto Claiming All Monster Trinket Script (Twisted Claim) + RETRY + AUTO OPEN
+--Auto Claiming All Monster Trinket Script (Twisted Claim) + RETRY + AUTO OPEN (fix)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
