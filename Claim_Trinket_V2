@@ -1,0 +1,134 @@
+--Auto Claiming All Monster Trinket Script (Twisted Claim) + RETRY + AUTO OPEN
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local EarnMonsterTrinket = ReplicatedStorage:WaitForChild("EarnMonsterTrinket")
+
+local monsterList = {
+    "WaxwellMonster", "PebbleMonster", "PoppyMonster", "RodgerMonster", "BoxtenMonster", 
+    "GoobMonster", "VeeMonster", "DandyMonster", "ScrapsMonster", 
+    "ShrimpoMonster", "AstroMonster", "BrightneyMonster", "RazzleDazzleMonster", 
+    "ToodlesMonster", "TishaMonster", "TeaganMonster", "ShellyMonster", 
+    "FlutterMonster", "CosmoMonster", "SproutMonster", "FinnMonster", 
+    "GlistenMonster", "GigiMonster", "ConnieMonster", "LooeyMonster", 
+    "YattaMonster", "BlottMonster", "DyleMonster", "BrushaMonster", 
+    "SquirmMonster", "BobetteMonster", "CoalMonster", "RudieMonster", 
+    "GingerMonster", "BassieMonster", "EggsonMonster", "CocoaMonster", 
+    "FlyteMonster", "RibeccaMonster", "SoulvesterMonster", "GourdyMonster", 
+    "EclipseMonster"
+}
+
+local MAX_RETRY = 3
+local WAIT_BETWEEN = 0.2 -- lebih cepat
+local WAIT_RETRY = 1
+
+-- ==================== HELPER ====================
+local function getMonsterButton()
+    local pGui = player:FindFirstChild("PlayerGui")
+    local mainGui = pGui and pGui:FindFirstChild("MainGui")
+    return mainGui
+        and mainGui:FindFirstChild("Menu")
+        and mainGui.Menu:FindFirstChild("LeftSide")
+        and mainGui.Menu.LeftSide:FindFirstChild("MonsterButton")
+end
+
+local function getUnclaimedCount()
+    local btn = getMonsterButton()
+    local indicator = btn and btn:FindFirstChild("NewIndicator")
+    
+    -- Kalau NewIndicator gak ada atau tidak visible = 0
+    if not indicator or not indicator.Visible then
+        return 0
+    end
+    
+    local label = indicator:FindFirstChild("TextLabel")
+    if label then
+        return tonumber(label.Text) or 0
+    end
+    return 0
+end
+
+local function clickMonsterButton()
+    local btn = getMonsterButton()
+    if btn and btn:IsA("TextButton") then
+        if getconnections then
+            for _, conn in pairs(getconnections(btn.MouseButton1Click)) do
+                conn:Fire()
+            end
+        end
+        print("🖱️ MonsterButton diklik — trigger update GUI")
+    else
+        warn("⚠️ MonsterButton tidak ditemukan!")
+    end
+end
+
+-- ==================== MAIN CLAIM ====================
+local function runClaim()
+    print("==================================================")
+    print("🎯 TWISTED CLAIM SCRIPT — FAST MODE")
+    print("==================================================")
+
+    local failed = {}
+
+    -- PASS 1: Claim semua dulu tanpa cek notif
+    print("🔁 PASS 1 - Claiming all monsters...")
+    for index, monsterName in ipairs(monsterList) do
+        local success, err = pcall(function()
+            EarnMonsterTrinket:InvokeServer(monsterName)
+        end)
+        if success then
+            print(string.format("[%d/%d] ✅ %s", index, #monsterList, monsterName))
+        else
+            warn(string.format("[%d/%d] ❌ %s | %s", index, #monsterList, monsterName, tostring(err)))
+            table.insert(failed, monsterName)
+        end
+        task.wait(WAIT_BETWEEN)
+    end
+
+    -- RETRY
+    local attempt = 1
+    while #failed > 0 and attempt <= MAX_RETRY do
+        print(string.format("🔁 RETRY #%d — %d monsters...", attempt, #failed))
+        task.wait(WAIT_RETRY)
+        local stillFailed = {}
+        for _, monsterName in ipairs(failed) do
+            local success, err = pcall(function()
+                EarnMonsterTrinket:InvokeServer(monsterName)
+            end)
+            if success then
+                print("✅ RETRY OK: " .. monsterName)
+            else
+                warn("❌ RETRY fail: " .. monsterName .. " | " .. tostring(err))
+                table.insert(stillFailed, monsterName)
+            end
+            task.wait(WAIT_BETWEEN)
+        end
+        failed = stillFailed
+        attempt = attempt + 1
+    end
+
+    -- KLIK MONSTER BUTTON BUAT TRIGGER UPDATE
+    task.wait(0.5)
+    clickMonsterButton()
+    task.wait(1.5) -- tunggu GUI refresh
+
+    -- CEK AFTER
+    local afterCount = getUnclaimedCount()
+    print("==================================================")
+    print(string.format("📊 NewIndicator sesudah claim: %d", afterCount))
+
+    if afterCount == 0 then
+        print("🎉 Semua trinket berhasil di-claim!")
+    else
+        print(string.format("⚠️ Masih ada %d yang belum ke-claim", afterCount))
+    end
+
+    if #failed > 0 then
+        print("❌ Permanently failed:")
+        for _, m in ipairs(failed) do print("   └─ " .. m) end
+    end
+    print("==================================================")
+end
+
+runClaim()
