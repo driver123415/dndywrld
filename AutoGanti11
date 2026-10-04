@@ -72,8 +72,8 @@ local Config = {
         "Vee"
     },
     ToonLastSkinAndEquiped = {      -- [1] Nama Skin, [2] Target Toon Asli
-        "ChocoCones", --VeeSpace
-        "Yatta" --Vee
+        "AceDetective", --VeeSpace, ChocoCones
+        "Rodger" --Vee, Yatta
     },
     LastToonsToBuy = {              -- Pembelian berurutan ketat sisa karakter terakhir
         "Squirm",
