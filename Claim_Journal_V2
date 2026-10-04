@@ -1,0 +1,142 @@
+--Auto Claiming All Journal Script V3 - COMPLETE LIST
+--lokasi path game:GetService("Players").LocalPlayer.PlayerGui.MainGui.DreamJournal.Margin.Pages.Medals.Margin.ScrollingFrame.MedalTemplate(Propertiesnya AchievementID ada di bisa lihat idnya)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local RemoteFunction = ReplicatedStorage:WaitForChild("SharedUtils"):WaitForChild("Network"):WaitForChild("RemoteFunction")
+
+local achievementList = {
+    "ID_10_HissyFit",               -- Hissy Fit
+    "ID_60_StashSearcher",          -- Stash Searcher
+    "ID_7_ItemFinder",              -- Item Finder
+    "ID_56_Cultivator",             -- Cultivator
+    "ID_24_Only75More",             -- Skilled Toon!
+    "ID_40_GetToWhere",             -- Get To Where?
+    "ID_22_GossipTime",             -- Gossip Time
+    "ID_63_HauntedGala26",          -- Haunted Gala
+    "ID_12_ClockedIn",              -- Clocked In
+    "ID_23_Only90MoreToGo",         -- Double Digits!
+    "ID_59_ExtinguishedConfidence", -- Extinguished Confidence
+    "ID_2_LongDistanceRunner",      -- Long Distance Runner
+    "ID_11_Sightseer",              -- Sightseer
+    "ID_61_StockpiledStash",        -- Stockpiled Stash
+    "ID_26_TwistedsFearMe",         -- Twisteds Fear Me
+    "ID_62_TrickOrTreat26",         -- Trick or Treat!
+    "ID_58_SwimmyBarnaby",          -- Just Keep Swimming
+    "ID_57_GreenThumb",             -- Green Thumb
+    "ID_55_Caretaker",              -- Caretaker
+    "ID_8_ItemTracker",             -- Item Tracker
+    "ID_36_WhatADeal",              -- What a Deal!
+    "ID_47_SqueakyClean",           -- Squeaky Clean
+    "ID_51_UnstoppablyHealthy",     -- Unstoppably Healthy
+    "ID_32_StealthMission",         -- Stealth Mission
+    "ID_46_EmptyHanded",            -- Empty Handed
+    "ID_52_Teamwork",               -- Teamwork
+    "ID_9_ItemHunter",              -- Item Hunter
+    "ID_4_MachineEnthusiast",       -- Machine Enthusiast
+    "ID_38_MainCharacter",          -- Main Character
+    "ID_50_QuickReactionTime",      -- Quick Reaction Time
+    "ID_21_GossipBud",              -- Gossip Bud
+    "ID_49_WinningChoice",          -- Winning Choice
+    "ID_48_Bedtime",                -- Bedtime
+    "ID_64_LockedAway26",           -- Locked Away
+    "ID_13_Overtime",               -- Overtime
+    "ID_43_Investigator",           -- Investigator
+    "ID_6_THEMachine",              -- THE Machine
+    "ID_44_LightsOut",              -- Lights Out
+    "ID_42_HelpfulHugger",          -- Helpful Hugger
+    "ID_1_SpeedWalker",             -- Speed Walker
+    "ID_41_Attached",               -- Attached
+    "ID_3_MarathonRunner",          -- Marathon Runner
+    "ID_33_SpeedRunner",            -- Speed Runner
+    "ID_5_MachineMaster",           -- Machine Master
+    "ID_31_FineDining",             -- Fine Dining
+    "ID_53_AllTogether",            -- All Together
+    "ID_45_CenterStage",            -- Center Stage
+    "ID_34_CenterOfAttention",      -- Center of Attention
+    "ID_37_GearedUp",               -- Geared Up
+    "ID_25_Halfway50More",          -- Super Skilled Pro!
+    "ID_35_MasterOfMany",           -- Master Of Many
+    "ID_54_Nurturer",               -- Nurturer
+}
+
+local MAX_RETRY = 3
+local WAIT_BETWEEN = 0.2
+local WAIT_RETRY = 1
+
+local function getUnclaimedCount()
+    local pGui = player:FindFirstChild("PlayerGui")
+    local mainGui = pGui and pGui:FindFirstChild("MainGui")
+    local indicator = mainGui
+        and mainGui:FindFirstChild("Menu")
+        and mainGui.Menu:FindFirstChild("LeftSide")
+        and mainGui.Menu.LeftSide:FindFirstChild("DreamJournalButton")
+        and mainGui.Menu.LeftSide.DreamJournalButton:FindFirstChild("NewIndicator")
+        and mainGui.Menu.LeftSide.DreamJournalButton.NewIndicator:FindFirstChild("TextLabel")
+    if not indicator then return 0 end
+    if not mainGui.Menu.LeftSide.DreamJournalButton.NewIndicator.Visible then return 0 end
+    return tonumber(indicator.Text) or 0
+end
+
+local function runClaim()
+    local beforeCount = getUnclaimedCount()
+    print("==================================================")
+    print("🎯 JOURNAL CLAIM SCRIPT V3 - COMPLETE")
+    print(string.format("📊 Unclaimed notif: %d", beforeCount))
+    print(string.format("📋 Total IDs: %d", #achievementList))
+    print("==================================================")
+
+    local failed = {}
+
+    for index, id in ipairs(achievementList) do
+        local success, err = pcall(function()
+            RemoteFunction:InvokeServer("AttemptRedeemAchievement", id)
+        end)
+        if success then
+            print(string.format("[%d/%d] ✅ %s", index, #achievementList, id))
+        else
+            warn(string.format("[%d/%d] ❌ %s | %s", index, #achievementList, id, tostring(err)))
+            table.insert(failed, id)
+        end
+        task.wait(WAIT_BETWEEN)
+    end
+
+    local attempt = 1
+    while #failed > 0 and attempt <= MAX_RETRY do
+        print(string.format("🔁 RETRY #%d — %d failed...", attempt, #failed))
+        task.wait(WAIT_RETRY)
+        local stillFailed = {}
+        for _, id in ipairs(failed) do
+            local success, err = pcall(function()
+                RemoteFunction:InvokeServer("AttemptRedeemAchievement", id)
+            end)
+            if success then
+                print("✅ RETRY OK: " .. id)
+            else
+                warn("❌ RETRY fail: " .. id .. " | " .. tostring(err))
+                table.insert(stillFailed, id)
+            end
+            task.wait(WAIT_BETWEEN)
+        end
+        failed = stillFailed
+        attempt = attempt + 1
+    end
+
+    task.wait(1)
+    local afterCount = getUnclaimedCount()
+    print("==================================================")
+    print(string.format("📊 Unclaimed sebelum : %d", beforeCount))
+    print(string.format("📊 Unclaimed sesudah : %d", afterCount))
+    if afterCount == 0 then
+        print("🎉 Semua journal berhasil di-claim!")
+    else
+        print(string.format("⚠️ Masih ada %d yang belum ke-claim", afterCount))
+    end
+    if #failed > 0 then
+        print("❌ Permanently failed:")
+        for _, id in ipairs(failed) do print("   └─ " .. id) end
+    end
+    print("==================================================")
+end
+
+runClaim()
