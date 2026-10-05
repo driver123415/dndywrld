@@ -53,11 +53,12 @@ local Config = {
 }
 
 local FallbackConfig = {
-    TutorialToon = "Poppy",
-    ToonToBuy    = "Rodger",
-    ToonCost     = 1000,
-    TrinketToBuy = "Wrench",
-    TrinketCost  = 325
+    TutorialToon  = "Poppy",
+    ToonToBuy     = "Rodger",
+    ToonCost      = 1000,
+    TrinketToBuy  = "Wrench",
+    TrinketCost   = 325,
+    TrinketImage  = "rbxassetid://17660170044",
 }
 
 -- ==========================================
@@ -677,18 +678,36 @@ else
                     if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
                     task.wait(1.5)
                 end
-                local slot1 = MainGui:FindFirstChild("Slot1") and MainGui.Slot1:FindFirstChild("ItemImage")
-                if not (slot1 and slot1.Visible) then
+                local slot1     = MainGui:FindFirstChild("Slot1") and MainGui.Slot1:FindFirstChild("ItemImage")
+                local wrenchOn  = slot1 and slot1.Visible and slot1.Image == FallbackConfig.TrinketImage
+                if not wrenchOn then
                     if currentIchor >= FallbackConfig.TrinketCost then
                         print("Membeli Trinket: " .. FallbackConfig.TrinketToBuy)
                         pcall(function() ReplicatedStorage:WaitForChild("BuyTrinket"):InvokeServer(FallbackConfig.TrinketToBuy) end)
                         task.wait(1.5)
-                        SmartEquipTrinkets()
+                        -- Equip Wrench langsung, bukan SmartEquipTrinkets (yang nyoba VeeRemote+StressBall)
+                        local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
+                        local maxTry = 10
+                        local try = 0
+                        repeat
+                            try += 1
+                            pcall(function() EquipTrinket:InvokeServer("None", "UnEquipAll") end)
+                            task.wait(1)
+                            pcall(function() EquipTrinket:InvokeServer(FallbackConfig.TrinketToBuy, "Equip") end)
+                            task.wait(1)
+                            local s1 = MainGui:FindFirstChild("Slot1") and MainGui.Slot1:FindFirstChild("ItemImage")
+                            wrenchOn = s1 and s1.Visible and s1.Image == FallbackConfig.TrinketImage
+                        until wrenchOn or try >= maxTry
+                        if wrenchOn then
+                            print("✅ Wrench berhasil terpasang!")
+                        else
+                            warn("❌ Gagal pasang Wrench setelah " .. maxTry .. "x.")
+                        end
                     else
                         print("Ichor belum cukup untuk Trinket (" .. currentIchor .. "/" .. FallbackConfig.TrinketCost .. ").")
                     end
                 else
-                    print("Trinket sudah terpasang.")
+                    print("✅ Wrench sudah terpasang. Skip.")
                 end
             end
         end
