@@ -537,6 +537,20 @@ if targetMet then
 
         if totalMasteryStars >= Config.MasteryStarRequirement then
             print("Syarat Mastery Main terpenuhi! Pembelian ketat...")
+
+            task.spawn(function()
+                local sharedUtils = ReplicatedStorage:WaitForChild("SharedUtils", 5)
+                local network     = sharedUtils and sharedUtils:WaitForChild("Network", 5)
+                local remoteEvent = network and network:WaitForChild("RemoteEvent", 5)
+                if remoteEvent then
+                    for _, step in ipairs({24, 25, 26, 27}) do
+                        remoteEvent:FireServer("AdvanceFTUEStep", step)
+                        task.wait(0.1)
+                    end
+                    print("✅ FTUE Step 24-27 berhasil di-fire!")
+                end
+            end)
+
             for _, mainToon in ipairs(Config.MainToonsToBuy) do
                 local mainToonUI = charScrollFrame:FindFirstChild(mainToon)
                 if mainToonUI and mainToonUI.Visible == false then
@@ -556,19 +570,6 @@ if targetMet then
         if totalMasteryStars >= Config.MasteryStarRequirementLast then
             print("Mode End-Game aktif!")
             skipRegularEquip = true
-
-            task.spawn(function()
-                local sharedUtils = ReplicatedStorage:WaitForChild("SharedUtils", 5)
-                local network     = sharedUtils and sharedUtils:WaitForChild("Network", 5)
-                local remoteEvent = network and network:WaitForChild("RemoteEvent", 5)
-                if remoteEvent then
-                    for _, step in ipairs({24, 25, 26, 27}) do
-                        remoteEvent:FireServer("AdvanceFTUEStep", step)
-                        task.wait(0.1)
-                    end
-                    print("✅ FTUE Step 24-27 berhasil di-fire!")
-                end
-            end)
 
             local targetFarmToon = Config.ToonForLastFarm[1]
             if currentToon ~= targetFarmToon then
