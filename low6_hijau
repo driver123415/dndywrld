@@ -4,7 +4,7 @@
 
 local Config = {
     AutoOptimizer = true, 
-    AutoStartDelay = 0.5 -- Set 0 untuk instan secepat kilat
+    AutoStartDelay = 0.5
 }
 
 local INGAME_PLACE_ID = 16552821455
@@ -17,9 +17,11 @@ local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage") -- ✅ FIX #1
 local Terrain = Workspace.Terrain
 
 local player = Players.LocalPlayer
+local userId = tostring(player.UserId) -- ✅ FIX #2
 
 local isOptimized = false
 local hasOptimizedOnce = false 
@@ -34,13 +36,12 @@ local stats = {
     Holiday = "0"
 }
 
--- Penambahan Tabel Stat Lobby (Termasuk Unlocked Monsters)
 local lobbyStats = {
     UsedToon = "Mencari...",
     OwnedToons = "0",
     OwnedTrinkets = "0",
     OwnedSkins = "0",
-    UnlockedMonsters = "", -- Fitur Baru
+    UnlockedMonsters = "",
     Currencies = {}
 }
 
@@ -81,7 +82,6 @@ local function applyLowGraphics()
                 v.Reflectance = 0
                 if v.MaterialVariant ~= "" then v.MaterialVariant = "" end
             end
-            
             if v:IsA("MeshPart") then v.TextureID = ""
             elseif v:IsA("SpecialMesh") then v.TextureId = ""
             elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1
@@ -142,28 +142,46 @@ blackScreen.Visible = false
 blackScreen.ZIndex = 1
 blackScreen.Parent = screenGui
 
--- PATCH: Green screen kalau 4 monster ini udah 100%
+-- ✅ GREEN SCREEN PATCH — FIXED
 local TARGET_MONSTERS = {"EclipseMonster","GourdyMonster","SoulvesterMonster","RibeccaMonster"}
+local missingWarning = "" -- shared state buat stats loop
 
 task.spawn(function()
     while true do
+        task.wait(3)
         if isOptimized and blackScreen.Visible then
             local PlayerData = ReplicatedStorage:FindFirstChild("PlayerData")
-            local ResearchFolder = PlayerData and PlayerData:FindFirstChild(userId) and PlayerData[userId]:FindFirstChild("Research")
+            local ResearchFolder = PlayerData 
+                and PlayerData:FindFirstChild(userId) 
+                and PlayerData[userId]:FindFirstChild("Research")
             
             if ResearchFolder then
-                local allDone = true
+                local missingMonsters = {}
                 for _, name in ipairs(TARGET_MONSTERS) do
                     local entry = ResearchFolder:FindFirstChild(name)
-                    if not entry or (tonumber(tostring(entry.Value)) or 0) < 100 then
-                        allDone = false
-                        break
+                    local val = entry and (tonumber(tostring(entry.Value)) or 0) or 0
+                    if val < 100 then
+                        table.insert(missingMonsters, {Name = name, Value = val})
                     end
                 end
-                blackScreen.BackgroundColor3 = allDone and Color3.fromRGB(50, 200, 80) or Color3.fromRGB(0, 0, 0)
+
+                local allDone = (#missingMonsters == 0)
+                local oneMissing = (#missingMonsters == 1)
+
+                blackScreen.BackgroundColor3 = allDone 
+                    and Color3.fromRGB(50, 200, 80) 
+                    or Color3.fromRGB(0, 0, 0)
+
+                -- Set shared warning string, dibaca sama stats loop
+                if oneMissing then
+                    local m = missingMonsters[1]
+                    local cleanName = string.gsub(m.Name, "Monster", "")
+                    missingWarning = "⚠ Missing: " .. cleanName .. " — " .. tostring(m.Value) .. "%/100%"
+                else
+                    missingWarning = ""
+                end
             end
         end
-        task.wait(3)
     end
 end)
 
@@ -175,7 +193,6 @@ textContainer.Visible = false
 textContainer.ZIndex = 2
 textContainer.Parent = screenGui
 
--- HEADER LOBBY / IN GAME (Atas)
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Size = UDim2.new(1, 0, 0.2, 0)
 headerLabel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -189,7 +206,6 @@ headerLabel.Font = Enum.Font.FredokaOne
 headerLabel.TextSize = 80
 headerLabel.Parent = textContainer
 
--- STATS LABEL (Tengah)
 local statsLabel = Instance.new("TextLabel")
 statsLabel.Size = UDim2.new(0.5, 0, 0.6, 0)
 statsLabel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -204,7 +220,6 @@ statsLabel.TextSize = 22
 statsLabel.RichText = true
 statsLabel.Parent = textContainer
 
--- PLAYER NAME LABEL (Bawah Tengah)
 local playerNameLabel = Instance.new("TextLabel")
 playerNameLabel.Size = UDim2.new(1, 0, 0.15, 0)
 playerNameLabel.AnchorPoint = Vector2.new(0.5, 1)
@@ -496,15 +511,9 @@ local function updateStatsVariables()
         local myCharInfo = nil
         local wsPlayers = Workspace:FindFirstChild("Players")
         
-        if wsPlayers then
-            myCharInfo = wsPlayers:FindFirstChild(player.Name)
-        end
-        if not myCharInfo then
-            myCharInfo = player.Character
-        end
-        if not myCharInfo then
-            myCharInfo = Workspace:FindFirstChild(player.Name)
-        end
+        if wsPlayers then myCharInfo = wsPlayers:FindFirstChild(player.Name) end
+        if not myCharInfo then myCharInfo = player.Character end
+        if not myCharInfo then myCharInfo = Workspace:FindFirstChild(player.Name) end
 
         if myCharInfo then
             local conf = myCharInfo:FindFirstChild("Config")
@@ -524,7 +533,6 @@ local function updateStatsVariables()
 
         local mainGui = pGui:FindFirstChild("MainGui")
         if mainGui then
-            -- MENGAMBIL DATA UNLOCKED MONSTERS
             local menu = mainGui:FindFirstChild("Menu")
             if menu then
                 local leftSide = menu:FindFirstChild("LeftSide")
@@ -592,7 +600,16 @@ task.spawn(function()
             updateStatsVariables()
             
             if locationStatus == "IN GAME" then
-                headerLabel.Text = "IN GAME (" .. stats.Floor .. ")"
+                -- Header + missing monster warning (hanya kalau kurang tepat 1)
+                local isBlack = (blackScreen.BackgroundColor3 == Color3.fromRGB(0, 0, 0))
+                if missingWarning ~= "" and isBlack then
+                    headerLabel.RichText = true
+                    headerLabel.Text = "IN GAME (" .. stats.Floor .. ")\n" ..
+                        "<font size='28'><font color='#FF4444'>" .. missingWarning .. "</font></font>"
+                else
+                    headerLabel.RichText = false
+                    headerLabel.Text = "IN GAME (" .. stats.Floor .. ")"
+                end
                 
                 statsLabel.TextSize = 22 
                 statsLabel.Size = UDim2.new(0.35, 0, 0.6, 0)
@@ -624,23 +641,31 @@ task.spawn(function()
                     end)
                 end
 
+                -- Warna font ngikut warna layar
+                local isGreen = (blackScreen.BackgroundColor3 == Color3.fromRGB(50, 200, 80))
+                local fontColor = isGreen and "#000000" or "#FFFFFF"
+                local labelColor = isGreen and "#111111" or "#C8C8C8"
+
+                statsLabel.TextColor3 = isGreen and Color3.fromRGB(30, 30, 30) or Color3.fromRGB(200, 200, 200)
+                headerLabel.TextColor3 = isGreen and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+                playerNameLabel.TextColor3 = isGreen and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
+
                 statsLabel.Text = string.format(
-                    "=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
-                    "👤 Used Toon        : <b><font color='#FFFFFF'>%s</font></b>\n" ..
-                    "🏢 Current Floor    : <b><font color='#FFFFFF'>%s</font></b>\n" ..
-                    "🎒 Items Taken      : <b><font color='#FFFFFF'>%d</font></b>\n" ..
-                    "🍔 Items Consumed   : <b><font color='#FFFFFF'>%d</font></b>\n" ..
-                    "⚙️ Handled by You   : <b><font color='#FFFFFF'>%d</font></b>\n" ..
-                    "💰 Ichor            : <b><font color='#FFFFFF'>%s</font></b>\n" ..
-                    "🎟️ Holiday Event    : <b><font color='#FFFFFF'>%s</font></b>\n" ..
-                    "⭐ Mastery Status   : <b><font color='#FFFFFF'>%s</font></b>\n\n" ..
-                    "===================================\n" ..
-                    "Tinggalkan perangkat dengan tenang.",
+                    "<font color='" .. labelColor .. "'>=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
+                    "👤 Used Toon        : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>🏢 Current Floor    : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>🎒 Items Taken      : </font><b><font color='" .. fontColor .. "'>%d</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>🍔 Items Consumed   : </font><b><font color='" .. fontColor .. "'>%d</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>⚙️ Handled by You   : </font><b><font color='" .. fontColor .. "'>%d</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>💰 Ichor            : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>🎟️ Holiday Event    : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>⭐ Mastery Status   : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n\n" ..
+                    "<font color='" .. labelColor .. "'>===================================\n" ..
+                    "Tinggalkan perangkat dengan tenang.</font>",
                     stats.Toon, stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Ichor, stats.Holiday, stats.Mastery
                 )
                 
             elseif locationStatus == "LOBBY" then
-                -- MENAMPILKAN UNLOCKED MONSTERS DI SEBELAH TULISAN LOBBY
                 if lobbyStats.UnlockedMonsters ~= "" and lobbyStats.UnlockedMonsters ~= "0" then
                     headerLabel.Text = "LOBBY (" .. lobbyStats.UnlockedMonsters .. ")"
                 else
