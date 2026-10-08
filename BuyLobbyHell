@@ -1,0 +1,186 @@
+-- ============================================================
+--        AXIOM AUTO BUY CONFIG - HALLOWEEN EVENT
+--        Edit config di bawah aja. Jangan otak-atik bawah CONFIG END.
+-- ============================================================
+
+local CONFIG = {
+
+    DELAY       = 0.5,  -- jeda antar pembelian (detik)
+    START_DELAY = 5,    -- tunggu sebelum mulai
+
+    -- ── [1] Holiday Towers (BuyHolidayTower) ─────────────
+    HOLIDAY_TOWERS = {
+        "Ribecca",
+        "Soulvester",
+        "Eclipse",
+        "Gourdy",
+    },
+
+    -- ── [2] Normal Towers (BuyTower) ─────────────────────
+    TOWERS = {
+        -- tambah toon biasa di sini kalau ada
+    },
+
+    -- ── [3] Skins (BuyHolidaySkin) ───────────────────────
+    -- enabled = false kalau mau skip
+    SKINS = {
+        -- [ MAHAL - 1200 ichor + 1200 pumpkin ]
+        { name = "WickedStitch",        enabled = true },
+        { name = "DessertfulScientist", enabled = true },
+        { name = "LostPrince",          enabled = true },
+        { name = "BerryBeast",          enabled = true },
+
+        -- [ MURAH - 600 pumpkin ]
+        { name = "ToxicExperiment",     enabled = true },
+        { name = "Halloween_Astro",     enabled = true },
+        { name = "SanguineSilence",     enabled = true },
+        { name = "CreepyChord",         enabled = true },
+        { name = "ScaryStylish",        enabled = true },
+        { name = "GhastlyGlow",         enabled = true },
+        { name = "FullMoon",            enabled = true },
+        { name = "LoneWolf",            enabled = true },
+        { name = "LittleRed",           enabled = true },
+        { name = "WrappedChic",         enabled = true },
+        { name = "CrimsonImp",          enabled = true },
+        { name = "CrinklingLeaves",     enabled = true },
+        { name = "MidnightSleeper",     enabled = true },
+        { name = "FreshFall",           enabled = true },
+        { name = "CreepyClown",         enabled = true },
+        { name = "ExtraCheese",         enabled = true },
+        { name = "DoubleBubble",        enabled = true },
+        { name = "HauntedTopic",        enabled = true },
+        { name = "SkeleKitty",          enabled = true },
+        { name = "VioletCaster",        enabled = true },
+        { name = "FairyGodmother",      enabled = true },
+        { name = "GourdGuard",          enabled = true },
+        { name = "HauntedFlame",        enabled = true },
+        { name = "CandyCritter",        enabled = true },
+        { name = "ZappedCreation",      enabled = true },
+        { name = "InfectedCandy",       enabled = true },
+    },
+
+    -- ── [4] Holiday Stickers (BuyHolidaySticker) ─────────
+    HOLIDAY_STICKERS = {
+        "Got tricked.",
+        "I can't find you! Gourdy",
+        "Looking good! Ribecca",
+        "See you later! Connie",
+        "Who needs help? Soulvester",
+        "I'll Protect You!",
+        "Keep It Up!",
+        "Thank You!! Eclipse",
+        "Need Anything?",
+        "Help! Gourdy",
+        "Scared?",
+        "Help! Soulvester",
+        "Thank You!! Gourdy",
+    },
+
+    -- ── [5] Backgrounds via SharedUtils (800 pumpkin) ────
+    HOLIDAY_BACKGROUNDS = {
+        { name = "LostPrince",        enabled = true },
+        { name = "EclipsePattern",    enabled = true },
+        { name = "GourdyPattern",     enabled = true },
+        { name = "RibeccaPattern",    enabled = true },
+        { name = "SoulvesterPattern", enabled = true },
+    },
+}
+
+-- ============================================================
+--                      CONFIG END
+-- ============================================================
+
+local RS = game:GetService("ReplicatedStorage")
+
+local remoteCache = {}
+local function getRemote(...)
+    local key = table.concat({...}, "|")
+    if remoteCache[key] then return remoteCache[key] end
+    local obj = RS
+    for _, child in ipairs({...}) do
+        obj = obj:WaitForChild(child)
+    end
+    remoteCache[key] = obj
+    return obj
+end
+
+local totalSuccess = 0
+local totalFail    = 0
+
+local function buy(remote, args, label)
+    local ok, err = pcall(function()
+        remote:InvokeServer(table.unpack(args))
+    end)
+    if ok then
+        totalSuccess += 1
+        print(string.format("[✓] %s", label))
+    else
+        totalFail += 1
+        warn(string.format("[✗] GAGAL: %s | %s", label, tostring(err)))
+    end
+    task.wait(CONFIG.DELAY)
+end
+
+local function printSection(title)
+    print(string.format("\n%s\n[ %s ]\n%s", string.rep("-", 45), title, string.rep("-", 45)))
+end
+
+-- ═══════════════════════════════════════
+--  START
+-- ═══════════════════════════════════════
+print(string.rep("=", 50))
+print(" AXIOM AUTO BUY — HALLOWEEN EVENT")
+print(string.format(" Mulai dalam %d detik...", CONFIG.START_DELAY))
+print(string.rep("=", 50))
+task.wait(CONFIG.START_DELAY)
+
+-- [1] Holiday Towers
+printSection("HOLIDAY TOWERS")
+local holidayTowerRemote = getRemote("BuyHolidayTower")
+for _, name in ipairs(CONFIG.HOLIDAY_TOWERS) do
+    buy(holidayTowerRemote, {name}, "HolidayTower: " .. name)
+end
+
+-- [2] Normal Towers
+if #CONFIG.TOWERS > 0 then
+    printSection("NORMAL TOWERS")
+    local towerRemote = getRemote("BuyTower")
+    for _, name in ipairs(CONFIG.TOWERS) do
+        buy(towerRemote, {name}, "Tower: " .. name)
+    end
+end
+
+-- [3] Skins
+printSection("SKINS")
+local skinRemote = getRemote("BuyHolidaySkin")
+for _, s in ipairs(CONFIG.SKINS) do
+    if s.enabled then
+        buy(skinRemote, {s.name}, "Skin: " .. s.name)
+    else
+        print("[~] Skip: " .. s.name)
+    end
+end
+
+-- [4] Holiday Stickers
+printSection("HOLIDAY STICKERS")
+local stickerRemote = getRemote("BuyHolidaySticker")
+for _, name in ipairs(CONFIG.HOLIDAY_STICKERS) do
+    buy(stickerRemote, {name}, "Sticker: " .. name)
+end
+
+-- [5] Backgrounds
+printSection("HOLIDAY BACKGROUNDS")
+local bgRemote = getRemote("SharedUtils", "Network", "RemoteFunction")
+for _, bg in ipairs(CONFIG.HOLIDAY_BACKGROUNDS) do
+    if bg.enabled then
+        buy(bgRemote, {"BuyHolidayBackground", bg.name}, "Background: " .. bg.name)
+    else
+        print("[~] Skip: " .. bg.name)
+    end
+end
+
+-- SUMMARY
+print(string.rep("=", 50))
+print(string.format(" SELESAI — Berhasil: %d | Gagal: %d", totalSuccess, totalFail))
+print(" That's what the hell is going on boss man. ✓")
+print(string.rep("=", 50))
