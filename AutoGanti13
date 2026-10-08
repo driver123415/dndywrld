@@ -41,8 +41,8 @@ local Config = {
         ["StressBall"] = "rbxassetid://86691053721590",
     },
 
-    ToonsToBuy                 = { "Toodles", "Tisha", "Brightney", "Cosmo", "Scraps", "Poppy", "Looey", "Yatta", "Goob" },
-    ToonsToUse                 = { "Toodles", "Tisha", "Brightney", "Cosmo", "Scraps", "Poppy", "Looey", "Yatta", "Goob" },
+    ToonsToBuy                 = { "Rodger", "Toodles", "Tisha", "Brightney", "Cosmo", "Scraps", "Poppy", "Looey", "Yatta", "Goob" },
+    ToonsToUse                 = { "Rodger", "Toodles", "Tisha", "Brightney", "Cosmo", "Scraps", "Poppy", "Looey", "Yatta", "Goob" },
     MasteryStarRequirement     = 8,
     MainToonsToBuy             = { "Pebble", "Shelly", "Sprout", "Vee", "Finn", "Shrimpo", "Poppy", "Boxten", "Yatta", "Astro" },
     MasteryStarRequirementLast = 9,
