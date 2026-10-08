@@ -1,0 +1,204 @@
+-- ============================================================
+--          AXIOM AUTO BUY CONFIG - EASTER EVENT
+--          Edit lists below. Don't touch below CONFIG END.
+-- ============================================================
+
+local CONFIG = {
+
+    DELAY       = 0.5,
+    START_DELAY = 5,
+
+    -- ── [0] Claim Event Reward (PostEventCalendar) ────────
+    -- Set enabled = false kalau mau skip claim
+    CLAIM_REWARDS = {
+        { action = "ClaimEventReward", calendar = "PostEventCalendar", day = 5, enabled = true },
+    },
+
+    -- ── [1] Holiday Towers (BuyHolidayTower) ─────────────
+    HOLIDAY_TOWERS = {
+        "Flyte",
+        "Eggson",
+        "Cocoa",
+        "Bassie",
+    },
+
+    -- ── [2] Normal Towers (BuyTower) ─────────────────────
+    TOWERS = {
+        "Tisha",
+        "Toodles",
+        "Brightney",
+        "Cosmo",
+        "Poppy",
+        "Shrimpo",
+        "Finn",
+        "Rodger",
+    },
+
+    -- ── [3] Holiday Stickers (BuyHolidaySticker) ─────────
+    HOLIDAY_STICKERS = {
+        "Could you repeat that",
+        "Full Inventory!",
+        "Here for you!",
+        "Need some help",
+    },
+
+    -- ── [4] Holiday Skins (BuyHolidaySkin) ───────────────
+    HOLIDAY_SKINS = {
+        { name = "VeesterBunny",        enabled = true  },
+        { name = "PebbleEgged",         enabled = true  },
+        { name = "BunnyWabbit",         enabled = true  },
+        { name = "TastyCarrot",         enabled = true  },
+        { name = "BelleBasket",         enabled = true  },
+        { name = "SunflowerPatch",      enabled = true  },
+        { name = "WingedChords",        enabled = true  },
+        { name = "BrightDawn",          enabled = true  },
+        { name = "SpringOuting",        enabled = true  },
+        { name = "WildberryDelight",    enabled = true  },
+        { name = "LilacHaunting",       enabled = true  },
+        { name = "CarrotCake",          enabled = true  },
+        { name = "PaintedPatterns",     enabled = true  },
+        { name = "LunaMoth",            enabled = true  },
+        { name = "SpringSky",           enabled = true  },
+        { name = "SwirlingMixUp",       enabled = true  },
+        { name = "FunnyBunny",          enabled = true  },
+        { name = "SpringFormal",        enabled = true  },
+        { name = "SpringQuilt",         enabled = true  },
+        { name = "BlossomBuddy",        enabled = true  },
+        { name = "EggcelentDecorator",  enabled = true  },
+        { name = "FloweryPunch",        enabled = true  },
+        { name = "RosyMapleMoth",       enabled = true  },
+        { name = "WiltedDaisies",       enabled = true  },
+        { name = "SpringCleaning",      enabled = true  },
+        { name = "PastelPorcelain",     enabled = true  }, -- Ichor 1200
+        { name = "StillHip",            enabled = true  }, -- Ichor 1200
+
+        -- [ TAMBAHAN BARU ]
+        { name = "SoothingPollen",      enabled = true  },
+        { name = "DawnClouds",          enabled = true  },
+        { name = "EggThief",            enabled = true  },
+        { name = "PerfectPetals",       enabled = true  },
+        { name = "GardenBlossoms",      enabled = true  },
+        { name = "FloralSuds",          enabled = true  },
+        { name = "VioletDebonair",      enabled = true  },
+        { name = "GardenBouquet",       enabled = true  },
+        { name = "PaintedEggshells",    enabled = true  },
+        { name = "TeaPartyGuest",       enabled = true  },
+        { name = "CrinkledConfetti",    enabled = true  }, -- Ichor 1200
+        { name = "FancyFrosting",       enabled = true  }, -- Ichor 1200
+        { name = "PastelPatterns",      enabled = true  }, -- Ichor 1200
+    },
+}
+
+-- ============================================================
+--                      CONFIG END
+-- ============================================================
+
+local RS = game:GetService("ReplicatedStorage")
+
+local remoteCache = {}
+local function getRemote(...)
+    local key = table.concat({...}, "|")
+    if remoteCache[key] then return remoteCache[key] end
+    local obj = RS
+    for _, child in ipairs({...}) do
+        obj = obj:WaitForChild(child)
+    end
+    remoteCache[key] = obj
+    return obj
+end
+
+local totalSuccess = 0
+local totalFail    = 0
+
+local function invoke(remote, args, label)
+    local ok, err = pcall(function()
+        remote:InvokeServer(table.unpack(args))
+    end)
+    if ok then
+        totalSuccess += 1
+        print(string.format("[✓] %s", label))
+    else
+        totalFail += 1
+        warn(string.format("[✗] GAGAL: %s | %s", label, tostring(err)))
+    end
+    task.wait(CONFIG.DELAY)
+end
+
+local function fire(remote, args, label)
+    local ok, err = pcall(function()
+        remote:FireServer(table.unpack(args))
+    end)
+    if ok then
+        totalSuccess += 1
+        print(string.format("[✓] %s", label))
+    else
+        totalFail += 1
+        warn(string.format("[✗] GAGAL: %s | %s", label, tostring(err)))
+    end
+    task.wait(CONFIG.DELAY)
+end
+
+local function printSection(title)
+    print(string.format("\n%s\n[ %s ]\n%s", string.rep("-", 45), title, string.rep("-", 45)))
+end
+
+-- ═══════════════════════════════════════
+--  START
+-- ═══════════════════════════════════════
+print(string.rep("=", 50))
+print(" AXIOM AUTO BUY — EASTER EVENT")
+print(string.format(" Mulai dalam %d detik...", CONFIG.START_DELAY))
+print(string.rep("=", 50))
+task.wait(CONFIG.START_DELAY)
+
+-- [0] Claim Rewards (FireServer — RemoteEvent)
+printSection("CLAIM EVENT REWARDS")
+local claimRemote = getRemote("SharedUtils", "Network", "RemoteEvent")
+for _, r in ipairs(CONFIG.CLAIM_REWARDS) do
+    if r.enabled then
+        fire(claimRemote, {r.action, r.calendar, r.day},
+            string.format("Claim: %s | %s | Day %d", r.action, r.calendar, r.day))
+    else
+        print("[~] Skip claim reward")
+    end
+end
+
+-- [1] Holiday Towers
+printSection("HOLIDAY TOWERS")
+local holidayTowerRemote = getRemote("BuyHolidayTower")
+for _, name in ipairs(CONFIG.HOLIDAY_TOWERS) do
+    invoke(holidayTowerRemote, {name}, "HolidayTower: " .. name)
+end
+
+-- [2] Normal Towers
+if #CONFIG.TOWERS > 0 then
+    printSection("NORMAL TOWERS")
+    local towerRemote = getRemote("BuyTower")
+    for _, name in ipairs(CONFIG.TOWERS) do
+        invoke(towerRemote, {name}, "Tower: " .. name)
+    end
+end
+
+-- [3] Holiday Stickers
+printSection("HOLIDAY STICKERS")
+local stickerRemote = getRemote("BuyHolidaySticker")
+for _, name in ipairs(CONFIG.HOLIDAY_STICKERS) do
+    invoke(stickerRemote, {name}, "Sticker: " .. name)
+end
+
+-- [4] Holiday Skins
+printSection("HOLIDAY SKINS")
+local skinRemote = getRemote("BuyHolidaySkin")
+for _, s in ipairs(CONFIG.HOLIDAY_SKINS) do
+    if s.enabled then
+        invoke(skinRemote, {s.name}, "Skin: " .. s.name)
+    else
+        print("[~] Skip: " .. s.name)
+    end
+end
+
+-- SUMMARY
+print(string.rep("=", 50))
+print(string.format(" SELESAI — Berhasil: %d | Gagal: %d", totalSuccess, totalFail))
+print(" That's what the hell is going on boss man. ✓")
+print(string.rep("=", 50))
