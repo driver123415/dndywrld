@@ -10,10 +10,10 @@ local CONFIG = {
 
     -- ── [1] Holiday Towers (BuyHolidayTower) ─────────────
     HOLIDAY_TOWERS = {
-        "Ribecca",
-        "Soulvester",
-        "Eclipse",
-        "Gourdy",
+        "Ribecca",    -- 300 pumpkin
+        "Soulvester", -- 700 pumpkin
+        "Eclipse",    -- 1500 pumpkin
+        "Gourdy",     -- 3000 pumpkin + 2500 ichor
     },
 
     -- ── [2] Normal Towers (BuyTower) ─────────────────────
