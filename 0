@@ -1,7 +1,8 @@
 print("Memulai Sistem Pantau Kick...")
 -- ==============================================================================
--- SOLO STUCK DETECTOR — AUTO REJOIN / KICK
--- Jika sendirian & floor tidak berubah dalam X detik → Lobby / Kick
+-- SOLO STUCK DETECTOR V2 — DUAL TRIGGER (SOLO + GLOBAL TIMEOUT)
+-- Trigger 1: Sendirian + stuck di floor yang sama > StuckTimeLimit
+-- Trigger 2: Di floor yang sama > GlobalTimeoutLimit (berlaku walau ada teman)
 -- ==============================================================================
 
 local INGAME_PLACE_ID = 16552821455
@@ -11,23 +12,33 @@ if game.PlaceId ~= INGAME_PLACE_ID then
     return
 end
 
-local Players          = game:GetService("Players")
-local Workspace        = game:GetService("Workspace")
+local Players           = game:GetService("Players")
+local Workspace         = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 
 -- ===================== KONFIGURASI =====================
 local Config = {
-    StuckTimeLimit   = 600,    -- Berapa detik diam di floor yang sama sebelum dianggap stuck (detik)
-    CheckInterval    = 2,     -- Seberapa sering ngecek (detik)
-    MinPlayerToCheck = 1,     -- Cek hanya jika total player <= angka ini (sendirian)
+    CheckInterval        = 2,     -- Seberapa sering ngecek (detik)
+
+    -- TRIGGER 1: Solo
+    MinPlayerToCheck     = 1,     -- Aktif jika total player <= angka ini (sendirian)
+    SoloStuckTimeLimit   = 60,    -- Detik stuck sendirian sebelum rejoin (default 60 detik)
+
+    -- TRIGGER 2: Global Timeout (berlaku walau ada teman)
+    GlobalTimeoutLimit   = 1200,  -- 20 menit = 1200 detik, ganti sesuai kebutuhan
 }
 -- =======================================================
 
 local isTeleporting  = false
-local lastFloor      = nil
-local stuckTimer     = 0
+
+-- Timer terpisah biar gak saling ganggu
+local soloStuckTimer   = 0
+local globalFloorTimer = 0
+
+local lastFloorSolo    = nil
+local lastFloorGlobal  = nil
 
 -- ===================== HELPERS =====================
 
@@ -38,12 +49,9 @@ end
 local function getCurrentFloor()
     local floor = nil
 
-    -- Coba baca dari PlayerGui label Floor
     pcall(function()
         local pGui = player:WaitForChild("PlayerGui", 3)
         if not pGui then return end
-
-        -- Cari semua TextLabel yang mengandung kata "floor" (case-insensitive)
         for _, ui in ipairs(pGui:GetDescendants()) do
             if ui:IsA("TextLabel") then
                 local text = string.upper(ui.Text)
@@ -56,12 +64,10 @@ local function getCurrentFloor()
         end
     end)
 
-    -- Fallback: coba dari Workspace CurrentRoom / map name
     if not floor then
         pcall(function()
             local currentRoom = Workspace:FindFirstChild("CurrentRoom")
             if currentRoom then
-                -- Cari anak model pertama, ambil angka dari namanya
                 for _, child in ipairs(currentRoom:GetChildren()) do
                     if child:IsA("Model") then
                         local match = string.match(child.Name, "(%d+)")
@@ -81,32 +87,19 @@ end
 local function kickLocalPlayer(reason)
     warn("[SYSTEM] Kick dipicu! Alasan: " .. reason)
 
-    -- Coba berbagai cara kick via script
     pcall(function()
-        -- Cara 1: loadstring exploit method (executor level)
-        if syn and syn.kick then
-            syn.kick()
-            return
-        end
+        if syn and syn.kick then syn.kick() return end
     end)
-
     pcall(function()
-        -- Cara 2: via Players service
         Players.LocalPlayer:Kick("[Auto-Kick] " .. reason)
     end)
-
     pcall(function()
-        -- Cara 3: via teleport ke place kosong / invalid
         game:GetService("TeleportService"):Teleport(1, player)
     end)
-
-    -- Cara 4: hard crash karakter sebagai last resort
     pcall(function()
         if player.Character then
             local hum = player.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.Health = 0
-            end
+            if hum then hum.Health = 0 end
         end
     end)
 end
@@ -117,21 +110,15 @@ local function teleportToLobby(reason)
 
     warn("[SYSTEM] Teleport ke Lobby! Alasan: " .. reason)
 
-    local success = false
-
-    -- Cara 1: Fire remote event teleport (dari referensi script kedua)
     pcall(function()
         ReplicatedStorage.Events.Teleport:FireServer()
-        success = true
     end)
 
-    -- Tunggu sebentar dan cek apakah berhasil pindah place
     task.wait(8)
 
-    -- Kalau masih di place yang sama → dianggap gagal → kick
     if game.PlaceId == INGAME_PLACE_ID then
-        warn("[SYSTEM] Teleport gagal. Memicu Auto-Kick sebagai fallback...")
-        kickLocalPlayer("Teleport ke lobby gagal setelah stuck: " .. reason)
+        warn("[SYSTEM] Teleport gagal. Memicu Auto-Kick...")
+        kickLocalPlayer("Teleport gagal — " .. reason)
     end
 
     task.wait(5)
@@ -140,7 +127,12 @@ end
 
 -- ===================== MAIN LOOP =====================
 
-print("[SYSTEM] Solo Stuck Detector aktif. Batas stuck: " .. Config.StuckTimeLimit .. " detik.")
+print(string.format(
+    "[SYSTEM] Dual Trigger Aktif | Solo Timeout: %ds | Global Timeout: %ds (%.0f menit)",
+    Config.SoloStuckTimeLimit,
+    Config.GlobalTimeoutLimit,
+    Config.GlobalTimeoutLimit / 60
+))
 
 task.spawn(function()
     while true do
@@ -150,70 +142,102 @@ task.spawn(function()
         if not player.Character then continue end
 
         local totalPlayers = getPlayerCount()
-
-        -- Hanya aktif jika sendirian
-        if totalPlayers > Config.MinPlayerToCheck then
-            -- Reset timer kalau ada teman masuk
-            stuckTimer = 0
-            lastFloor  = nil
-            continue
-        end
-
         local currentFloor = getCurrentFloor()
 
-        if currentFloor == nil then
-            -- Floor tidak terdeteksi (mungkin loading / transisi), skip dulu
-            continue
+        if currentFloor == nil then continue end
+
+        -- ============================================================
+        -- TRIGGER 1: SOLO STUCK
+        -- Hanya jalan kalau sendirian
+        -- ============================================================
+        if totalPlayers <= Config.MinPlayerToCheck then
+
+            if lastFloorSolo == nil then
+                lastFloorSolo  = currentFloor
+                soloStuckTimer = 0
+            elseif currentFloor == lastFloorSolo then
+                soloStuckTimer = soloStuckTimer + Config.CheckInterval
+
+                local remaining = Config.SoloStuckTimeLimit - soloStuckTimer
+                if remaining > 0 and remaining % 10 == 0 then
+                    warn(string.format(
+                        "[TRIGGER 1 - SOLO] Sendirian di Floor %d | Stuck %.0fs | %.0fs lagi...",
+                        currentFloor, soloStuckTimer, remaining
+                    ))
+                end
+
+                if soloStuckTimer >= Config.SoloStuckTimeLimit then
+                    teleportToLobby(string.format(
+                        "[TRIGGER 1] Sendirian & stuck di Floor %d selama %ds",
+                        currentFloor, soloStuckTimer
+                    ))
+                    soloStuckTimer = 0
+                    lastFloorSolo  = nil
+                end
+            else
+                -- Floor berubah, reset solo timer
+                print(string.format("[TRIGGER 1] Floor berubah %d → %d. Solo timer reset.", lastFloorSolo, currentFloor))
+                lastFloorSolo  = currentFloor
+                soloStuckTimer = 0
+            end
+
+        else
+            -- Ada teman → reset solo timer & baseline
+            soloStuckTimer = 0
+            lastFloorSolo  = nil
         end
 
-        if lastFloor == nil then
-            -- Pertama kali detect, set baseline
-            lastFloor  = currentFloor
-            stuckTimer = 0
-            print("[SYSTEM] Floor baseline set: " .. tostring(lastFloor))
-            continue
-        end
+        -- ============================================================
+        -- TRIGGER 2: GLOBAL TIMEOUT
+        -- Jalan terus walau ada teman, hitung dari floor yang sama
+        -- ============================================================
+        if lastFloorGlobal == nil then
+            lastFloorGlobal  = currentFloor
+            globalFloorTimer = 0
 
-        if currentFloor == lastFloor then
-            -- Floor sama → nambah timer
-            stuckTimer = stuckTimer + Config.CheckInterval
+        elseif currentFloor == lastFloorGlobal then
+            globalFloorTimer = globalFloorTimer + Config.CheckInterval
 
-            local remaining = Config.StuckTimeLimit - stuckTimer
-            if remaining % 10 == 0 and remaining > 0 then
+            -- Log tiap 1 menit
+            if globalFloorTimer % 60 == 0 then
                 warn(string.format(
-                    "[STUCK DETECTOR] Sendirian di Floor %d | Stuck selama %.0f detik | %.0f detik lagi sebelum rejoin...",
-                    currentFloor, stuckTimer, remaining
+                    "[TRIGGER 2 - GLOBAL] Floor %d | Sudah %.0f menit (%.0f menit lagi sebelum timeout)",
+                    currentFloor,
+                    globalFloorTimer / 60,
+                    (Config.GlobalTimeoutLimit - globalFloorTimer) / 60
                 ))
             end
 
-            if stuckTimer >= Config.StuckTimeLimit then
-                teleportToLobby(
-                    string.format("Sendirian & stuck di Floor %d selama %d detik", currentFloor, stuckTimer)
-                )
-                stuckTimer = 0
-                lastFloor  = nil
+            if globalFloorTimer >= Config.GlobalTimeoutLimit then
+                teleportToLobby(string.format(
+                    "[TRIGGER 2] Stuck di Floor %d selama %.0f menit (ada %d player)",
+                    currentFloor,
+                    globalFloorTimer / 60,
+                    totalPlayers
+                ))
+                globalFloorTimer = 0
+                lastFloorGlobal  = nil
             end
+
         else
-            -- Floor berubah → progress normal, reset
-            print(string.format("[SYSTEM] Floor berubah %d → %d. Timer direset.", lastFloor, currentFloor))
-            lastFloor  = currentFloor
-            stuckTimer = 0
+            -- Floor berubah, reset global timer
+            print(string.format("[TRIGGER 2] Floor berubah %d → %d. Global timer reset.", lastFloorGlobal, currentFloor))
+            lastFloorGlobal  = currentFloor
+            globalFloorTimer = 0
         end
+
     end
 end)
 
 -- ===================== ANTISIPASI PLAYER KELUAR =====================
--- Kalau ada orang keluar dan jadi sendirian, langsung mulai hitung
 Players.PlayerRemoving:Connect(function(leavingPlayer)
     if leavingPlayer == player then return end
-
-    task.wait(1) -- Beri jeda sesaat biar count update
+    task.wait(1)
 
     local remaining = getPlayerCount()
     if remaining <= Config.MinPlayerToCheck then
-        warn("[SYSTEM] Player keluar! Sekarang sendirian. Stuck timer mulai berjalan dari sekarang.")
-        -- Reset timer biar mulai fresh saat sendirian
-        stuckTimer = 0
-        lastFloor  = getCurrentFloor()
+        warn("[SYSTEM] Player keluar! Sendirian sekarang. Solo timer mulai fresh.")
+        soloStuckTimer = 0
+        lastFloorSolo  = getCurrentFloor()
     end
 end)
