@@ -1,1 +1,219 @@
-print("Memulai sistem...")
+print("Memulai Sistem Pantau Kick...")
+-- ==============================================================================
+-- SOLO STUCK DETECTOR — AUTO REJOIN / KICK
+-- Jika sendirian & floor tidak berubah dalam X detik → Lobby / Kick
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    warn("[SYSTEM] Script dibatalkan: Bukan INGAME.")
+    return
+end
+
+local Players          = game:GetService("Players")
+local Workspace        = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+
+-- ===================== KONFIGURASI =====================
+local Config = {
+    StuckTimeLimit   = 600,    -- Berapa detik diam di floor yang sama sebelum dianggap stuck (detik)
+    CheckInterval    = 2,     -- Seberapa sering ngecek (detik)
+    MinPlayerToCheck = 1,     -- Cek hanya jika total player <= angka ini (sendirian)
+}
+-- =======================================================
+
+local isTeleporting  = false
+local lastFloor      = nil
+local stuckTimer     = 0
+
+-- ===================== HELPERS =====================
+
+local function getPlayerCount()
+    return #Players:GetPlayers()
+end
+
+local function getCurrentFloor()
+    local floor = nil
+
+    -- Coba baca dari PlayerGui label Floor
+    pcall(function()
+        local pGui = player:WaitForChild("PlayerGui", 3)
+        if not pGui then return end
+
+        -- Cari semua TextLabel yang mengandung kata "floor" (case-insensitive)
+        for _, ui in ipairs(pGui:GetDescendants()) do
+            if ui:IsA("TextLabel") then
+                local text = string.upper(ui.Text)
+                local match = string.match(text, "FLOOR%s*(%d+)")
+                if match then
+                    floor = tonumber(match)
+                    return
+                end
+            end
+        end
+    end)
+
+    -- Fallback: coba dari Workspace CurrentRoom / map name
+    if not floor then
+        pcall(function()
+            local currentRoom = Workspace:FindFirstChild("CurrentRoom")
+            if currentRoom then
+                -- Cari anak model pertama, ambil angka dari namanya
+                for _, child in ipairs(currentRoom:GetChildren()) do
+                    if child:IsA("Model") then
+                        local match = string.match(child.Name, "(%d+)")
+                        if match then
+                            floor = tonumber(match)
+                            return
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    return floor
+end
+
+local function kickLocalPlayer(reason)
+    warn("[SYSTEM] Kick dipicu! Alasan: " .. reason)
+
+    -- Coba berbagai cara kick via script
+    pcall(function()
+        -- Cara 1: loadstring exploit method (executor level)
+        if syn and syn.kick then
+            syn.kick()
+            return
+        end
+    end)
+
+    pcall(function()
+        -- Cara 2: via Players service
+        Players.LocalPlayer:Kick("[Auto-Kick] " .. reason)
+    end)
+
+    pcall(function()
+        -- Cara 3: via teleport ke place kosong / invalid
+        game:GetService("TeleportService"):Teleport(1, player)
+    end)
+
+    -- Cara 4: hard crash karakter sebagai last resort
+    pcall(function()
+        if player.Character then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.Health = 0
+            end
+        end
+    end)
+end
+
+local function teleportToLobby(reason)
+    if isTeleporting then return end
+    isTeleporting = true
+
+    warn("[SYSTEM] Teleport ke Lobby! Alasan: " .. reason)
+
+    local success = false
+
+    -- Cara 1: Fire remote event teleport (dari referensi script kedua)
+    pcall(function()
+        ReplicatedStorage.Events.Teleport:FireServer()
+        success = true
+    end)
+
+    -- Tunggu sebentar dan cek apakah berhasil pindah place
+    task.wait(8)
+
+    -- Kalau masih di place yang sama → dianggap gagal → kick
+    if game.PlaceId == INGAME_PLACE_ID then
+        warn("[SYSTEM] Teleport gagal. Memicu Auto-Kick sebagai fallback...")
+        kickLocalPlayer("Teleport ke lobby gagal setelah stuck: " .. reason)
+    end
+
+    task.wait(5)
+    isTeleporting = false
+end
+
+-- ===================== MAIN LOOP =====================
+
+print("[SYSTEM] Solo Stuck Detector aktif. Batas stuck: " .. Config.StuckTimeLimit .. " detik.")
+
+task.spawn(function()
+    while true do
+        task.wait(Config.CheckInterval)
+
+        if isTeleporting then continue end
+        if not player.Character then continue end
+
+        local totalPlayers = getPlayerCount()
+
+        -- Hanya aktif jika sendirian
+        if totalPlayers > Config.MinPlayerToCheck then
+            -- Reset timer kalau ada teman masuk
+            stuckTimer = 0
+            lastFloor  = nil
+            continue
+        end
+
+        local currentFloor = getCurrentFloor()
+
+        if currentFloor == nil then
+            -- Floor tidak terdeteksi (mungkin loading / transisi), skip dulu
+            continue
+        end
+
+        if lastFloor == nil then
+            -- Pertama kali detect, set baseline
+            lastFloor  = currentFloor
+            stuckTimer = 0
+            print("[SYSTEM] Floor baseline set: " .. tostring(lastFloor))
+            continue
+        end
+
+        if currentFloor == lastFloor then
+            -- Floor sama → nambah timer
+            stuckTimer = stuckTimer + Config.CheckInterval
+
+            local remaining = Config.StuckTimeLimit - stuckTimer
+            if remaining % 10 == 0 and remaining > 0 then
+                warn(string.format(
+                    "[STUCK DETECTOR] Sendirian di Floor %d | Stuck selama %.0f detik | %.0f detik lagi sebelum rejoin...",
+                    currentFloor, stuckTimer, remaining
+                ))
+            end
+
+            if stuckTimer >= Config.StuckTimeLimit then
+                teleportToLobby(
+                    string.format("Sendirian & stuck di Floor %d selama %d detik", currentFloor, stuckTimer)
+                )
+                stuckTimer = 0
+                lastFloor  = nil
+            end
+        else
+            -- Floor berubah → progress normal, reset
+            print(string.format("[SYSTEM] Floor berubah %d → %d. Timer direset.", lastFloor, currentFloor))
+            lastFloor  = currentFloor
+            stuckTimer = 0
+        end
+    end
+end)
+
+-- ===================== ANTISIPASI PLAYER KELUAR =====================
+-- Kalau ada orang keluar dan jadi sendirian, langsung mulai hitung
+Players.PlayerRemoving:Connect(function(leavingPlayer)
+    if leavingPlayer == player then return end
+
+    task.wait(1) -- Beri jeda sesaat biar count update
+
+    local remaining = getPlayerCount()
+    if remaining <= Config.MinPlayerToCheck then
+        warn("[SYSTEM] Player keluar! Sekarang sendirian. Stuck timer mulai berjalan dari sekarang.")
+        -- Reset timer biar mulai fresh saat sendirian
+        stuckTimer = 0
+        lastFloor  = getCurrentFloor()
+    end
+end)
