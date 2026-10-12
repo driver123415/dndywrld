@@ -8,9 +8,14 @@ local CONFIG = {
     DELAY       = 0.5,
     START_DELAY = 5,
 
-    -- ── [0] Claim Reward (sebelum beli apapun) ───────────
+    -- ── [0] Claim Reward (FireServer — RemoteEvent) ───────
+    -- auto loop dari day_start sampai day_end
     CLAIM_REWARDS = {
-        { action = "ClaimHolidaySkinReward", calendar = "PreEventCalendar", enabled = true },
+        enabled   = true,
+        action    = "ClaimEventReward",
+        calendar  = "PreEventCalendar",
+        day_start = 1,   -- hari pertama
+        day_end   = 20,  -- hari terakhir, ubah sesuai event
     },
 
     -- ── [1] Holiday Towers (BuyHolidayTower) ─────────────
@@ -115,9 +120,23 @@ end
 local totalSuccess = 0
 local totalFail    = 0
 
-local function buy(remote, args, label)
+local function invoke(remote, args, label)
     local ok, err = pcall(function()
         remote:InvokeServer(table.unpack(args))
+    end)
+    if ok then
+        totalSuccess += 1
+        print(string.format("[✓] %s", label))
+    else
+        totalFail += 1
+        warn(string.format("[✗] GAGAL: %s | %s", label, tostring(err)))
+    end
+    task.wait(CONFIG.DELAY)
+end
+
+local function fire(remote, args, label)
+    local ok, err = pcall(function()
+        remote:FireServer(table.unpack(args))
     end)
     if ok then
         totalSuccess += 1
@@ -142,23 +161,24 @@ print(string.format(" Mulai dalam %d detik...", CONFIG.START_DELAY))
 print(string.rep("=", 50))
 task.wait(CONFIG.START_DELAY)
 
--- [0] Claim Rewards
-printSection("CLAIM REWARDS")
-local claimRemote = getRemote("SharedUtils", "Network", "RemoteFunction")
-for _, r in ipairs(CONFIG.CLAIM_REWARDS) do
-    if r.enabled then
-        buy(claimRemote, {r.action, r.calendar},
-            string.format("Claim: %s | %s", r.action, r.calendar))
-    else
-        print("[~] Skip claim: " .. r.action)
+-- [0] Claim Rewards — loop day_start sampai day_end
+printSection("CLAIM EVENT REWARDS")
+local cr = CONFIG.CLAIM_REWARDS
+if cr.enabled then
+    local claimRemote = getRemote("SharedUtils", "Network", "RemoteEvent")
+    for day = cr.day_start, cr.day_end do
+        fire(claimRemote, {cr.action, cr.calendar, day},
+            string.format("Claim: %s | %s | Day %d", cr.action, cr.calendar, day))
     end
+else
+    print("[~] Claim rewards diskip.")
 end
 
 -- [1] Holiday Towers
 printSection("HOLIDAY TOWERS")
 local holidayTowerRemote = getRemote("BuyHolidayTower")
 for _, name in ipairs(CONFIG.HOLIDAY_TOWERS) do
-    buy(holidayTowerRemote, {name}, "HolidayTower: " .. name)
+    invoke(holidayTowerRemote, {name}, "HolidayTower: " .. name)
 end
 
 -- [2] Normal Towers
@@ -166,7 +186,7 @@ if #CONFIG.TOWERS > 0 then
     printSection("NORMAL TOWERS")
     local towerRemote = getRemote("BuyTower")
     for _, name in ipairs(CONFIG.TOWERS) do
-        buy(towerRemote, {name}, "Tower: " .. name)
+        invoke(towerRemote, {name}, "Tower: " .. name)
     end
 end
 
@@ -175,7 +195,7 @@ printSection("SKINS")
 local skinRemote = getRemote("BuyHolidaySkin")
 for _, s in ipairs(CONFIG.SKINS) do
     if s.enabled then
-        buy(skinRemote, {s.name}, "Skin: " .. s.name)
+        invoke(skinRemote, {s.name}, "Skin: " .. s.name)
     else
         print("[~] Skip: " .. s.name)
     end
@@ -185,7 +205,7 @@ end
 printSection("HOLIDAY STICKERS")
 local stickerRemote = getRemote("BuyHolidaySticker")
 for _, name in ipairs(CONFIG.HOLIDAY_STICKERS) do
-    buy(stickerRemote, {name}, "Sticker: " .. name)
+    invoke(stickerRemote, {name}, "Sticker: " .. name)
 end
 
 -- [5] Backgrounds
@@ -193,7 +213,7 @@ printSection("HOLIDAY BACKGROUNDS")
 local bgRemote = getRemote("SharedUtils", "Network", "RemoteFunction")
 for _, bg in ipairs(CONFIG.HOLIDAY_BACKGROUNDS) do
     if bg.enabled then
-        buy(bgRemote, {"BuyHolidayBackground", bg.name}, "Background: " .. bg.name)
+        invoke(bgRemote, {"BuyHolidayBackground", bg.name}, "Background: " .. bg.name)
     else
         print("[~] Skip: " .. bg.name)
     end
