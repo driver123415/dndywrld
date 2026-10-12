@@ -25,15 +25,18 @@ local CONFIG = {
     -- enabled = false kalau mau skip
     SKINS = {
         -- [ MAHAL - 1200 ichor + 1200 pumpkin ]
-        { name = "WickedStitch",        enabled = true },
+        { name = "WickedStitch",        enabled = true },--2026
         { name = "DessertfulScientist", enabled = true },
         { name = "LostPrince",          enabled = true },
         { name = "BerryBeast",          enabled = true },
 
         -- [ MURAH - 600 pumpkin ]
-        { name = "FuzzyBeast",          enabled = true },
-        { name = "ToxicExperiment",     enabled = true },
-        { name = "Halloween_Astro",     enabled = true },
+        { name = "MysteriousSpy",       enabled = true },--2026 new
+        { name = "SteepedShadow",       enabled = true },--2026 new
+        { name = "MossyStone",          enabled = true },--2026 new
+        { name = "FuzzyBeast",          enabled = true },--2026
+        { name = "ToxicExperiment",     enabled = true },--2026
+        { name = "Halloween_Astro",     enabled = true },--Scarlet Night
         { name = "SanguineSilence",     enabled = true },
         { name = "CreepyChord",         enabled = true },
         { name = "ScaryStylish",        enabled = true },
