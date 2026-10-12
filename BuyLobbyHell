@@ -5,15 +5,20 @@
 
 local CONFIG = {
 
-    DELAY       = 0.5,  -- jeda antar pembelian (detik)
-    START_DELAY = 5,    -- tunggu sebelum mulai
+    DELAY       = 0.5,
+    START_DELAY = 5,
+
+    -- ── [0] Claim Reward (sebelum beli apapun) ───────────
+    CLAIM_REWARDS = {
+        { action = "ClaimHolidaySkinReward", calendar = "PreEventCalendar", enabled = true },
+    },
 
     -- ── [1] Holiday Towers (BuyHolidayTower) ─────────────
     HOLIDAY_TOWERS = {
-        "Ribecca",    -- 300 pumpkin
-        "Soulvester", -- 700 pumpkin
-        "Eclipse",    -- 1500 pumpkin
-        "Gourdy",     -- 3000 pumpkin + 2500 ichor
+        "Ribecca",
+        "Soulvester",
+        "Eclipse",
+        "Gourdy",
     },
 
     -- ── [2] Normal Towers (BuyTower) ─────────────────────
@@ -22,7 +27,6 @@ local CONFIG = {
     },
 
     -- ── [3] Skins (BuyHolidaySkin) ───────────────────────
-    -- enabled = false kalau mau skip
     SKINS = {
         -- [ MAHAL - 1200 ichor + 1200 pumpkin ]
         { name = "WickedStitch",        enabled = true },--2026
@@ -137,6 +141,18 @@ print(" AXIOM AUTO BUY — HALLOWEEN EVENT")
 print(string.format(" Mulai dalam %d detik...", CONFIG.START_DELAY))
 print(string.rep("=", 50))
 task.wait(CONFIG.START_DELAY)
+
+-- [0] Claim Rewards
+printSection("CLAIM REWARDS")
+local claimRemote = getRemote("SharedUtils", "Network", "RemoteFunction")
+for _, r in ipairs(CONFIG.CLAIM_REWARDS) do
+    if r.enabled then
+        buy(claimRemote, {r.action, r.calendar},
+            string.format("Claim: %s | %s", r.action, r.calendar))
+    else
+        print("[~] Skip claim: " .. r.action)
+    end
+end
 
 -- [1] Holiday Towers
 printSection("HOLIDAY TOWERS")
