@@ -36,9 +36,25 @@ local Config = {
         "ID_35_MasterOfMany", "ID_54_Nurturer",
     },
 
-    TrinketsToUse = {
-        ["VeeRemote"]  = "rbxassetid://17653810346",
-        ["StressBall"] = "rbxassetid://86691053721590",
+    TrinketRetryBeforeFallback = 3,
+
+    TrinketSlots = {
+        -- Slot 1: urutan prioritas
+        {
+            { name = "VeeRemote",          image = "rbxassetid://17653810346"   },
+            { name = "Wrench",             image = "rbxassetid://17660170044"   },
+            { name = "PinkBow",            image = "rbxassetid://17651848463"   },
+            { name = "BlueBandana",        image = "rbxassetid://17653809331"   },
+            { name = "FriendshipBracelet", image = "rbxassetid://17653809548"   },
+        },
+        -- Slot 2: urutan prioritas
+        {
+            { name = "StressBall",         image = "rbxassetid://86691053721590" },
+            { name = "Wrench",             image = "rbxassetid://17660170044"    },
+            { name = "PinkBow",            image = "rbxassetid://17651848463"    },
+            { name = "BlueBandana",        image = "rbxassetid://17653809331"    },
+            { name = "FriendshipBracelet", image = "rbxassetid://17653809548"    },
+        },
     },
 
     ToonsToBuy                 = { "Rodger", "Toodles", "Tisha", "Brightney", "Cosmo", "Scraps", "Poppy", "Looey", "Yatta", "Goob" },
@@ -163,54 +179,85 @@ end
 -- ==========================================
 -- =   CEK TRINKET VIA IMAGE ID            =
 -- ==========================================
-local function correctTrinketsEquipped()
-    local equippedTrinkets = {}
-    for i = 1, 2 do
-        local slot      = MainGui:FindFirstChild("Slot" .. i)
-        local itemImage = slot and slot:FindFirstChild("ItemImage")
-        if itemImage and itemImage.Visible then
-            for trinketName, assetId in pairs(Config.TrinketsToUse) do
-                if itemImage.Image == assetId then
-                    table.insert(equippedTrinkets, trinketName)
-                end
-            end
-        end
+-- ==========================================
+-- =   CEK & EQUIP TRINKET VIA PRIORITY    =
+-- ==========================================
+local function getSlotImage(slotIndex)
+    local slot      = MainGui:FindFirstChild("Slot" .. slotIndex)
+    local itemImage = slot and slot:FindFirstChild("ItemImage")
+    if itemImage and itemImage.Visible then
+        return itemImage.Image
     end
-
-    print("🔎 Trinket terpasang: " .. (next(equippedTrinkets) and table.concat(equippedTrinkets, ", ") or "kosong"))
-
-    for trinketName, _ in pairs(Config.TrinketsToUse) do
-        local found = false
-        for _, have in ipairs(equippedTrinkets) do
-            if have == trinketName then found = true break end
-        end
-        if not found then return false end
-    end
-    return true
+    return nil
 end
 
--- ==========================================
--- =  FUNGSI SMART EQUIP TRINKET (BLOCKING) =
--- ==========================================
-local function SmartEquipTrinkets()
-    local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
-    local maxRetries   = 25
-    local attempts     = 0
-    repeat
-        attempts += 1
-        if correctTrinketsEquipped() then
-            print("✅ Trinket berhasil terpasang!")
+local function correctTrinketsEquipped()
+    -- Cek apakah trinket UTAMA (index 1 tiap slot) sudah terpasang
+    local allCorrect = true
+    for slotIndex, priorities in ipairs(Config.TrinketSlots) do
+        local currentImage = getSlotImage(slotIndex)
+        if currentImage ~= priorities[1].image then
+            allCorrect = false
             break
         end
-        print("[Percobaan " .. attempts .. "] Trinket belum terpasang. Retry...")
+    end
+    return allCorrect
+end
+
+local function SmartEquipTrinkets()
+    local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
+    local maxRetry     = Config.TrinketRetryBeforeFallback or 3
+
+    -- Tentukan trinket terbaik yang bisa dipakai per slot
+    local function getBestAvailableTrinket(slotIndex)
+        -- Coba equip tiap prioritas, cek apakah berhasil masuk slot
+        for _, trinket in ipairs(Config.TrinketSlots[slotIndex]) do
+            -- Coba equip trinket ini
+            pcall(function() EquipTrinket:InvokeServer(trinket.name, "Equip") end)
+            task.wait(1)
+            local currentImage = getSlotImage(slotIndex)
+            if currentImage == trinket.image then
+                print(string.format("✅ Slot %d: %s terpasang!", slotIndex, trinket.name))
+                return trinket
+            else
+                print(string.format("⚠️ Slot %d: %s gagal/tidak dimiliki, coba berikutnya...", slotIndex, trinket.name))
+            end
+        end
+        return nil
+    end
+
+    local attempts = 0
+    repeat
+        attempts += 1
+        print(string.format("🔧 [Percobaan %d] Memulai equip trinket...", attempts))
+
+        -- UnEquip semua dulu
         pcall(function() EquipTrinket:InvokeServer("None", "UnEquipAll") end)
         task.wait(1.5)
-        for trinketName, _ in pairs(Config.TrinketsToUse) do
-            pcall(function() EquipTrinket:InvokeServer(trinketName, "Equip") end)
-            task.wait(1.5)
+
+        -- Equip slot 1 dan slot 2 berdasarkan prioritas
+        local slot1Done = getBestAvailableTrinket(1)
+        local slot2Done = getBestAvailableTrinket(2)
+
+        if slot1Done and slot2Done then
+            print(string.format("✅ Trinket terpasang: Slot1=%s | Slot2=%s", slot1Done.name, slot2Done.name))
+
+            -- Log apakah ini trinket utama atau cadangan
+            if slot1Done.name == Config.TrinketSlots[1][1].name and
+               slot2Done.name == Config.TrinketSlots[2][1].name then
+                print("🎯 Trinket UTAMA terpasang sempurna!")
+            else
+                print("🔄 Trinket CADANGAN aktif — akan dicoba ulang ke utama session berikutnya.")
+            end
+            return
         end
-    until attempts >= maxRetries
-    if attempts >= maxRetries then warn("Gagal pasang trinket setelah " .. maxRetries .. "x.") end
+
+        warn(string.format("❌ [Percobaan %d] Salah satu slot gagal. Retry...", attempts))
+        task.wait(1)
+
+    until attempts >= maxRetry
+
+    warn("❌ Gagal pasang trinket setelah " .. maxRetry .. " percobaan.")
 end
 
 -- ==========================================
@@ -571,12 +618,40 @@ if targetMet then
             print("Mode End-Game aktif!")
             skipRegularEquip = true
 
-            local targetFarmToon = Config.ToonForLastFarm[1]
-            if currentToon ~= targetFarmToon then
-                local toonData = TowerDataFolder:FindFirstChild(targetFarmToon)
-                if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
-                task.wait(1.5)
+            -- Cek dulu apakah semua ToonsToUse sudah bintang
+            -- Kalau belum → equip yang belum bintang dulu, jangan langsung Rodger
+            local allToonsMaxed = true
+            local unfinishedToon = nil
+            for _, toonName in ipairs(Config.ToonsToUse) do
+                local toonUI = charScrollFrame:FindFirstChild(toonName)
+                if toonUI and toonUI.Visible then
+                    local mStar = toonUI:FindFirstChild("MasteryStar")
+                    if mStar and not mStar.Visible then
+                        allToonsMaxed = false
+                        unfinishedToon = toonName
+                        break
+                    end
+                end
             end
+
+            if not allToonsMaxed and unfinishedToon then
+                print("⚠️ " .. unfinishedToon .. " belum max mastery. Equip dulu sebelum farming Rodger.")
+                if currentToon ~= unfinishedToon then
+                    local toonData = TowerDataFolder:FindFirstChild(unfinishedToon)
+                    if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
+                    task.wait(1.5)
+                else
+                    print("Toon " .. unfinishedToon .. " sudah aktif.")
+                end
+            else
+                -- Semua ToonsToUse sudah bintang → baru farming Rodger
+                local targetFarmToon = Config.ToonForLastFarm[1]
+                if currentToon ~= targetFarmToon then
+                    local toonData = TowerDataFolder:FindFirstChild(targetFarmToon)
+                    if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
+                    task.wait(1.5)
+                end
+            end -- end else allToonsMaxed
 
             for _, lastToon in ipairs(Config.LastToonsToBuy) do
                 local lastToonUI = charScrollFrame:FindFirstChild(lastToon)
