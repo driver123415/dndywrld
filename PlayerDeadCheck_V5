@@ -1,0 +1,194 @@
+-- ==================== Configuration ====================
+local AUTO_MATCHMAKE = true         -- True: Prioritaskan Matchmaking in-game, False: Langsung ke Lobby
+local MATCHMAKE_TIMEOUT = 30        -- Detik maksimal antrean matchmaking (diperpanjang karena script sekarang lebih pintar)
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game
+local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
+local MAX_RETRY_BEFORE_KICK = 3     -- Berapa kali siklus teleport boleh gagal sebelum di-kick
+local RETRY_COOLDOWN = 6            -- Waktu tunggu (detik) untuk mengecek apakah teleport/matchmake berhasil
+-- =======================================================
+
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+if game.PlaceId == INGAME_PLACE_ID then
+    print("[ULTIMATE] In-game detected. Memantau UI kematian secara pasif...")
+
+    local Players = game:GetService("Players")
+    local TeleportService = game:GetService("TeleportService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    
+    local player = Players.LocalPlayer
+    local playerGui = player:WaitForChild("PlayerGui")
+    local isProcessingDeath = false
+
+    -- Fungsi bantuan untuk klik tombol GUI (Bypass Executor)
+    local function clickButton(button)
+        if not button then return false end
+        pcall(function()
+            if firesignal then
+                firesignal(button.MouseButton1Click)
+                firesignal(button.Activated)
+            elseif getconnections then
+                for _, connection in pairs(getconnections(button.MouseButton1Click)) do
+                    connection:Fire()
+                end
+            end
+        end)
+        return true
+    end
+
+    -- Fungsi Eksekusi Teleportasi Hibrida (Lobby Fallback)
+    local function executeLobbyTeleport()
+        print("[INFO] Memulai proses kabur ke Lobby...")
+        local attempt = 0
+        
+        while attempt < MAX_RETRY_BEFORE_KICK do
+            attempt = attempt + 1
+            print("[LOBBY] Siklus Teleportasi ke-" .. attempt .. " dari " .. MAX_RETRY_BEFORE_KICK)
+            
+            -- Tahap 1: Server-Side Remote
+            print("[1/2] Menembak RemoteEvent Teleport (Server-Side)...")
+            local success1, err1 = pcall(function()
+                if ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("Teleport") then
+                    ReplicatedStorage.Events.Teleport:FireServer()
+                else
+                    error("RemoteEvent Teleport tidak ditemukan")
+                end
+            end)
+            
+            if not success1 then warn("[WARN] RemoteEvent Error: " .. tostring(err1)) end
+            task.wait(RETRY_COOLDOWN)
+            if game.PlaceId ~= INGAME_PLACE_ID then return end
+            
+            -- Tahap 2: Client-Side Teleport
+            print("[2/2] Player masih di In-Game. Mencoba TeleportService (Client-Side)...")
+            local success2, err2 = pcall(function()
+                TeleportService:Teleport(LOBBY_PLACE_ID, player)
+            end)
+            
+            if not success2 then warn("[WARN] TeleportService Error: " .. tostring(err2)) end
+            task.wait(RETRY_COOLDOWN)
+            if game.PlaceId ~= INGAME_PLACE_ID then return end
+        end
+        
+        -- Failsafe Final: Kick
+        if game.PlaceId == INGAME_PLACE_ID then
+            warn("[FATAL] Gagal berteleportasi setelah " .. MAX_RETRY_BEFORE_KICK .. " siklus maksimal.")
+            player:Kick("Auto-Failsafe: Gagal join Matchmaking dan Lobby. Koneksi diputus untuk keamanan.")
+        end
+    end
+
+-- Fungsi Utama: Menangani Logika Setelah Kematian Terdeteksi
+    local function processDeathRoutine()
+        if isProcessingDeath then return end
+        isProcessingDeath = true
+        
+        task.spawn(function()
+            print("[SYSTEM] Layar kematian tervalidasi. Memulai urutan spektator...")
+            
+            -- Langkah 1: Klik tombol Spectate (Biasanya server minta kita masuk mode spectate dulu sebelum bisa matchmaking)
+            local deathGui = playerGui:WaitForChild("DeathGui", 5)
+            if deathGui then
+                local spectateBtn = deathGui:WaitForChild("SpectateButton", 5)
+                if spectateBtn then
+                    print("[ACTION] Menekan SpectateButton...")
+                    clickButton(spectateBtn)
+                    task.wait(1.5)
+                end
+            end
+
+            -- Langkah 2: Eksekusi Matchmaking via Remote Event (Lebih Cepat & Bypass UI Click)
+            if AUTO_MATCHMAKE then
+                print("[ACTION] AUTO_MATCHMAKE Aktif! Menembak Remote Matchmaking...")
+                
+                -- Mengeksekusi remote yang kamu temukan!
+                local successMM, errMM = pcall(function()
+                    game.ReplicatedStorage.SharedUtils.Network.RemoteEvent:FireServer("SpectateMatchmakeGroupToggle")
+                end)
+
+                if not successMM then
+                    warn("[WARN] Gagal menembak Remote Matchmaking: " .. tostring(errMM))
+                else
+                    print("[INFO] Remote Matchmaking berhasil ditembak! Memantau status antrean...")
+                end
+                
+                -- Langkah 3: Tetap Pantau UI untuk memastikan kita benar-benar masuk antrean
+                local spectatorGui = playerGui:WaitForChild("SpectatorGui", 10)
+                local bottomFrame = spectatorGui and spectatorGui:WaitForChild("BottomFrame", 5)
+                local matchmakeBtn = bottomFrame and bottomFrame:FindFirstChild("MatchmakeGroup")
+                
+                if matchmakeBtn then
+                    local textLabel = matchmakeBtn:WaitForChild("TextLabel", 2)
+                    local bottomText = matchmakeBtn:WaitForChild("BottomText", 2)
+                    
+                    local waited = 0
+                    local inQueue = false
+                    
+                    while waited < MATCHMAKE_TIMEOUT do
+                        -- Jika tiba-tiba Place ID berubah, berarti Teleport berhasil (entah ke Match atau nyasar ke Lobby)
+                        if game.PlaceId ~= INGAME_PLACE_ID then
+                            print("[SUCCESS] Perpindahan server terdeteksi!")
+                            return 
+                        end
+                        
+                        -- Cek status antrean lewat Teks UI
+                        if textLabel then
+                            if textLabel.Text == "Matchmaking..." then
+                                inQueue = true
+                                if bottomText and waited % 5 == 0 then
+                                    print("[MATCHMAKING] Status Antrean: " .. tostring(bottomText.Text))
+                                end
+                            elseif textLabel.Text == "Join Matchmaking" and inQueue and waited > 3 then
+                                -- Antrean terputus dari server gamenya!
+                                warn("[FAILED] Server game memutus antrean! Beralih ke Failsafe Lobby...")
+                                break
+                            end
+                        end
+                        
+                        task.wait(1)
+                        waited = waited + 1
+                    end
+                end
+            else
+                print("[INFO] AUTO_MATCHMAKE = false. Melompati proses Matchmaking...")
+            end
+
+            -- Langkah 4: Failsafe (Kalau remote gagal, antrean putus, atau timeout)
+            executeLobbyTeleport()
+        end)
+    end
+
+    -- Fungsi Pemantauan GUI Kematian (DeathGui)
+    local function monitorDeathGui(gui)
+        if gui.Name == "DeathGui" then
+            print("[DEBUG] DeathGui terdeteksi! Memantau kemunculannya...")
+            local deathScreen = gui:WaitForChild("DeathScreen", 10)
+            local spectateBtn = gui:WaitForChild("SpectateButton", 10)
+            
+            if deathScreen and spectateBtn then
+                deathScreen:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if deathScreen.Visible == true then processDeathRoutine() end
+                end)
+                spectateBtn:GetPropertyChangedSignal("Visible"):Connect(function()
+                    if spectateBtn.Visible == true then processDeathRoutine() end
+                end)
+                
+                if deathScreen.Visible == true or spectateBtn.Visible == true then
+                    processDeathRoutine()
+                end
+            end
+        end
+    end
+
+    -- Inisialisasi Monitoring
+    for _, child in ipairs(playerGui:GetChildren()) do
+        monitorDeathGui(child)
+    end
+    playerGui.ChildAdded:Connect(function(child)
+        monitorDeathGui(child)
+    end)
+
+else
+    print("[INFO] Not in-game (Place ID mismatch). Auto-Grind Ultimate dinonaktifkan.")
+end
