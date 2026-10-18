@@ -1,0 +1,198 @@
+print("Memulai pengecekan sistem New BSGUI.....")
+
+-- Tunggu sampai game dan karakter LocalPlayer benar-benar siap
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+task.wait(0.2)
+
+-- =======================================================
+-- PENGATURAN UTAMA (SILAKAN UBAH DI SINI)
+-- =======================================================
+
+local LOBBY_PLACE_ID  = 16116270224 -- ID Map Lobby Dandy's World
+local INGAME_PLACE_ID = 16552821455 -- ID Map In-Game (Run)
+
+-- Kontrol di map mana saja GUI ingin dijalankan (bisa true dua-duanya)
+local JALANKAN_GUI_DI_LOBBY  = false -- true = Buka GUI saat di Lobby
+local JALANKAN_GUI_DI_INGAME = true  -- true = Buka GUI saat di In-Game
+
+-- Pengaturan Nama Config (Kosongkan "" jika tidak ingin auto-load di map tersebut)
+local NAMA_CONFIG_LOBBY    = ""           -- Nama config untuk Lobby: 
+local NAMA_CONFIG_INGAME   = "NewPlayerV1" -- Nama config untuk In-Game (Run) NewPlayerV1 (tidak beli masih ambil item sebagian) / OldPlayerV1 (beli dan ambil item)
+local NAMA_CONFIG_ROLEPLAY = ""           -- Nama config untuk Roleplay
+
+-- Pengaturan Tambahan di Persistent.json (true = Nyala, false = Mati)
+local SET_EXCLUDE_YOURSELF      = true  -- Exclude yourself
+local SET_IGNORE_FULL_RESEARCH  = true  -- Ignore full Research Twisteds
+local SET_KEEP_ON_SERVER_SWITCH = false -- Keep on server switch
+local SET_DEBUG_MODE            = false -- Debug mode
+local SET_UI_SCALE              = 1     -- Ukuran UI Mainframe & Button (Default: 1)
+
+-- Path Folder & URL Loader
+local FOLDER_PATH = "Boxten Sex GUI" -- Otomatis mengarah ke Workspace/Boxten Sex GUI
+local LOADER_URL  = "https://raw.githubusercontent.com/Team-Noxious/Roblox/refs/heads/main/Loader.lua"
+
+-- =======================================================
+-- INISIALISASI SERVICE & FOLDER
+-- =======================================================
+local HttpService = game:GetService("HttpService")
+
+-- Buat folder jika belum ada di dalam Workspace Executor
+if isfolder and makefolder and not isfolder(FOLDER_PATH) then
+    makefolder(FOLDER_PATH)
+end
+
+-- =======================================================
+-- SMART JSON REWRITE FUNCTION
+-- Membandingkan isi tabel JSON secara langsung (kebal urutan teks acak)
+-- =======================================================
+local function isTableEqual(t1, t2)
+    if type(t1) ~= "table" or type(t2) ~= "table" then return t1 == t2 end
+    for k, v in pairs(t1) do
+        if t2[k] ~= v then return false end
+    end
+    for k, v in pairs(t2) do
+        if t1[k] ~= v then return false end
+    end
+    return true
+end
+
+local function smartWriteJSON(filePath, targetTable)
+    if not writefile then
+        warn("[AutoConfig] Executor tidak mendukung fungsi writefile!")
+        return
+    end
+
+    local needWrite = true
+
+    -- Cek apakah file sudah ada dan bandingkan isi datanya
+    if isfile and readfile and isfile(filePath) then
+        local success, currentContent = pcall(readfile, filePath)
+        if success and currentContent then
+            local decodeOk, currentTable = pcall(function()
+                return HttpService:JSONDecode(currentContent)
+            end)
+            -- Jika isi key dan value di dalam JSON sudah sama persis, tidak perlu rewrite
+            if decodeOk and type(currentTable) == "table" then
+                if isTableEqual(currentTable, targetTable) then
+                    needWrite = false
+                end
+            end
+        end
+    end
+
+    -- Tulis file hanya jika memang ada nilai settingan yang berubah
+    if needWrite then
+        local okEncode, jsonString = pcall(function()
+            return HttpService:JSONEncode(targetTable)
+        end)
+        if okEncode then
+            local okWrite, err = pcall(writefile, filePath, jsonString)
+            if okWrite then
+                print("[AutoConfig] File diperbarui: " .. filePath)
+            else
+                warn("[AutoConfig] Gagal menulis " .. filePath .. ": " .. tostring(err))
+            end
+        end
+    else
+        print("[AutoConfig] Skip Rewrite (Data sudah sama): " .. filePath)
+    end
+end
+
+-- =======================================================
+-- 1. UPDATE FILE: Auto-loads.json
+-- =======================================================
+local autoLoadsPath = FOLDER_PATH .. "/Auto-loads.json"
+local autoLoadsTable = {
+    [tostring(LOBBY_PLACE_ID)]  = NAMA_CONFIG_LOBBY,
+    [tostring(INGAME_PLACE_ID)] = NAMA_CONFIG_INGAME
+}
+
+smartWriteJSON(autoLoadsPath, autoLoadsTable)
+
+-- =======================================================
+-- 2. UPDATE FILE: Persistent.json
+-- =======================================================
+local persistentPath = FOLDER_PATH .. "/Persistent.json"
+
+local persistentData = {
+    ["Alternate Boxten personality"] = false,
+    ["Mainframe UI scale"] = SET_UI_SCALE,
+    ["Exclude yourself"] = SET_EXCLUDE_YOURSELF,
+    ["Auto-load lobby config"] = NAMA_CONFIG_LOBBY,
+    ["Closed captions for Boxten"] = false,
+    ["Debug mode"] = SET_DEBUG_MODE,
+    ["Auto-load run config"] = NAMA_CONFIG_INGAME,
+    ["Ignore full Research Twisteds"] = SET_IGNORE_FULL_RESEARCH,
+    ["Live Poppy reaction"] = false,
+    ["Closed captions for Shrimpo"] = false,
+    ["Closed captions for Poppy"] = false,
+    ["Keep on server switch"] = SET_KEEP_ON_SERVER_SWITCH,
+    ["Auto-load roleplay config"] = NAMA_CONFIG_ROLEPLAY,
+    ["Live Shrimpo reaction"] = false,
+    ["Button UI scale"] = SET_UI_SCALE,
+    ["Clear search bar on category switch"] = false
+}
+
+-- Baca file lama terlebih dahulu agar settingan lain tidak ter-reset
+if isfile and readfile and isfile(persistentPath) then
+    local success, content = pcall(readfile, persistentPath)
+    if success and content then
+        local decodeOk, decodedTable = pcall(function()
+            return HttpService:JSONDecode(content)
+        end)
+        if decodeOk and type(decodedTable) == "table" then
+            -- Salin data lama ke tabel baru agar aman
+            for k, v in pairs(decodedTable) do
+                persistentData[k] = v
+            end
+        end
+    end
+end
+
+-- Timpa nilai spesifik sesuai konfigurasi di atas
+persistentData["Auto-load lobby config"]        = NAMA_CONFIG_LOBBY
+persistentData["Auto-load run config"]          = NAMA_CONFIG_INGAME
+persistentData["Auto-load roleplay config"]     = NAMA_CONFIG_ROLEPLAY
+persistentData["Exclude yourself"]              = SET_EXCLUDE_YOURSELF
+persistentData["Ignore full Research Twisteds"] = SET_IGNORE_FULL_RESEARCH
+persistentData["Keep on server switch"]         = SET_KEEP_ON_SERVER_SWITCH
+persistentData["Debug mode"]                    = SET_DEBUG_MODE
+persistentData["Mainframe UI scale"]            = SET_UI_SCALE
+persistentData["Button UI scale"]               = SET_UI_SCALE
+
+smartWriteJSON(persistentPath, persistentData)
+
+-- =======================================================
+-- 3. DETEKSI TEMPAT & EKSEKUSI LOADER BSGUI
+-- Mengecek PlaceId saat ini dan menjalankan GUI sesuai pengaturan
+-- =======================================================
+local function jalankanBSGUI()
+    local success, err = pcall(function()
+        loadstring(game:HttpGet(LOADER_URL))({load = "BSGUI", fix = true})
+    end)
+    if not success then
+        warn("[AutoLoad] Gagal memuat BSGUI: " .. tostring(err))
+    end
+end
+
+local currentPlaceId = game.PlaceId
+
+if currentPlaceId == LOBBY_PLACE_ID then
+    if JALANKAN_GUI_DI_LOBBY then
+        print("[AutoLoad] Terdeteksi di Lobby. Menjalankan BSGUI...")
+        jalankanBSGUI()
+    else
+        print("[AutoLoad] Lobby (Mode OFF). Skip eksekusi GUI.")
+    end
+
+elseif currentPlaceId == INGAME_PLACE_ID then
+    if JALANKAN_GUI_DI_INGAME then
+        print("[AutoLoad] Terdeteksi di In-Game (Run). Menjalankan BSGUI...")
+        jalankanBSGUI()
+    else
+        print("[AutoLoad] In-Game (Mode OFF). Skip eksekusi GUI.")
+    end
+
+else
+    warn("[AutoLoad] PlaceId (" .. tostring(currentPlaceId) .. ") tidak dikenali sebagai Lobby/In-Game Dandy's World!")
+end
