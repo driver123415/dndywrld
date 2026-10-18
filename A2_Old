@@ -1,0 +1,112 @@
+print("Memulai pengecekan sistem OLD.....")
+repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
+task.wait(1) -- Jeda singkat agar game siap sepenuhnya
+
+-- =======================================================
+-- PENGATURAN UTAMA (SILAKAN UBAH DI SINI)
+-- =======================================================
+
+-- 1. Pengaturan Place ID (Dandy's World)
+local LOBBY_PLACE_ID  = 16116270224 -- ID Map Lobby
+local INGAME_PLACE_ID = 16552821455 -- ID Map In-Game (Run)
+
+-- 2. Pengaturan Tempat Eksekusi Script (Menyalakan GUI)
+local JALANKAN_GUI_DI_LOBBY  = false -- true = Buka GUI saat di Lobby | false = Jangan buka GUI di Lobby
+local JALANKAN_GUI_DI_INGAME = true -- true = Buka GUI saat di In-Game | false = Jangan buka GUI di In-Game
+
+-- 3. Pengaturan AutoStartConfig.json (Otomatis Load Config dari folder Saved Configs)
+local PAKAI_CONFIG_LOBBY  = false         -- Ubah ke true JIKA kamu punya file config khusus Lobby
+local NAMA_CONFIG_LOBBY   = ""            -- Nama config saat di Lobby (kosongkan "" jika tidak pakai)
+
+local PAKAI_CONFIG_INGAME = true          -- true = Otomatis load config saat masuk In-Game (Run)
+local NAMA_CONFIG_INGAME  = "TestFarmV2"  -- Nama config untuk di In-Game (tanpa ekstensi file)
+
+-- 4. Pengaturan File Flag ("1" = Nyala, "0" = Mati)
+local SET_AUTO_RECONNECT = "0" -- Otomatis reconnect jika terputus/DC
+local SET_AUTO_RUN_AGAIN = "0" -- Otomatis masuk lift/main lagi saat kembali ke Lobby
+local SET_TUTORIAL_SEEN  = "1" -- Lewati tampilan tutorial awal GUI
+
+-- 5. Path Folder & Link Script
+local FOLDER_PATH = "Yatta's Crazy GUI"
+local LOADER_URL  = "https://raw.githubusercontent.com/BluuGuy-Sure/BluuHead-Dandy-s-World/refs/heads/main/JustThisOnce.lua"
+
+
+-- =======================================================
+-- SISTEM SMART REWRITE (CEK ISI FILE SEBELUM MENIMPA)
+-- =======================================================
+if isfolder and makefolder and not isfolder(FOLDER_PATH) then
+    makefolder(FOLDER_PATH)
+end
+
+local function smartWriteFile(filePath, targetContent)
+    if not writefile then
+        warn("[AutoConfig] Executor tidak mendukung fungsi writefile!")
+        return
+    end
+
+    local needWrite = true
+
+    if isfile and readfile and isfile(filePath) then
+        local success, currentContent = pcall(readfile, filePath)
+        if success and currentContent then
+            local cleanCurrent = string.gsub(currentContent, "^%s*(.-)%s*$", "%1")
+            local cleanTarget  = string.gsub(tostring(targetContent), "^%s*(.-)%s*$", "%1")
+            
+            if cleanCurrent == cleanTarget then
+                needWrite = false
+            end
+        end
+    end
+
+    if needWrite then
+        local success, err = pcall(writefile, filePath, tostring(targetContent))
+        if success then
+            print("[AutoConfig] File diperbarui: " .. filePath)
+        else
+            warn("[AutoConfig] Gagal menulis " .. filePath .. ": " .. tostring(err))
+        end
+    else
+        print("[AutoConfig] Value sudah sesuai (Skip Rewrite): " .. filePath)
+    end
+end
+
+-- Susun format JSON untuk AutoStartConfig.json
+local jsonConfig = string.format(
+    '{"lobby":{"enabled":%s,"name":"%s"},"run":{"enabled":%s,"name":"%s"}}',
+    tostring(PAKAI_CONFIG_LOBBY),
+    NAMA_CONFIG_LOBBY,
+    tostring(PAKAI_CONFIG_INGAME),
+    NAMA_CONFIG_INGAME
+)
+
+-- Jalankan pengecekan dan rewrite untuk ke-4 file
+smartWriteFile(FOLDER_PATH .. "/AutoReconnect.flag", SET_AUTO_RECONNECT)
+smartWriteFile(FOLDER_PATH .. "/AutoRunAgain.flag", SET_AUTO_RUN_AGAIN)
+smartWriteFile(FOLDER_PATH .. "/tutorial_seen.txt", SET_TUTORIAL_SEEN)
+smartWriteFile(FOLDER_PATH .. "/AutoStartConfig.json", jsonConfig)
+
+
+-- =======================================================
+-- DETEKSI TEMPAT & EKSEKUSI LOADER
+-- =======================================================
+local currentPlaceId = game.PlaceId
+
+if currentPlaceId == LOBBY_PLACE_ID then
+    if JALANKAN_GUI_DI_LOBBY then
+        print("[AutoLoad] Terdeteksi di Lobby. Menjalankan Yatta's Crazy GUI...")
+        loadstring(game:HttpGet(LOADER_URL))()
+    else
+        print("[AutoLoad] Terdeteksi di Lobby (Mode OFF). Melewati eksekusi.")
+    end
+
+elseif currentPlaceId == INGAME_PLACE_ID then
+    if JALANKAN_GUI_DI_INGAME then
+        print("[AutoLoad] Terdeteksi di In-Game (Run). Menjalankan Yatta's Crazy GUI...")
+        loadstring(game:HttpGet(LOADER_URL))()
+    else
+        print("[AutoLoad] Terdeteksi di In-Game (Mode OFF). Melewati eksekusi.")
+    end
+
+else
+    warn("[AutoLoad] PlaceId (" .. tostring(currentPlaceId) .. ") bukan Dandy's World!")
+end
