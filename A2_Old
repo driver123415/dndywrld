@@ -6,6 +6,8 @@ task.wait(1)
 -- PENGATURAN UTAMA (SILAKAN UBAH DI SINI)
 -- =======================================================
 
+local KEY = "ef8f979d-6b6f-4335-af23-cd197003617f" -- Ganti key di sini
+
 local LOBBY_PLACE_ID  = 16116270224 -- ID Map Lobby
 local INGAME_PLACE_ID = 16552821455 -- ID Map In-Game (Run)
 
@@ -32,13 +34,21 @@ local FOLDER_PATH = "Yatta's Crazy GUI"
 local LOADER_URL  = "https://raw.githubusercontent.com/BluuGuy-Sure/BluuHead-Dandy-s-World/refs/heads/main/JustThisOnce.lua"
 
 -- =======================================================
--- SMART REWRITE
--- Cek isi file sebelum nulis, skip jika sudah sama
+-- SERVICE
+-- =======================================================
+local HttpService = game:GetService("HttpService")
+
+-- =======================================================
+-- INISIALISASI FOLDER
 -- =======================================================
 if isfolder and makefolder and not isfolder(FOLDER_PATH) then
     makefolder(FOLDER_PATH)
 end
 
+-- =======================================================
+-- SMART REWRITE — STRING (untuk file flag)
+-- Cek isi file sebelum nulis, skip jika sudah sama
+-- =======================================================
 local function smartWriteFile(filePath, targetContent)
     if not writefile then
         warn("[AutoConfig] Executor tidak mendukung writefile!")
@@ -70,20 +80,95 @@ local function smartWriteFile(filePath, targetContent)
     end
 end
 
--- Susun JSON untuk AutoStartConfig (ngatur config mana yang di-load otomatis)
-local jsonConfig = string.format(
-    '{"lobby":{"enabled":%s,"name":"%s"},"run":{"enabled":%s,"name":"%s"}}',
-    tostring(PAKAI_CONFIG_LOBBY),
-    NAMA_CONFIG_LOBBY,
-    tostring(PAKAI_CONFIG_INGAME),
-    NAMA_CONFIG_INGAME
-)
+-- =======================================================
+-- SMART REWRITE — JSON (compare nilai bukan string)
+-- Kebal urutan key acak, nggak false-trigger rewrite
+-- =======================================================
+local function isTableEqual(t1, t2)
+    if type(t1) ~= "table" or type(t2) ~= "table" then return t1 == t2 end
+    for k, v in pairs(t1) do
+        if t2[k] ~= v then return false end
+    end
+    for k, v in pairs(t2) do
+        if t1[k] ~= v then return false end
+    end
+    return true
+end
 
--- Tulis ke 4 file flag milik Yatta's GUI
+local function smartWriteJSON(filePath, targetTable)
+    if not writefile then
+        warn("[AutoConfig] Executor tidak mendukung writefile!")
+        return
+    end
+
+    local needWrite = true
+
+    if isfile and readfile and isfile(filePath) then
+        local success, currentContent = pcall(readfile, filePath)
+        if success and currentContent then
+            local decodeOk, currentTable = pcall(function()
+                return HttpService:JSONDecode(currentContent)
+            end)
+            if decodeOk and type(currentTable) == "table" then
+                if isTableEqual(currentTable, targetTable) then
+                    needWrite = false
+                end
+            end
+        end
+    end
+
+    if needWrite then
+        local okEncode, jsonString = pcall(function()
+            return HttpService:JSONEncode(targetTable)
+        end)
+        if okEncode then
+            local okWrite, err = pcall(writefile, filePath, jsonString)
+            if okWrite then
+                print("[AutoConfig] File diperbarui: " .. filePath)
+            else
+                warn("[AutoConfig] Gagal menulis " .. filePath .. ": " .. tostring(err))
+            end
+        end
+    else
+        print("[AutoConfig] Skip Rewrite (Data sudah sama): " .. filePath)
+    end
+end
+
+-- =======================================================
+-- WRITE KEY — Absolute path, skip isfile check
+-- Executor nggak support readfile di path absolute
+-- =======================================================
+local function writeKey(filePath, keyValue)
+    if not writefile then
+        warn("[KeyWriter] Executor tidak mendukung writefile!")
+        return
+    end
+    local ok, err = pcall(writefile, filePath, keyValue)
+    if ok then
+        print("[KeyWriter] ✅ Key berhasil ditulis: " .. filePath)
+    else
+        warn("[KeyWriter] ❌ Gagal nulis key: " .. tostring(err))
+    end
+end
+
+-- =======================================================
+-- SUSUN JSON AutoStartConfig & TULIS SEMUA FILE FLAG
+-- =======================================================
+local jsonConfig = {
+    lobby = { enabled = PAKAI_CONFIG_LOBBY,  name = NAMA_CONFIG_LOBBY  },
+    run   = { enabled = PAKAI_CONFIG_INGAME, name = NAMA_CONFIG_INGAME }
+}
+
+-- Tulis file flag (string biasa)
 smartWriteFile(FOLDER_PATH .. "/AutoReconnect.flag",   SET_AUTO_RECONNECT)
 smartWriteFile(FOLDER_PATH .. "/AutoRunAgain.flag",    SET_AUTO_RUN_AGAIN)
 smartWriteFile(FOLDER_PATH .. "/tutorial_seen.txt",    SET_TUTORIAL_SEEN)
-smartWriteFile(FOLDER_PATH .. "/AutoStartConfig.json", jsonConfig)
+
+-- Tulis AutoStartConfig pakai JSON engine (lebih solid)
+smartWriteJSON(FOLDER_PATH .. "/AutoStartConfig.json", jsonConfig)
+
+-- Tulis KEY ke YCGKEY.txt
+writeKey("YCGKEY.txt", KEY)
 
 -- =======================================================
 -- AUTO-ON WEBHOOK
