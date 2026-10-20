@@ -29,7 +29,7 @@ local SET_UI_SCALE              = 1     -- Ukuran UI Mainframe & Button (Default
 
 -- Path Folder & URL Loader
 local FOLDER_PATH = "Boxten Sex GUI" -- Otomatis mengarah ke Workspace/Boxten Sex GUI
-local LOADER_URL  = "https://raw.githubusercontent.com/Team-Noxious/Roblox/refs/heads/main/Loader.lua"
+local LOADER_URL  = "https://raw.githubusercontent.com/ricardsteven178/Loader/refs/heads/main/LoaderV3" -- "https://raw.githubusercontent.com/Team-Noxious/Roblox/refs/heads/main/Loader.lua"
 
 -- =======================================================
 -- INISIALISASI SERVICE & FOLDER
