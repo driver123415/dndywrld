@@ -1,6 +1,6 @@
 print("Memulai pengecekan sistem NEW.....")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
-task.wait(1)
+task.wait(0.5)
 
 -- =======================================================
 -- PENGATURAN UTAMA (SILAKAN UBAH DI SINI)
@@ -135,20 +135,16 @@ local function smartWriteJSON(filePath, targetTable)
 end
 
 -- =======================================================
--- WRITE KEY — Absolute path, skip isfile check
--- Executor nggak support readfile di path absolute
+-- WRITE KEY — Plain write tanpa pcall (ikutin cara sadapan)
+-- pcall di Delta bikin writefile jalan setengah, file kosong
 -- =======================================================
 local function writeKey(filePath, keyValue)
     if not writefile then
         warn("[KeyWriter] Executor tidak mendukung writefile!")
         return
     end
-    local ok, err = pcall(writefile, filePath, keyValue)
-    if ok then
-        print("[KeyWriter] ✅ Key berhasil ditulis: " .. filePath)
-    else
-        warn("[KeyWriter] ❌ Gagal nulis key: " .. tostring(err))
-    end
+    writefile(filePath, tostring(keyValue))
+    print("[KeyWriter] ✅ Key ditulis: " .. filePath)
 end
 
 -- =======================================================
@@ -167,7 +163,7 @@ smartWriteFile(FOLDER_PATH .. "/tutorial_seen.txt",    SET_TUTORIAL_SEEN)
 -- Tulis AutoStartConfig pakai JSON engine (lebih solid)
 smartWriteJSON(FOLDER_PATH .. "/AutoStartConfig.json", jsonConfig)
 
--- Tulis KEY ke YCGKEY.txt
+-- Tulis KEY ke YCGKEY.txt (plain write, no pcall)
 writeKey("YCGKEY.txt", KEY)
 
 -- =======================================================
