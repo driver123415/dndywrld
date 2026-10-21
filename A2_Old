@@ -6,7 +6,7 @@ task.wait(1)
 -- PENGATURAN UTAMA (SILAKAN UBAH DI SINI)
 -- =======================================================
 
-local KEY = "ef8f979d-6b6f-4335-af23-cd197003617f" -- Ganti key di sini
+local KEY = "604fc128-47be-4b3e-9815-a8b20a6680cc" -- Ganti key di sini
 
 local LOBBY_PLACE_ID  = 16116270224 -- ID Map Lobby
 local INGAME_PLACE_ID = 16552821455 -- ID Map In-Game (Run)
