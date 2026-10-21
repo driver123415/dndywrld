@@ -1,4 +1,4 @@
-print("Memulai pengecekan sistem NEW.....")
+print("Memulai pengecekan sistem OLD.....")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 task.wait(0.5)
 
