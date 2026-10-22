@@ -6,7 +6,7 @@ task.wait(0.5)
 -- PENGATURAN UTAMA (SILAKAN UBAH DI SINI)
 -- =======================================================
 
-local KEY = "604fc128-47be-4b3e-9815-a8b20a6680cc" -- Ganti key di sini
+local KEY = "" -- Ganti key di sini
 
 local LOBBY_PLACE_ID  = 16116270224 -- ID Map Lobby
 local INGAME_PLACE_ID = 16552821455 -- ID Map In-Game (Run)
@@ -135,7 +135,7 @@ local function smartWriteJSON(filePath, targetTable)
 end
 
 -- =======================================================
--- WRITE KEY — Plain write tanpa pcall (ikutin cara sadapan)
+-- WRITE KEY — Plain write tanpa pcall (ikutin cara sadapan) & Skip jika KEY kosong, jaga isi file lama
 -- pcall di Delta bikin writefile jalan setengah, file kosong
 -- =======================================================
 local function writeKey(filePath, keyValue)
@@ -143,7 +143,15 @@ local function writeKey(filePath, keyValue)
         warn("[KeyWriter] Executor tidak mendukung writefile!")
         return
     end
-    writefile(filePath, tostring(keyValue))
+
+    local trimmed = string.gsub(tostring(keyValue), "^%s*(.-)%s*$", "%1")
+
+    if trimmed == "" then
+        print("[KeyWriter] ⏭️ KEY kosong, skip — file lama dibiarkan.")
+        return
+    end
+
+    writefile(filePath, trimmed)
     print("[KeyWriter] ✅ Key ditulis: " .. filePath)
 end
 
