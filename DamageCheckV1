@@ -1,0 +1,464 @@
+-- ==============================================================================
+-- AUTO MASTERY DAMAGER & SMART HEAL V2 (CLOSEST MONSTER + TWEEN/INSTANT CONFIG)
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam match/game
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    warn("[SYSTEM] Script dibatalkan: Kamu sedang tidak berada di dalam In-Game!")
+    return
+end
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- ============================ KONFIGURASI SCRIPT ============================
+local Config = {
+    -- 1. PENGATURAN TOON & NYAWA
+    TargetToons      = {"Poppy", "Looey"}, -- Toon yang diizinkan menjalankan script ini
+    MaxHealth        = 3,                  -- Wajib 3 HP penuh sebelum mulai sengaja kena hit
+    TargetStopHealth = 1,                  -- Haram kena monster jika HP <= angka ini (langsung kabur)
+
+    -- 2. PENGATURAN METODE TELEPORT / PERGERAKAN
+    Teleport = {
+        Mode                   = "Instant", -- Pilihan: "Instant" atau "Tween"
+        TweenSpeed             = 1.25,      -- Kecepatan gerak jika memakai mode "Tween"
+        ForceInstantOnEvacuate = true       -- WAJIB TRUE: Paksa kabur "Instant" saat sisa 1 HP walau Mode = "Tween"
+    },
+
+    -- 3. PENGATURAN FILTER MONSTER
+    Monsters = {
+        TargetClosest      = true,          -- true = Pilih monster paling dekat dari posisi LocalPlayer
+        LethalSafeDistance = 35,            -- Jangan tabrak monster normal jika di dekatnya ada Dandy/Dyle dalam jarak ini
+        
+        -- Daftar monster yang BOLEH ditabrak (Isi {"All"} untuk semua monster aman, atau tulis spesifik misal {"BoxtenMonster", "PoppyMonster"})
+        AllowedMonsters = {
+            "All"
+        },
+
+        -- HARAM DIDEKATI: Monster 1-Hit Mati / Instakill (Mutlak dihindari)
+        LethalMonsters = {
+            "DandyMonster",
+            "DyleMonster"
+        },
+
+        -- DIABAIKAN: Monster pasif/jebakan yang tidak memukul normal saat didekati
+        PassiveMonsters = {
+            "RodgerMonster",
+            "ConnieMonster",
+            "RazzleDazzleMonster",
+            "SquirmMonster",
+            "BlottMonster",
+            "GourdyMonster"
+        }
+    },
+
+    -- 4. PENGATURAN SMART HEAL & INVENTORY
+    Heal = {
+        EnableAutoHeal    = true, -- Otomatis pakai Bandage (+1) / HealthKit (+2)
+        WaitFullComboHeal = true, -- true = Tunggu item di tas cukup untuk langsung 3 HP baru dipakai
+        Slots = {                 -- Slot tas yang diizinkan untuk dicek & dipakai
+            Slot1 = true,
+            Slot2 = true,
+            Slot3 = true,
+            Slot4 = true
+        }
+    },
+
+    -- 5. KECEPATAN SCANNING
+    ScanInterval       = 0.2,  -- Jeda pengecekan normal (detik)
+    DamageTickInterval = 0.05  -- Jeda pengecekan super cepat saat menempel di monster
+}
+
+-- Nilai tambah nyawa per item heal
+local HealValues = {
+    ["Bandage"]   = 1, -- Menambah 1 Nyawa
+    ["HealthKit"] = 2  -- Menambah 2 Nyawa
+}
+-- ============================================================================
+
+print("[SYSTEM] Auto Mastery V2 Berjalan! Mode Gerak: " .. Config.Teleport.Mode)
+
+local isScriptActive = true
+local isDamagingPhase = false
+local activeTween = nil
+
+-- ============================ HELPER FUNCTIONS ============================
+
+-- Mengecek apakah nama ada di dalam tabel list
+local function isNameInList(name, list)
+    local lowName = string.lower(name)
+    for _, v in ipairs(list) do
+        if string.lower(v) == "all" then return true end
+        if string.find(lowName, string.lower(v), 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Mengecek nilai tambah darah dari nama item
+local function getHealAmount(itemName)
+    if not itemName or itemName == "" or itemName == "None" then return 0 end
+    local low = string.lower(itemName)
+    for healName, amount in pairs(HealValues) do
+        if string.find(low, string.lower(healName), 1, true) then
+            return amount
+        end
+    end
+    return 0
+end
+
+-- Mengecek Toon yang sedang dipakai oleh LocalPlayer
+local function getUsedUnit()
+    local unitName = "Unknown"
+    local igp = Workspace:FindFirstChild("InGamePlayers")
+    if igp then
+        local myCharInfo = igp:FindFirstChild(player.Name)
+        if myCharInfo and myCharInfo:FindFirstChild("Config") then
+            local conf = myCharInfo.Config
+            local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+            if charName and charName:IsA("StringValue") and charName.Value ~= "" then
+                unitName = string.split(charName.Value, "_")[1]
+            end
+        end
+    end
+    return unitName
+end
+
+-- Mengecek status Mastery dari UI PassiveAbilityActivate
+local function isMasteryCompleted()
+    local isCompleted = false
+    pcall(function()
+        local pGui = player:FindFirstChild("PlayerGui")
+        local charAmountLabel = pGui.ScreenGui.MasteryFrame.HolderFrame.PassiveAbilityActivate.CharacterAmount
+        if charAmountLabel and charAmountLabel:IsA("TextLabel") then
+            local text = string.upper(charAmountLabel.Text)
+            if string.find(text, "COMPLETED", 1, true) then
+                isCompleted = true
+            else
+                local cur, tot = string.match(text, "(%d+)%s*/%s*(%d+)")
+                if cur and tot and tonumber(cur) >= tonumber(tot) and tonumber(tot) > 0 then
+                    isCompleted = true
+                end
+            end
+        end
+    end)
+    return isCompleted
+end
+
+-- Membaca jumlah HP dari UI Heart Pulse
+local function getHealthData()
+    local currentHP = -1
+    pcall(function()
+        local pGui = player:FindFirstChild("PlayerGui")
+        local content = pGui.ScreenGui.Menu.BottomLeftCorner.Status.Bottom.StaminaBin.InfoBin.HealthBin.Bar.Content
+        if content then
+            local hp = 0
+            for i = 1, Config.MaxHealth do
+                local heart = content:FindFirstChild("Heart" .. i)
+                if heart and heart:FindFirstChild("Pulse") and heart.Pulse.Visible then
+                    hp = i
+                end
+            end
+            currentHP = hp
+        end
+    end)
+    return currentHP, Config.MaxHealth
+end
+
+-- Mengambil model map ruangan saat ini
+local function getMap()
+    return Workspace:FindFirstChild("CurrentRoom") and Workspace.CurrentRoom:FindFirstChildWhichIsA("Model")
+end
+
+-- Mencari titik tengah dari sebuah Model
+local function getModelCenter(model)
+    if not model or not model:IsA("Model") then return nil end
+    local parts = {}
+    for _, part in pairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then table.insert(parts, part) end
+    end
+    if #parts == 0 then return nil end
+    local totalPos = Vector3.zero
+    for _, part in pairs(parts) do totalPos = totalPos + part.Position end
+    return totalPos / #parts
+end
+
+-- Mencari lokasi aman (DandyShop atau FakeElevator) untuk evakuasi
+local function getSafePlaceCFrame()
+    local elevators = Workspace:FindFirstChild("Elevators")
+    if elevators then
+        for _, el in ipairs(elevators:GetChildren()) do
+            if el.Name == "Elevator" and el:IsA("Model") then
+                local dandyStore = el:FindFirstChild("DandyStore")
+                local dandyShop = dandyStore and dandyStore:FindFirstChild("DandyShop")
+                local root = dandyShop and dandyShop:FindFirstChild("RootPart")
+                if root then
+                    return root.CFrame * CFrame.new(0, 3, 0)
+                end
+            end
+        end
+    end
+    
+    local map = getMap()
+    if map and map:FindFirstChild("FreeArea") then
+        local fakeElevator = map.FreeArea:FindFirstChild("FakeElevator")
+        if fakeElevator then
+            local center = getModelCenter(fakeElevator)
+            if center then return CFrame.new(center) end
+        end
+    end
+    return nil
+end
+
+-- Fungsi Pergerakan Hybrid (Mendukung Instant & Tween)
+local function moveCharacter(targetCFrame, forceInstant)
+    local char = player.Character
+    local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+    if not rootPart or not targetCFrame then return end
+
+    -- Batalkan tween yang sedang berjalan jika ada perintah gerak baru
+    if activeTween then
+        activeTween:Cancel()
+        activeTween = nil
+    end
+
+    local originalGravity = Workspace.Gravity
+    Workspace.Gravity = 0
+    rootPart.Anchored = false
+    rootPart.AssemblyLinearVelocity = Vector3.zero
+
+    local useMode = forceInstant and "Instant" or Config.Teleport.Mode
+
+    if useMode == "Instant" then
+        char:PivotTo(targetCFrame)
+    else
+        local speed = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 16
+        local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+        local duration = distance / (speed * Config.Teleport.TweenSpeed)
+        if duration <= 0.05 then
+            char:PivotTo(targetCFrame)
+        else
+            local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+            activeTween = TweenService:Create(rootPart, tweenInfo, { CFrame = targetCFrame })
+            activeTween:Play()
+            
+            -- Tunggu tween selesai ATAU hentikan paksa jika HP mendadak turun ke batas bahaya di tengah jalan
+            while activeTween and activeTween.PlaybackState == Enum.PlaybackState.Playing do
+                local hp = getHealthData()
+                if hp > 0 and hp <= Config.TargetStopHealth then
+                    activeTween:Cancel()
+                    break
+                end
+                task.wait(0.03)
+            end
+        end
+    end
+
+    Workspace.Gravity = originalGravity
+end
+
+-- Melepaskan interaksi mesin jika karakter sedang memegang generator
+local function forceStopGenerator()
+    local char = player.Character
+    if not char then return end
+    local decoding = char:FindFirstChild("Decoding") and char.Decoding.Value
+    if decoding ~= nil then
+        pcall(function() decoding.Stats.StopInteracting:FireServer("Stop") end)
+    end
+end
+
+-- Mencari monster yang valid, bukan Lethal, dan paling dekat dengan LocalPlayer
+local function getValidMonsterToHit()
+    local char = player.Character
+    local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+    local map = getMap()
+    if not rootPart or not map then return nil end
+    
+    local monstersFolder = map:FindFirstChild("Monsters")
+    if not monstersFolder then return nil end
+    
+    local lethalPositions = {}
+    local candidateMonsters = {}
+
+    -- Langkah 1: Catat semua posisi monster Lethal (Dandy/Dyle) di map
+    for _, monster in ipairs(monstersFolder:GetChildren()) do
+        if monster:IsA("Model") and monster.PrimaryPart then
+            if isNameInList(monster.Name, Config.Monsters.LethalMonsters) then
+                table.insert(lethalPositions, monster.PrimaryPart.Position)
+            end
+        end
+    end
+
+    -- Langkah 2: Filter monster yang aman untuk ditabrak
+    for _, monster in ipairs(monstersFolder:GetChildren()) do
+        if monster:IsA("Model") and monster.PrimaryPart then
+            local mName = monster.Name
+            
+            -- Pastikan BUKAN Lethal, BUKAN Passive, dan MASUK daftar AllowedMonsters
+            local isLethal  = isNameInList(mName, Config.Monsters.LethalMonsters)
+            local isPassive = isNameInList(mName, Config.Monsters.PassiveMonsters)
+            local isAllowed = isNameInList(mName, Config.Monsters.AllowedMonsters)
+
+            if not isLethal and not isPassive and isAllowed then
+                -- Cek apakah monster ini terlalu dekat dengan monster Lethal (Dandy/Dyle)
+                local tooCloseToLethal = false
+                for _, lethalPos in ipairs(lethalPositions) do
+                    if (monster.PrimaryPart.Position - lethalPos).Magnitude <= Config.Monsters.LethalSafeDistance then
+                        tooCloseToLethal = true
+                        break
+                    end
+                end
+
+                if not tooCloseToLethal then
+                    local distFromPlayer = (rootPart.Position - monster.PrimaryPart.Position).Magnitude
+                    table.insert(candidateMonsters, {
+                        model    = monster,
+                        distance = distFromPlayer
+                    })
+                end
+            end
+        end
+    end
+
+    if #candidateMonsters == 0 then return nil end
+
+    -- Langkah 3: Urutkan berdasarkan jarak terdekat jika TargetClosest aktif
+    if Config.Monsters.TargetClosest then
+        table.sort(candidateMonsters, function(a, b)
+            return a.distance < b.distance
+        end)
+    end
+
+    return candidateMonsters[1].model
+end
+
+-- Fungsi Kalkulasi & Penggunaan Item Heal Otomatis
+local function processSmartHealing(currentHP)
+    if not Config.Heal.EnableAutoHeal or currentHP >= Config.MaxHealth or currentHP <= 0 then return end
+    
+    local char = player.Character
+    local inv = char and char:FindFirstChild("Inventory")
+    if not inv then return end
+
+    local missingHP = Config.MaxHealth - currentHP
+    local totalPotentialHeal = 0
+    local availableHeals = {}
+
+    for slotName, isAllowed in pairs(Config.Heal.Slots) do
+        if isAllowed then
+            local slotObj = inv:FindFirstChild(slotName)
+            if slotObj and slotObj.Value ~= "" and slotObj.Value ~= "None" then
+                local healVal = getHealAmount(slotObj.Value)
+                if healVal > 0 then
+                    totalPotentialHeal = totalPotentialHeal + healVal
+                    table.insert(availableHeals, {
+                        slot = slotObj,
+                        name = slotObj.Value,
+                        val  = healVal
+                    })
+                end
+            end
+        end
+    end
+
+    if #availableHeals == 0 then return end
+
+    -- Tunggu sampai kombinasi heal di tas cukup untuk mengembalikan darah ke 3 HP
+    if Config.Heal.WaitFullComboHeal and (currentHP + totalPotentialHeal < Config.MaxHealth) then
+        return
+    end
+
+    -- Urutkan: Pakai HealthKit (+2) jika kurang 2 darah, atau Bandage (+1) jika kurang 1 darah
+    table.sort(availableHeals, function(a, b)
+        if missingHP >= 2 then
+            return a.val > b.val
+        else
+            return a.val < b.val
+        end
+    end)
+
+    local bestHeal = availableHeals[1]
+    if bestHeal then
+        print(string.format("[SMART HEAL] Memakai %s (+%d HP) | HP Saat Ini: %d/%d", bestHeal.name, bestHeal.val, currentHP, Config.MaxHealth))
+        pcall(function()
+            ReplicatedStorage.Events.ItemEvent:InvokeServer(char, bestHeal.slot)
+        end)
+        task.wait(0.3)
+    end
+end
+
+-- ============================ MAIN LOOP ============================
+
+task.spawn(function()
+    while isScriptActive do
+        local char = player.Character
+        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+
+        if char and rootPart then
+            local usedUnit = getUsedUnit()
+
+            -- 1. Validasi apakah Toon yang dipakai sesuai Config
+            if isNameInList(usedUnit, Config.TargetToons) then
+                
+                -- 2. Validasi apakah Mastery sudah COMPLETED!
+                if isMasteryCompleted() then
+                    print("[MASTERY COMPLETE] Mastery untuk " .. usedUnit .. " sudah COMPLETED! Mematikan script...")
+                    isDamagingPhase = false
+                    local safePos = getSafePlaceCFrame()
+                    if safePos then moveCharacter(safePos, true) end
+                    isScriptActive = false
+                    break
+                end
+
+                local hp, maxHP = getHealthData()
+
+                if hp > 0 then
+                    -- ATURAN MUTLAK: Jika HP <= 1, HARAM kena monster & langsung evakuasi!
+                    if hp <= Config.TargetStopHealth then
+                        if isDamagingPhase then
+                            isDamagingPhase = false
+                            print("[SAFETY EVACUATE] HP tersisa " .. hp .. "! Kabur ke Safe Place...")
+                            local safePos = getSafePlaceCFrame()
+                            if safePos then 
+                                moveCharacter(safePos, Config.Teleport.ForceInstantOnEvacuate) 
+                            else 
+                                moveCharacter(rootPart.CFrame * CFrame.new(0, 50, 0), true) 
+                            end
+                        end
+                        
+                        -- Cek tas untuk melakukan Smart Heal kembali ke 3 HP
+                        processSmartHealing(hp)
+
+                    -- FASE PEMULIHAN (HP = 2 dan sedang tidak dalam siklus tabrak)
+                    elseif hp < maxHP and not isDamagingPhase then
+                        processSmartHealing(hp)
+
+                    -- FASE TABRAK MONSTER (Wajib mulai dari 3 HP penuh)
+                    elseif hp >= maxHP or isDamagingPhase then
+                        local targetMonster = getValidMonsterToHit()
+                        
+                        if targetMonster and targetMonster.PrimaryPart then
+                            if not isDamagingPhase then
+                                isDamagingPhase = true
+                                print(string.format("[DAMAGE PHASE] HP Penuh (%d/%d)! Menghampiri monster terdekat: %s", hp, maxHP, targetMonster.Name))
+                            end
+                            
+                            forceStopGenerator()
+                            moveCharacter(targetMonster.PrimaryPart.CFrame, false)
+                            
+                            task.wait(Config.DamageTickInterval)
+                            continue
+                        end
+                    end
+                end
+            end
+        end
+
+        task.wait(Config.ScanInterval)
+    end
+end)
