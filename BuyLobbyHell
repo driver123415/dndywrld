@@ -6,12 +6,12 @@
 local CONFIG = {
 
     DELAY       = 0.5,
-    START_DELAY = 5,
+    START_DELAY = 2,
 
     -- ── [ MASTER TOGGLE KATEGORI ] ────────────────────────
     -- Ubah ke false kalau kategori tersebut TIDAK ingin dijalankan/dibeli
     FITUR_AKTIF = {
-        CLAIM_REWARDS       = true,  -- [0] Auto klaim kalender event
+        CLAIM_REWARDS       = false,  -- [0] Auto klaim kalender event
         HOLIDAY_TOWERS      = true,  -- [1] Beli Toon Halloween
         NORMAL_TOWERS       = false, -- [2] Beli Toon Biasa
         SKINS               = true,  -- [3] Beli Skin Halloween
