@@ -11,12 +11,22 @@ local CONFIG = {
     -- ── [ MASTER TOGGLE KATEGORI ] ────────────────────────
     -- Ubah ke false kalau kategori tersebut TIDAK ingin dijalankan/dibeli
     FITUR_AKTIF = {
-        CLAIM_REWARDS       = false,  -- [0] Auto klaim kalender event
+        CLAIM_TRINKETS      = true,  -- [+] Auto klaim Monster Trinket
+        CLAIM_REWARDS       = false, -- [0] Auto klaim kalender event
         HOLIDAY_TOWERS      = true,  -- [1] Beli Toon Halloween
         NORMAL_TOWERS       = false, -- [2] Beli Toon Biasa
-        SKINS               = false,  -- [3] Beli Skin Halloween
-        HOLIDAY_STICKERS    = false,  -- [4] Beli Stiker Halloween
-        HOLIDAY_BACKGROUNDS = false,  -- [5] Beli Background Halloween
+        SKINS               = false, -- [3] Beli Skin Halloween
+        HOLIDAY_STICKERS    = false, -- [4] Beli Stiker Halloween
+        HOLIDAY_BACKGROUNDS = false, -- [5] Beli Background Halloween
+    },
+
+    -- ── [+] Claim Monster Trinkets (EarnMonsterTrinket) ───
+    -- Urutan klaim otomatis dari atas ke bawah
+    CLAIM_TRINKETS = {
+        { name = "GourdyMonster",     enabled = true },
+        { name = "SoulvesterMonster", enabled = true },
+        { name = "EclipseMonster",    enabled = true },
+        { name = "RibeccaMonster",    enabled = true },
     },
 
     -- ── [0] Detail Claim Reward (FireServer — RemoteEvent) ─
@@ -199,6 +209,22 @@ print(string.rep("=", 50))
 task.wait(CONFIG.START_DELAY)
 
 local aktif = CONFIG.FITUR_AKTIF
+
+-- [+] Claim Monster Trinkets
+printSection("CLAIM MONSTER TRINKETS")
+if aktif.CLAIM_TRINKETS then
+    local trinketRemote = getRemote("EarnMonsterTrinket")
+    for _, item in ipairs(CONFIG.CLAIM_TRINKETS) do
+        local name, enabled = parseItem(item)
+        if enabled then
+            invoke(trinketRemote, {name}, "Trinket: " .. name)
+        else
+            print("[~] Skip Trinket: " .. name)
+        end
+    end
+else
+    print("[~] Kategori CLAIM_TRINKETS dinonaktifkan (Skip).")
+end
 
 -- [0] Claim Rewards
 printSection("CLAIM EVENT REWARDS")
