@@ -1,0 +1,300 @@
+-- ============================================================
+--        AXIOM AUTO BUY CONFIG - HALLOWEEN EVENT
+--        Edit config di bawah aja. Jangan otak-atik bawah CONFIG END.
+-- ============================================================
+
+local CONFIG = {
+
+    DELAY       = 0.5,
+    START_DELAY = 2,
+
+    -- ── [ MASTER TOGGLE KATEGORI ] ────────────────────────
+    -- Ubah ke false kalau kategori tersebut TIDAK ingin dijalankan/dibeli
+    FITUR_AKTIF = {
+        CLAIM_REWARDS       = false,  -- [0] Auto klaim kalender event
+        HOLIDAY_TOWERS      = true,  -- [1] Beli Toon Halloween
+        NORMAL_TOWERS       = false, -- [2] Beli Toon Biasa
+        SKINS               = false,  -- [3] Beli Skin Halloween
+        HOLIDAY_STICKERS    = false,  -- [4] Beli Stiker Halloween
+        HOLIDAY_BACKGROUNDS = false,  -- [5] Beli Background Halloween
+    },
+
+    -- ── [0] Detail Claim Reward (FireServer — RemoteEvent) ─
+    CLAIM_REWARDS = {
+        action    = "ClaimEventReward",
+        calendar  = "PreEventCalendar",
+        day_start = 1,   -- hari pertama
+        day_end   = 20,  -- hari terakhir, ubah sesuai event
+    },
+
+    -- ── [1] Holiday Towers (BuyHolidayTower) ─────────────
+    -- Urutan beli otomatis dari atas ke bawah
+    HOLIDAY_TOWERS = {
+        { name = "Ribecca",    enabled = true },
+        { name = "Soulvester", enabled = true },
+        { name = "Gourdy",     enabled = true },
+        { name = "Eclipse",    enabled = true },
+    },
+
+    -- ── [2] Normal Towers (BuyTower) ─────────────────────
+    TOWERS = {
+        -- Contoh: { name = "Boxten", enabled = true },
+    },
+
+    -- ── [3] Skins (BuyHolidaySkin) ───────────────────────
+    SKINS = {
+        -- [ MAHAL - 1200 ichor + 1200 pumpkin ]
+        { name = "WickedStitch",        enabled = true }, -- 2026 (1200 harga)
+        { name = "DessertfulScientist", enabled = true }, -- 1200 harga
+        { name = "LostPrince",          enabled = true }, -- 1200 harga
+        { name = "BerryBeast",          enabled = true }, -- 1200 harga
+
+        -- [ MURAH - 600 pumpkin ]
+        { name = "WebWeaver",           enabled = true }, -- 2026 new (600 harga)
+        { name = "CuriousStranger",     enabled = true }, -- 2026 new (600 harga)
+        { name = "BattyShade",          enabled = true }, -- 2026 new (600 harga)
+        { name = "ShadowMoth",          enabled = true }, -- 2026 new (600 harga)
+        { name = "PaintedBrain",        enabled = true }, -- 2026 new (600 harga)
+        { name = "FuzzyBeast",          enabled = true }, -- 2026 (600 harga)
+        { name = "MysteriousSpy",       enabled = true }, -- 2026 new (600 harga)
+        { name = "SteepedShadow",       enabled = true }, -- 2026 new (600 harga)
+        { name = "MossyStone",          enabled = true }, -- 2026 new (600 harga)
+        { name = "ToxicExperiment",     enabled = true }, -- 2026 (600 harga)
+        { name = "Halloween_Astro",     enabled = true }, -- Scarlet Night (600 harga)
+        { name = "SanguineSilence",     enabled = true },
+        { name = "CreepyChord",         enabled = true },
+        { name = "ScaryStylish",        enabled = true },
+        { name = "GhastlyGlow",         enabled = true },
+        { name = "FullMoon",            enabled = true },
+        { name = "LoneWolf",            enabled = true },
+        { name = "LittleRed",           enabled = true },
+        { name = "WrappedChic",         enabled = true },
+        { name = "CrimsonImp",          enabled = true },
+        { name = "CrinklingLeaves",     enabled = true },
+        { name = "MidnightSleeper",     enabled = true },
+        { name = "FreshFall",           enabled = true },
+        { name = "CreepyClown",         enabled = true },
+        { name = "ExtraCheese",         enabled = true },
+        { name = "DoubleBubble",        enabled = true },
+        { name = "HauntedTopic",        enabled = true },
+        { name = "SkeleKitty",          enabled = true },
+        { name = "VioletCaster",        enabled = true },
+        { name = "FairyGodmother",      enabled = true },
+        { name = "GourdGuard",          enabled = true },
+        { name = "HauntedFlame",        enabled = true },
+        { name = "CandyCritter",        enabled = true },
+        { name = "ZappedCreation",      enabled = true },
+        { name = "InfectedCandy",       enabled = true },
+    },
+
+    -- ── [4] Holiday Stickers (BuyHolidaySticker) ─────────
+    HOLIDAY_STICKERS = {
+        -- [ STICKER BARU 2026 ]
+        { name = "Blackout! Eclipse",          enabled = true }, -- 2026 new
+        { name = "How do I look? Ribecca",     enabled = true }, -- 2026 new
+        { name = "It's alright Connie",        enabled = true }, -- 2026 new
+        { name = "Who, me? Gourdy",            enabled = true }, -- 2026 new
+        { name = "You're welcome Soulvester",  enabled = true }, -- 2026 new
+
+        -- [ STICKER UPDATE / LAMA ]
+        { name = "Got tricked.",               enabled = true },
+        { name = "I can't find you! Gourdy",   enabled = true },
+        { name = "Looking good! Ribecca",      enabled = true },
+        { name = "See you later! Connie",      enabled = true },
+        { name = "Who needs help? Soulvester", enabled = true },
+        { name = "I'll Protect You!",          enabled = true },
+        { name = "Keep It Up!",                enabled = true },
+        { name = "Thank You!! Eclipse",        enabled = true },
+        { name = "Need Anything?",             enabled = true },
+        { name = "Help! Gourdy",               enabled = true },
+        { name = "Scared?",                    enabled = true },
+        { name = "Help! Soulvester",           enabled = true },
+        { name = "Thank You!! Gourdy",         enabled = true },
+    },
+
+    -- ── [5] Backgrounds via SharedUtils ──────────────────
+    HOLIDAY_BACKGROUNDS = {
+        -- [ MAHAL - 1200 pumpkin ]
+        { name = "HauntedGala",         enabled = true }, -- 2026 new (1200 harga)
+
+        -- [ MURAH - 800 pumpkin ]
+        { name = "GardenviewHalloween", enabled = true }, -- 2026 new (800 harga)
+        { name = "LostPrince",          enabled = true }, -- 800 harga
+        { name = "EclipsePattern",      enabled = true }, -- 800 harga
+        { name = "GourdyPattern",       enabled = true }, -- 800 harga
+        { name = "RibeccaPattern",      enabled = true }, -- 800 harga
+        { name = "SoulvesterPattern",   enabled = true }, -- 800 harga
+    },
+}
+
+-- ============================================================
+--                       CONFIG END
+-- ============================================================
+
+local RS = game:GetService("ReplicatedStorage")
+
+local remoteCache = {}
+local function getRemote(...)
+    local key = table.concat({...}, "|")
+    if remoteCache[key] then return remoteCache[key] end
+    local obj = RS
+    for _, child in ipairs({...}) do
+        obj = obj:WaitForChild(child)
+    end
+    remoteCache[key] = obj
+    return obj
+end
+
+local totalSuccess = 0
+local totalFail    = 0
+
+local function invoke(remote, args, label)
+    local ok, err = pcall(function()
+        remote:InvokeServer(table.unpack(args))
+    end)
+    if ok then
+        totalSuccess += 1
+        print(string.format("[✓] %s", label))
+    else
+        totalFail += 1
+        warn(string.format("[✗] GAGAL: %s | %s", label, tostring(err)))
+    end
+    task.wait(CONFIG.DELAY)
+end
+
+local function fire(remote, args, label)
+    local ok, err = pcall(function()
+        remote:FireServer(table.unpack(args))
+    end)
+    if ok then
+        totalSuccess += 1
+        print(string.format("[✓] %s", label))
+    else
+        totalFail += 1
+        warn(string.format("[✗] GAGAL: %s | %s", label, tostring(err)))
+    end
+    task.wait(CONFIG.DELAY)
+end
+
+-- Fungsi pintar: mendukung format { name = "Item", enabled = true } maupun string langsung "Item"
+local function parseItem(entry)
+    if type(entry) == "table" then
+        return entry.name, (entry.enabled ~= false)
+    else
+        return tostring(entry), true
+    end
+end
+
+local function printSection(title)
+    print(string.format("\n%s\n[ %s ]\n%s", string.rep("-", 45), title, string.rep("-", 45)))
+end
+
+-- ═══════════════════════════════════════
+--  START
+-- ═══════════════════════════════════════
+print(string.rep("=", 50))
+print(" AXIOM AUTO BUY — HALLOWEEN EVENT")
+print(string.format(" Mulai dalam %d detik...", CONFIG.START_DELAY))
+print(string.rep("=", 50))
+task.wait(CONFIG.START_DELAY)
+
+local aktif = CONFIG.FITUR_AKTIF
+
+-- [0] Claim Rewards
+printSection("CLAIM EVENT REWARDS")
+if aktif.CLAIM_REWARDS then
+    local cr = CONFIG.CLAIM_REWARDS
+    local claimRemote = getRemote("SharedUtils", "Network", "RemoteEvent")
+    for day = cr.day_start, cr.day_end do
+        fire(claimRemote, {cr.action, cr.calendar, day},
+            string.format("Claim: %s | %s | Day %d", cr.action, cr.calendar, day))
+    end
+else
+    print("[~] Kategori CLAIM_REWARDS dinonaktifkan (Skip).")
+end
+
+-- [1] Holiday Towers
+printSection("HOLIDAY TOWERS")
+if aktif.HOLIDAY_TOWERS then
+    local holidayTowerRemote = getRemote("BuyHolidayTower")
+    for _, item in ipairs(CONFIG.HOLIDAY_TOWERS) do
+        local name, enabled = parseItem(item)
+        if enabled then
+            invoke(holidayTowerRemote, {name}, "HolidayTower: " .. name)
+        else
+            print("[~] Skip HolidayTower: " .. name)
+        end
+    end
+else
+    print("[~] Kategori HOLIDAY_TOWERS dinonaktifkan (Skip).")
+end
+
+-- [2] Normal Towers
+printSection("NORMAL TOWERS")
+if aktif.NORMAL_TOWERS and #CONFIG.TOWERS > 0 then
+    local towerRemote = getRemote("BuyTower")
+    for _, item in ipairs(CONFIG.TOWERS) do
+        local name, enabled = parseItem(item)
+        if enabled then
+            invoke(towerRemote, {name}, "Tower: " .. name)
+        else
+            print("[~] Skip Tower: " .. name)
+        end
+    end
+else
+    print("[~] Kategori NORMAL_TOWERS dinonaktifkan / kosong (Skip).")
+end
+
+-- [3] Skins
+printSection("SKINS")
+if aktif.SKINS then
+    local skinRemote = getRemote("BuyHolidaySkin")
+    for _, item in ipairs(CONFIG.SKINS) do
+        local name, enabled = parseItem(item)
+        if enabled then
+            invoke(skinRemote, {name}, "Skin: " .. name)
+        else
+            print("[~] Skip Skin: " .. name)
+        end
+    end
+else
+    print("[~] Kategori SKINS dinonaktifkan (Skip).")
+end
+
+-- [4] Holiday Stickers
+printSection("HOLIDAY STICKERS")
+if aktif.HOLIDAY_STICKERS then
+    local stickerRemote = getRemote("BuyHolidaySticker")
+    for _, item in ipairs(CONFIG.HOLIDAY_STICKERS) do
+        local name, enabled = parseItem(item)
+        if enabled then
+            invoke(stickerRemote, {name}, "Sticker: " .. name)
+        else
+            print("[~] Skip Sticker: " .. name)
+        end
+    end
+else
+    print("[~] Kategori HOLIDAY_STICKERS dinonaktifkan (Skip).")
+end
+
+-- [5] Backgrounds
+printSection("HOLIDAY BACKGROUNDS")
+if aktif.HOLIDAY_BACKGROUNDS then
+    local bgRemote = getRemote("SharedUtils", "Network", "RemoteFunction")
+    for _, item in ipairs(CONFIG.HOLIDAY_BACKGROUNDS) do
+        local name, enabled = parseItem(item)
+        if enabled then
+            invoke(bgRemote, {"BuyHolidayBackground", name}, "Background: " .. name)
+        else
+            print("[~] Skip Background: " .. name)
+        end
+    end
+else
+    print("[~] Kategori HOLIDAY_BACKGROUNDS dinonaktifkan (Skip).")
+end
+
+-- SUMMARY
+print(string.rep("=", 50))
+print(string.format(" SELESAI — Berhasil: %d | Gagal: %d", totalSuccess, totalFail))
+print(" That's what the hell is going on boss man. ✓")
+print(string.rep("=", 50))
