@@ -14,7 +14,7 @@ local CONFIG = {
         CLAIM_TRINKETS      = true,  -- [+] Auto klaim Monster Trinket
         CLAIM_REWARDS       = false, -- [0] Auto klaim kalender event
         HOLIDAY_TOWERS      = true,  -- [1] Beli Toon Halloween
-        NORMAL_TOWERS       = false, -- [2] Beli Toon Biasa
+        NORMAL_TOWERS       = true,  -- [2] Beli Toon Biasa
         SKINS               = false, -- [3] Beli Skin Halloween
         HOLIDAY_STICKERS    = false, -- [4] Beli Stiker Halloween
         HOLIDAY_BACKGROUNDS = false, -- [5] Beli Background Halloween
@@ -48,6 +48,7 @@ local CONFIG = {
 
     -- ── [2] Normal Towers (BuyTower) ─────────────────────
     TOWERS = {
+        { name = "Shrimpo",    enabled = true },
         -- Contoh: { name = "Boxten", enabled = true },
     },
 
