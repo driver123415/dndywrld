@@ -1,4 +1,4 @@
-print("Memulai pengecekan sistem Old BSGUI.....")
+print("Memulai pengecekan sistem OLD BSGUI.....")
 
 -- Tunggu sampai game dan karakter LocalPlayer benar-benar siap
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
@@ -16,9 +16,9 @@ local JALANKAN_GUI_DI_LOBBY  = false -- true = Buka GUI saat di Lobby
 local JALANKAN_GUI_DI_INGAME = true  -- true = Buka GUI saat di In-Game
 
 -- Pengaturan Nama Config (Kosongkan "" jika tidak ingin auto-load di map tersebut)
-local NAMA_CONFIG_LOBBY    = ""           -- Nama config untuk Lobby: 
-local NAMA_CONFIG_INGAME   = "OldPlayerV1" -- Nama config untuk In-Game (Run) NewPlayerV1 (tidak beli masih ambil item sebagian) / OldPlayerV1 (beli dan ambil item)
-local NAMA_CONFIG_ROLEPLAY = ""           -- Nama config untuk Roleplay
+local NAMA_CONFIG_LOBBY    = ""            -- Nama config untuk Lobby
+local NAMA_CONFIG_INGAME   = "OldPlayerV1" -- Nama config untuk In-Game (Run) NewPlayerV1 / OldPlayerV1
+local NAMA_CONFIG_ROLEPLAY = ""            -- Nama config untuk Roleplay
 
 -- Pengaturan Tambahan di Persistent.json (true = Nyala, false = Mati)
 local SET_EXCLUDE_YOURSELF      = true  -- Exclude yourself
@@ -27,9 +27,10 @@ local SET_KEEP_ON_SERVER_SWITCH = false -- Keep on server switch
 local SET_DEBUG_MODE            = false -- Debug mode
 local SET_UI_SCALE              = 1     -- Ukuran UI Mainframe & Button (Default: 1)
 
--- Path Folder & URL Loader
+-- Path Folder & URL Loader Terbaru
 local FOLDER_PATH = "Boxten Sex GUI" -- Otomatis mengarah ke Workspace/Boxten Sex GUI
 local LOADER_URL  = "https://raw.githubusercontent.com/Team-Noxious/Roblox/refs/heads/main/Loader.lua"
+local LOADER_ARGS = {load = "Boxten Sex GUI"}
 
 -- =======================================================
 -- INISIALISASI SERVICE & FOLDER
@@ -168,7 +169,12 @@ smartWriteJSON(persistentPath, persistentData)
 -- =======================================================
 local function jalankanBSGUI()
     local success, err = pcall(function()
-        loadstring(game:HttpGet(LOADER_URL))({load = "BSGUI", fix = true})
+        local loaderFunc = loadstring(game:HttpGet(LOADER_URL))
+        if type(loaderFunc) == "function" then
+            loaderFunc(LOADER_ARGS)
+        else
+            error("Loader tidak mengembalikan function yang valid.")
+        end
     end)
     if not success then
         warn("[AutoLoad] Gagal memuat BSGUI: " .. tostring(err))
