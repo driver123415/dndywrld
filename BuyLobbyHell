@@ -50,6 +50,8 @@ local CONFIG = {
         { name = "BerryBeast",          enabled = true }, -- 1200 harga
 
         -- [ MURAH - 600 pumpkin ]
+        { name = "PotionGlass",           enabled = true }, -- 2026 new (600 harga)
+        { name = "MarigoldBloom",     enabled = true }, -- 2026 new (600 harga)
         { name = "WebWeaver",           enabled = true }, -- 2026 new (600 harga)
         { name = "CuriousStranger",     enabled = true }, -- 2026 new (600 harga)
         { name = "BattyShade",          enabled = true }, -- 2026 new (600 harga)
@@ -90,6 +92,7 @@ local CONFIG = {
     -- ── [4] Holiday Stickers (BuyHolidaySticker) ─────────
     HOLIDAY_STICKERS = {
         -- [ STICKER BARU 2026 ]
+        { name = "I'll miss you! Gourdy",      enabled = true }, -- 2026 new
         { name = "Blackout! Eclipse",          enabled = true }, -- 2026 new
         { name = "How do I look? Ribecca",     enabled = true }, -- 2026 new
         { name = "It's alright Connie",        enabled = true }, -- 2026 new
