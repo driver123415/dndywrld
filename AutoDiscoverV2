@@ -1,0 +1,1691 @@
+-- ==============================================================================
+-- 👁️ AUTO-DISCOVER MONSTER v4.1 (PANIC/MACHINE TRIGGER + COLLIDER SAFEPLACE)
+-- + MULTI-TELEPORT ENGINE + AUTO-MINIMIZE + CLEAN DESTROY GUI 👁️
+-- ==============================================================================
+
+-- ==============================================================================
+-- [SECTION 1] CONFIGURATION (PENGATURAN UTAMA DI BAGIAN ATAS)
+-- ==============================================================================
+local Config = {
+    AutoStart = true,              -- true = langsung aktif memantau saat script dijalankan
+    AutoMinimize = true,           -- true = kondisi awal GUI langsung ter-minimize saat script dijalankan | false = terbuka penuh
+    ConsoleCommand = true,         -- true = tampilkan log di Console (F9) | false = sembunyikan
+
+    -- ==========================================================================
+    -- [PENGATURAN METODE TELEPORT (INSTANT / TWEEN / HYBRID-Y)]
+    -- Pilihan Mode:
+    --   "Instant" -> Langsung pindah koordinat detik itu juga (Paling cepat untuk Hit & Run)
+    --   "Tween"   -> Jalan mulus Dual-Speed (3.50 jalan bebas / 1.05 saat tembus collider)
+    --   "HybridY" -> Bypass lewat bawah tanah (Y = -241) untuk jarak jauh, otomatis Tween jika dekat
+    -- ==========================================================================
+    Teleport = {
+        Mode = "Instant",          -- Pilih: "Instant", "Tween", atau "HybridY"
+        TweenSpeed = 3.50,         -- Kecepatan gerak saat area terbuka (Mode Tween)
+        NoClipTweenSpeed = 1.05,   -- Kecepatan otomatis direm saat menembus tembok/collider agar anti-revert
+        HybridMinDistance = 75,    -- Jarak minimal (studs) untuk mengaktifkan loncatan HybridY
+        HybridBypassY = -241,      -- Koordinat Y bawah tanah untuk metode HybridY
+        HybridBypassDelay = 0.40,  -- Waktu tunggu (detik) di koordinat Y sebelum loncat ke tujuan
+    },
+
+    -- ==========================================================================
+    -- [ATURAN KAPAN SCRIPT BEKERJA (TRIGGER RULES)]
+    -- Pilihan Mode:
+    --   "PanicTime"    -> Hanya bekerja saat Panic Time (semua mesin selesai / timer lift muncul)
+    --   "MachineCount" -> Bekerja saat mesin yang selesai >= MinMachinesCompleted (misal 2 mesin)
+    --   "Either"       -> Bekerja saat mesin selesai >= MinMachinesCompleted ATAU saat Panic Time
+    --   "Always"       -> Langsung bekerja sejak awal lantai tanpa menunggu mesin
+    -- ==========================================================================
+    TriggerRules = {
+        Mode = "MachineCount",     -- Pilih: "PanicTime", "MachineCount", "Either", atau "Always"
+        MinMachinesCompleted = 2,  -- Jumlah minimal mesin selesai jika memilih "MachineCount" / "Either"
+    },
+
+    -- ==========================================================================
+    -- [PENGATURAN SAFEPLACE DI TENGAH COLLISION]
+    -- Pilihan Mode:
+    --   "ThickCollider" -> Ngungsi ke tengah-tengah NoClip_Collider / CylinderCollider tebal
+    --                      (Otomatis beralih ke Real Elevator jika sudah masuk Panic Time!)
+    --   "RealElevator"  -> Selalu gunakan kabin dalam Real Elevator sebagai SafePlace
+    -- ==========================================================================
+    SafePlace = {
+        Mode = "ThickCollider",    -- Pilih: "ThickCollider" atau "RealElevator"
+        MinHideThickness = 3.5,    -- Ketebalan minimal (studs X & Z) agar Collider dianggap tebal & aman
+    },
+
+    -- ==========================================================================
+    -- [JAMINAN 1000% MASUK REAL ELEVATOR SAAT PANIC TIME]
+    -- ==========================================================================
+    ElevatorSafety = {
+        AlwaysLockInElevatorOnPanic = true, -- true = wajib masuk & dikunci di Real Elevator saat selesai / Panic Time
+        PanicDeadlineSeconds = 7,           -- Batas detik darurat! Jika sisa waktu lift <= 7 detik, STOP Hit & Run & wajib langsung masuk Real Elevator!
+        CabinInwardDepth = 8.0,             -- Jarak masuk ke dalam kabin lift di belakang DoorHitbox (studs)
+        MaxAllowedDrift = 5.5,              -- Jika karakter bergeser > 5.5 studs dari titik tengah kabin lift, otomatis ditarik masuk lagi
+    },
+
+    -- ==========================================================================
+    -- [PENGATURAN HIT & RUN DISCOVER DAN DAFTAR TWISTED]
+    -- ==========================================================================
+    Discover = {
+        DistanceToMonster = 15,      -- Jarak aman menatap monster saat Hit & Run (studs)
+        HeightOffset = 3,            -- Offset ketinggian saat menatap monster (studs)
+        MaxWaitSeconds = 3.5,        -- Waktu maksimal (detik) menatap 1 monster sebelum ngungsi
+        TargetMaxPercent = 0,        -- 0 = hanya kejar Twisted yang masih 0% (Belum Discover) | Ubah ke 99 jika ingin mengejar semua yang < 100%
+        IncludeEventMonsters = true, -- true = masukkan Monster Event ke target & daftar | false = hanya Monster Standar
+    },
+
+    -- Daftar 30 Monster Biasa (Reguler)
+    StandardMonsters = {
+        "AstroMonster", "BlottMonster", "BoxtenMonster", "BrightneyMonster",
+        "BrushaMonster", "ConnieMonster", "CosmoMonster", "DandyMonster",
+        "DyleMonster", "FinnMonster", "FlutterMonster", "GigiMonster",
+        "GlistenMonster", "GoobMonster", "LooeyMonster", "PebbleMonster",
+        "PoppyMonster", "RazzleDazzleMonster", "RodgerMonster", "ScrapsMonster",
+        "ShellyMonster", "ShrimpoMonster", "SproutMonster", "SquirmMonster",
+        "TeaganMonster", "TishaMonster", "ToodlesMonster", "VeeMonster",
+        "WaxwellMonster", "YattaMonster"
+    },
+
+    -- Daftar 12 Monster Event (Sudah menggunakan RibeccaMonster)
+    EventMonsters = {
+        "BassieMonster", "BobetteMonster", "CoalMonster", "CocoaMonster",
+        "EclipseMonster", "EggsonMonster", "FlyteMonster", "GingerMonster",
+        "GourdyMonster", "RibeccaMonster", "RudieMonster", "SoulvesterMonster"
+    }
+}
+
+-- ==============================================================================
+-- [SECTION 2] SERVICES & RUNTIME VARIABLES
+-- ==============================================================================
+local Players           = game:GetService("Players")
+local TweenService      = game:GetService("TweenService")
+local Workspace         = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui           = game:GetService("CoreGui")
+local RunService        = game:GetService("RunService")
+local UserInputService  = game:GetService("UserInputService")
+
+local player    = Players.LocalPlayer
+local userId    = tostring(player.UserId)
+local character = player.Character
+local rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+
+local DEFAULT_GRAVITY = (Workspace.Gravity > 10) and Workspace.Gravity or 196.2
+
+local isScriptDestroyed     = false
+local isAutoDiscovering     = false
+local abortCurrentMovement  = false
+local activeLoopId          = 0
+local activeTween           = nil
+local currentStatusText     = "IDLE (NONAKTIF)"
+local currentMapInstance    = nil
+local cachedRealElevCF      = nil
+local cachedRealElevRoom    = nil
+local lastColliderScanClock = 0
+local lastColliderScanRoom  = nil
+
+local cachedCharParts       = {}
+local cachedAllCols         = {}
+local cachedHideCols        = {}
+local tempHideCollideStates = {}
+local activeHoldConns       = {}
+local runtimeConnections    = {}
+local currentSafePlatform   = nil
+local discoveredThisFloor   = {}
+
+local guiFilterMode = "ZERO"
+
+local function cprint(message)
+    if Config.ConsoleCommand and not isScriptDestroyed then
+        print(message)
+    end
+end
+
+local function restoreNormalGravity()
+    Workspace.Gravity = DEFAULT_GRAVITY
+end
+
+local function rebuildCharPartCache(c)
+    table.clear(cachedCharParts)
+    if not c then return end
+    for _, part in ipairs(c:GetDescendants()) do
+        if part:IsA("BasePart") then
+            table.insert(cachedCharParts, part)
+        end
+    end
+end
+
+if character then rebuildCharPartCache(character) end
+
+local charAddedConn = player.CharacterAdded:Connect(function(c)
+    if isScriptDestroyed then return end
+    character = c
+    rootPart  = c:WaitForChild("HumanoidRootPart", 10)
+    rebuildCharPartCache(c)
+    restoreNormalGravity()
+end)
+table.insert(runtimeConnections, charAddedConn)
+
+-- Menjaga karakter tetap NoClip selama script aktif agar tidak nyangkut di tengah Collider / Pintu Lift
+local steppedNoClipConn = RunService.Stepped:Connect(function()
+    if isScriptDestroyed then return end
+    if isAutoDiscovering and character then
+        for i = 1, #cachedCharParts do
+            local part = cachedCharParts[i]
+            if part and part.Parent and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+table.insert(runtimeConnections, steppedNoClipConn)
+
+-- ==============================================================================
+-- [SECTION 3] MAP, GEOMETRY, PROGRESS & PANIC TIME HELPERS
+-- ==============================================================================
+local function getMap()
+    local cr = Workspace:FindFirstChild("CurrentRoom")
+    local m  = cr and cr:FindFirstChildWhichIsA("Model")
+    if m and m ~= currentMapInstance then
+        currentMapInstance = m
+        cachedRealElevCF   = nil
+        cachedRealElevRoom = nil
+        table.clear(discoveredThisFloor)
+    end
+    return m
+end
+
+local function getModelCenter(model)
+    if not model or not model:IsA("Model") then return nil end
+    local total, n = Vector3.zero, 0
+    for _, p in pairs(model:GetDescendants()) do
+        if p:IsA("BasePart") and p.Name ~= "DoorHitbox" then
+            total = total + p.Position
+            n = n + 1
+        end
+    end
+    return n > 0 and (total / n) or nil
+end
+
+local function getMonsterPart(monster)
+    if not monster or not monster:IsA("Model") then return nil end
+    return monster.PrimaryPart
+        or monster:FindFirstChild("HumanoidRootPart")
+        or monster:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function getWorldBoxSize(part)
+    local cf = part.CFrame
+    local sz = part.Size
+    local wx = math.abs(cf.RightVector.X) * sz.X + math.abs(cf.UpVector.X) * sz.Y + math.abs(cf.LookVector.X) * sz.Z
+    local wy = math.abs(cf.RightVector.Y) * sz.X + math.abs(cf.UpVector.Y) * sz.Y + math.abs(cf.LookVector.Y) * sz.Z
+    local wz = math.abs(cf.RightVector.Z) * sz.X + math.abs(cf.UpVector.Z) * sz.Y + math.abs(cf.LookVector.Z) * sz.Z
+    return Vector3.new(wx, wy, wz)
+end
+
+local function getSafeWalkY(referenceY)
+    if rootPart and rootPart.Position.Y > -50 and rootPart.Position.Y < 200 then
+        return rootPart.Position.Y
+    end
+    return referenceY or 100
+end
+
+local function isFloorPart(p)
+    if not p or not p:IsA("BasePart") then return true end
+    local ln = p.Name:lower()
+    if ln:find("floor") or ln:find("ground") or ln:find("baseplate") or ln:find("carpet")
+       or ln:find("pedestal") or ln:find("stageouter") or ln:find("stageinner") or ln:find("stair") or ln:find("ramp") then
+        return true
+    end
+    local parent = p.Parent
+    while parent and parent ~= Workspace and parent.Name ~= "CurrentRoom" do
+        local pn = parent.Name:lower()
+        if pn == "floor" or pn:find("floor") or pn:find("ground") or pn:find("pedestal") or pn:find("stair") then
+            return true
+        end
+        parent = parent.Parent
+    end
+    if p.Size.Y < 2.5 and p.Size.X > 25 and p.Size.Z > 25 and rootPart and p.Position.Y < (rootPart.Position.Y - 1.5) then
+        return true
+    end
+    return false
+end
+
+local function isPointInsideExpandedBox(pt, part, marginXZ, marginY)
+    if not part or not part:IsA("BasePart") then return false end
+    marginXZ  = marginXZ or 0
+    marginY   = marginY or marginXZ
+    local lPt = part.CFrame:PointToObjectSpace(pt)
+    return math.abs(lPt.X) <= (part.Size.X * 0.5 + marginXZ)
+       and math.abs(lPt.Y) <= (part.Size.Y * 0.5 + marginY)
+       and math.abs(lPt.Z) <= (part.Size.Z * 0.5 + marginXZ)
+end
+
+local function getMachineProgress()
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        local specGui  = pGui:FindFirstChild("SpectatorGui")
+        local info     = specGui and specGui:FindFirstChild("InfoFrame")
+        local genFrame = info and info:FindFirstChild("GeneratorFrame")
+        local msg      = genFrame and genFrame:FindFirstChild("Message")
+        if msg and msg:IsA("TextLabel") then
+            local cur, tot = string.match(msg.Text, "Machines Completed: (%d+)/(%d+)")
+            if cur and tot then
+                return tonumber(cur), tonumber(tot)
+            end
+        end
+        for _, gui in ipairs(pGui:GetChildren()) do
+            local topBar = gui:FindFirstChild("TopBar", true)
+            local gf     = (topBar and topBar:FindFirstChild("GeneratorFrame")) or gui:FindFirstChild("GeneratorFrame", true)
+            local m      = gf and gf:FindFirstChild("Message")
+            if m and m:IsA("TextLabel") then
+                local cur, tot = string.match(m.Text, "Machines Completed: (%d+)/(%d+)")
+                if cur and tot then
+                    return tonumber(cur), tonumber(tot)
+                end
+            end
+        end
+    end
+
+    local map = getMap()
+    local genFolder = map and map:FindFirstChild("Generators")
+    if genFolder then
+        local doneCount, totalCount = 0, 0
+        for _, gen in ipairs(genFolder:GetChildren()) do
+            if gen:IsA("Model") then
+                totalCount = totalCount + 1
+                local stats = gen:FindFirstChild("Stats")
+                if stats and stats:FindFirstChild("Completed") and stats.Completed.Value then
+                    doneCount = doneCount + 1
+                end
+            end
+        end
+        if totalCount > 0 then
+            return doneCount, totalCount
+        end
+    end
+
+    return 0, 0
+end
+
+local function getElevatorCountdownSeconds()
+    local pGui = player:FindFirstChild("PlayerGui")
+    if not pGui then return nil end
+
+    local screenGui = pGui:FindFirstChild("ScreenGui")
+    local menu      = screenGui and screenGui:FindFirstChild("Menu")
+    local topBar    = menu and menu:FindFirstChild("TopBar")
+    local msgLabel  = topBar and topBar:FindFirstChild("Message")
+
+    if msgLabel and msgLabel:IsA("TextLabel") and msgLabel.Visible then
+        local sec = string.match(msgLabel.Text, "Elevator leaves in (%d+)")
+            or string.match(string.lower(msgLabel.Text), "leaves in (%d+)")
+        if sec then
+            return tonumber(sec)
+        end
+    end
+
+    for _, gui in ipairs(pGui:GetChildren()) do
+        local tb = gui:FindFirstChild("TopBar", true) or gui:FindFirstChild("InfoFrame", true)
+        if tb then
+            for _, d in ipairs(tb:GetDescendants()) do
+                if d:IsA("TextLabel") and d.Visible then
+                    local sec = string.match(d.Text, "Elevator leaves in (%d+)")
+                        or string.match(string.lower(d.Text), "leaves in (%d+)")
+                    if sec then
+                        return tonumber(sec)
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function isPanicTimeActive()
+    local secLeft = getElevatorCountdownSeconds()
+    if secLeft ~= nil then
+        return true, secLeft
+    end
+    local curGen, totGen = getMachineProgress()
+    if totGen > 0 and curGen >= totGen then
+        return true, nil
+    end
+    return false, nil
+end
+
+local function isPanicDeadlineReached()
+    local secLeft = getElevatorCountdownSeconds()
+    local deadline = Config.ElevatorSafety.PanicDeadlineSeconds or 7
+    if secLeft ~= nil and secLeft <= deadline then
+        return true, secLeft
+    end
+    return false, secLeft
+end
+
+local function isTriggerConditionMet()
+    local mode = string.lower(tostring(Config.TriggerRules.Mode or "machinecount"))
+    local minReq = Config.TriggerRules.MinMachinesCompleted or 2
+    local curGen, totGen = getMachineProgress()
+    local panicNow, secLeft = isPanicTimeActive()
+
+    if mode == "always" then
+        return true, "Always Active"
+    elseif mode == "panictime" then
+        if panicNow then
+            return true, "Panic Time Aktif" .. (secLeft and (" (" .. secLeft .. "s)") or "")
+        end
+        return false, string.format("Menunggu Panic Time (Mesin: %d/%d)", curGen, totGen)
+    elseif mode == "machinecount" then
+        if curGen >= minReq or panicNow then
+            return true, string.format("Target Mesin Terpenuhi (%d/%d >= %d)", curGen, totGen, minReq)
+        end
+        return false, string.format("Menunggu %d Mesin Selesai (Sekarang: %d/%d)", minReq, curGen, totGen)
+    elseif mode == "either" then
+        if panicNow then
+            return true, "Panic Time Aktif" .. (secLeft and (" (" .. secLeft .. "s)") or "")
+        elseif curGen >= minReq then
+            return true, string.format("Target Mesin Terpenuhi (%d/%d >= %d)", curGen, totGen, minReq)
+        end
+        return false, string.format("Menunggu %d Mesin / Panic Time (%d/%d)", minReq, curGen, totGen)
+    end
+
+    return panicNow, "Menunggu Trigger"
+end
+
+-- ==============================================================================
+-- [SECTION 4] COLLIDER SAFEPLACE, MULTI-TELEPORT & REAL ELEVATOR 1000% ENGINE
+-- ==============================================================================
+local function clearAllServerSyncedHolds()
+    for _, c in ipairs(activeHoldConns) do
+        pcall(function() c:Disconnect() end)
+    end
+    table.clear(activeHoldConns)
+    if currentSafePlatform and currentSafePlatform.Parent then
+        pcall(function() currentSafePlatform:Destroy() end)
+        currentSafePlatform = nil
+    end
+end
+
+local function startServerSyncedHold(getTargetPosFn)
+    clearAllServerSyncedHolds()
+    if rootPart then rootPart.Anchored = false end
+    Workspace.Gravity = 0
+
+    local initPos = getTargetPosFn()
+    if initPos then
+        local plat = Instance.new("Part")
+        plat.Name         = "_AutoDiscoverSafePlat"
+        plat.Size         = Vector3.new(10, 1, 10)
+        plat.Anchored     = true
+        plat.CanCollide   = true
+        plat.Transparency = 1
+        plat.CFrame       = CFrame.new(initPos.X, initPos.Y - 3, initPos.Z)
+        plat.Parent       = Workspace
+        currentSafePlatform = plat
+    end
+
+    local tickCounter = 0
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if isScriptDestroyed or not rootPart or not isAutoDiscovering then
+            if conn then conn:Disconnect() end
+            return
+        end
+        local holdPos = getTargetPosFn()
+        if not holdPos then return end
+        if currentSafePlatform and currentSafePlatform.Parent then
+            currentSafePlatform.CFrame = CFrame.new(holdPos.X, holdPos.Y - 3, holdPos.Z)
+        end
+        if (rootPart.Position - holdPos).Magnitude <= 5.0 then
+            tickCounter = tickCounter + 1
+            local jitterX = (tickCounter % 2 == 0) and 0.03 or -0.03
+            local jitterZ = (tickCounter % 4 < 2) and 0.03 or -0.03
+            rootPart.AssemblyLinearVelocity  = Vector3.zero
+            rootPart.AssemblyAngularVelocity = Vector3.zero
+            rootPart.CFrame = CFrame.new(holdPos.X + jitterX, holdPos.Y, holdPos.Z + jitterZ)
+        end
+    end)
+    table.insert(activeHoldConns, conn)
+    return conn
+end
+
+local function isValidThickHideCollider(col)
+    if not col or not col:IsA("BasePart") then return false end
+    local n = col.Name
+    if n ~= "NoClip_Collider" and n ~= "CylinderCollider" then
+        return false
+    end
+
+    local parent = col.Parent
+    while parent and parent ~= Workspace and parent.Name ~= "CurrentRoom" do
+        local pn = parent.Name:lower()
+        if pn:find("wall") or pn:find("window") or pn:find("door") or pn:find("railing")
+           or pn:find("fence") or pn:find("barrier") or pn:find("border") or pn:find("pillar") then
+            return false
+        end
+        parent = parent.Parent
+    end
+
+    local wSize    = getWorldBoxSize(col)
+    local minHoriz = math.min(wSize.X, wSize.Z)
+    local maxHoriz = math.max(wSize.X, wSize.Z)
+
+    if minHoriz < (Config.SafePlace.MinHideThickness or 3.5) then
+        return false
+    end
+    if (maxHoriz / math.max(minHoriz, 0.1)) > 5.5 and minHoriz < 4.5 then
+        return false
+    end
+    return true
+end
+
+local function updateColliderCaches(forceRebuild)
+    local room = Workspace:FindFirstChild("CurrentRoom")
+    local map  = getMap()
+    local now  = os.clock()
+
+    if not forceRebuild
+       and map ~= nil
+       and map == lastColliderScanRoom
+       and #cachedHideCols > 0
+       and cachedHideCols[1]
+       and cachedHideCols[1].Parent ~= nil
+       and (now - lastColliderScanClock) < 2.5 then
+        return
+    end
+
+    lastColliderScanClock = now
+    lastColliderScanRoom  = map
+
+    local allC, hideC = {}, {}
+    if room then
+        for _, v in ipairs(room:GetDescendants()) do
+            if v:IsA("BasePart") and (v.Name == "NoClip" or v.Name == "NoClip_Collider" or v.Name == "CylinderCollider") then
+                if not isFloorPart(v) then
+                    table.insert(allC, v)
+                    if isValidThickHideCollider(v) then
+                        table.insert(hideC, v)
+                    end
+                end
+            end
+        end
+    end
+    cachedAllCols  = allC
+    cachedHideCols = hideC
+end
+
+local function setTargetColliderPassable(targetCol, passable)
+    if passable and targetCol and targetCol.Parent then
+        local room = Workspace:FindFirstChild("CurrentRoom")
+        local map  = getMap()
+
+        local function disablePart(p)
+            if p and p:IsA("BasePart") and not isFloorPart(p) then
+                if tempHideCollideStates[p] == nil then
+                    tempHideCollideStates[p] = p.CanCollide
+                end
+                p.CanCollide = false
+            end
+        end
+
+        disablePart(targetCol)
+        local parentObj = targetCol.Parent
+        if parentObj and parentObj ~= room and parentObj ~= map then
+            if parentObj:IsA("BasePart") then disablePart(parentObj) end
+            for _, d in ipairs(parentObj:GetDescendants()) do
+                disablePart(d)
+            end
+        end
+    elseif not passable then
+        for p, orig in pairs(tempHideCollideStates) do
+            if p and p.Parent then p.CanCollide = orig end
+        end
+        table.clear(tempHideCollideStates)
+    end
+end
+
+local function getMinDistanceToMonsters(pt)
+    local minDist = math.huge
+    local map = getMap()
+    local monstersFolder = map and map:FindFirstChild("Monsters")
+    if monstersFolder then
+        for _, m in pairs(monstersFolder:GetChildren()) do
+            if m:IsA("Model") then
+                local p = getMonsterPart(m)
+                if p then
+                    local d = (p.Position - pt).Magnitude
+                    if d < minDist then minDist = d end
+                end
+            end
+        end
+    end
+    return minDist
+end
+
+local function getBestThickColliderCenter()
+    updateColliderCaches(false)
+    if #cachedHideCols == 0 then return nil, nil end
+
+    local walkY = getSafeWalkY(rootPart and rootPart.Position.Y or 100)
+    local bestCol, bestCenter, bestMobDist = nil, nil, -1
+
+    for _, col in ipairs(cachedHideCols) do
+        if col and col.Parent then
+            local center = Vector3.new(col.Position.X, walkY, col.Position.Z)
+            local mobDist = getMinDistanceToMonsters(center)
+            if mobDist > bestMobDist then
+                bestMobDist = mobDist
+                bestCol     = col
+                bestCenter  = center
+            end
+        end
+    end
+
+    return bestCenter, bestCol
+end
+
+-- 1. Metode Instant Teleport
+local function teleportInstant(cf, keepZeroGravity)
+    character = player.Character
+    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    rootPart.Anchored = false
+    Workspace.Gravity = 0
+    rootPart.AssemblyLinearVelocity  = Vector3.zero
+    rootPart.AssemblyAngularVelocity = Vector3.zero
+    rootPart.CFrame = cf
+    if character then character:PivotTo(cf) end
+    if not keepZeroGravity then
+        restoreNormalGravity()
+    end
+end
+
+-- 2. Metode Dual-Speed Tween (3.50 Open / 1.05 Obstacle)
+local function teleportTween(cf, customSpeed, keepZeroGravity)
+    character = player.Character
+    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+
+    rootPart.Anchored = false
+    Workspace.Gravity = 0
+
+    local startPos  = rootPart.Position
+    local targetPos = cf.Position
+    local baseSpd   = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 27.5
+    local openMult  = customSpeed or Config.Teleport.TweenSpeed or 3.50
+    local noclipMult = Config.Teleport.NoClipTweenSpeed or 1.05
+
+    -- Cek apakah jalur melewati collider untuk menentukan kecepatan aman
+    updateColliderCaches(false)
+    local nearObstacle = false
+    local midPt = startPos:Lerp(targetPos, 0.5)
+    for _, col in ipairs(cachedAllCols) do
+        if col and col.Parent then
+            if isPointInsideExpandedBox(midPt, col, 4.0, 2.5) or isPointInsideExpandedBox(targetPos, col, 4.0, 2.5) then
+                nearObstacle = true
+                setTargetColliderPassable(col, true)
+            end
+        end
+    end
+
+    local moveSpd = baseSpd * (nearObstacle and noclipMult or openMult)
+    local dist    = (startPos - targetPos).Magnitude
+    local dur     = math.max(dist / math.max(moveSpd, 1), 0.001)
+
+    local tw = TweenService:Create(rootPart, TweenInfo.new(dur, Enum.EasingStyle.Linear), { CFrame = cf })
+    activeTween = tw
+    tw:Play()
+
+    local done = false
+    tw.Completed:Connect(function(playbackState)
+        if playbackState == Enum.PlaybackState.Completed then done = true end
+    end)
+
+    while not done and isAutoDiscovering and not abortCurrentMovement and not isScriptDestroyed do
+        if isPanicDeadlineReached() then
+            tw:Cancel()
+            break
+        end
+        task.wait(0.015)
+    end
+
+    if rootPart and (rootPart.Position - targetPos).Magnitude <= 4.5 then
+        rootPart.CFrame = cf
+        if character then character:PivotTo(cf) end
+    end
+    if rootPart then
+        rootPart.AssemblyLinearVelocity  = Vector3.zero
+        rootPart.AssemblyAngularVelocity = Vector3.zero
+    end
+    if activeTween == tw then activeTween = nil end
+
+    if not keepZeroGravity then
+        restoreNormalGravity()
+    end
+    return true
+end
+
+-- 3. Metode Hybrid Y-Bypass (Turun ke Y = -241 lalu loncat ke tujuan)
+local function teleportHybridY(cf, keepZeroGravity)
+    character = player.Character
+    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    local flatDist = Vector2.new(rootPart.Position.X - cf.Position.X, rootPart.Position.Z - cf.Position.Z).Magnitude
+    local minDist  = Config.Teleport.HybridMinDistance or 75
+
+    -- Jika jarak dekat (< 75 studs), lebih cepat dan aman langsung pakai Tween
+    if flatDist < minDist then
+        teleportTween(cf, Config.Teleport.TweenSpeed, keepZeroGravity)
+        return
+    end
+
+    local colCenter, targetCol = getBestThickColliderCenter()
+    if colCenter and targetCol then
+        setTargetColliderPassable(targetCol, true)
+        teleportTween(CFrame.new(colCenter), Config.Teleport.TweenSpeed, true)
+    end
+
+    local anchorPos = rootPart and rootPart.Position or cf.Position
+    local bypassY   = Config.Teleport.HybridBypassY or -241
+    local waitDelay = math.max(Config.Teleport.HybridBypassDelay or 0.40, 0.05)
+    local bypassCF  = CFrame.new(anchorPos.X, bypassY, anchorPos.Z)
+
+    Workspace.Gravity = 0
+    teleportInstant(bypassCF, true)
+
+    local holdConn = RunService.Heartbeat:Connect(function()
+        if rootPart and isAutoDiscovering and not abortCurrentMovement and not isScriptDestroyed then
+            rootPart.AssemblyLinearVelocity  = Vector3.zero
+            rootPart.AssemblyAngularVelocity = Vector3.zero
+            rootPart.CFrame = bypassCF
+        end
+    end)
+
+    local elapsed = 0
+    while elapsed < waitDelay and isAutoDiscovering and not abortCurrentMovement and not isScriptDestroyed do
+        if isPanicDeadlineReached() then break end
+        local step = math.min(0.05, waitDelay - elapsed)
+        task.wait(step)
+        elapsed = elapsed + step
+    end
+
+    if holdConn then holdConn:Disconnect() end
+
+    teleportInstant(cf, true)
+    task.wait(0.04)
+    teleportInstant(cf, keepZeroGravity)
+end
+
+-- Router Utama Perpindahan Karakter (Mengikuti Config.Teleport.Mode)
+local function moveCharacterTo(cf, keepZeroGravity, forceInstant)
+    if forceInstant then
+        teleportInstant(cf, keepZeroGravity)
+        return
+    end
+
+    local mode = string.lower(tostring(Config.Teleport.Mode or "instant"))
+    if mode == "tween" then
+        teleportTween(cf, Config.Teleport.TweenSpeed, keepZeroGravity)
+    elseif mode == "hybridy" then
+        teleportHybridY(cf, keepZeroGravity)
+    else
+        teleportInstant(cf, keepZeroGravity)
+    end
+end
+
+-- Menentukan titik tengah kabin Real Elevator (Aman di belakang DoorHitbox) & mematikan collision pintu lift
+local function getRealElevatorCFrame()
+    local walkY  = (rootPart and rootPart.Position.Y > -50 and rootPart.Position.Y < 200) and rootPart.Position.Y or nil
+    local curMap = getMap()
+    local depth  = Config.ElevatorSafety.CabinInwardDepth or 8.0
+
+    local elevatorsFolder = Workspace:FindFirstChild("Elevators")
+    if elevatorsFolder then
+        for _, obj in ipairs(elevatorsFolder:GetChildren()) do
+            if obj.Name == "Elevator" and obj:IsA("Model") then
+                for _, desc in ipairs(obj:GetDescendants()) do
+                    if desc:IsA("BasePart") and not isFloorPart(desc) then
+                        local ln = desc.Name:lower()
+                        if ln == "doorhitbox" or ln:find("door") or ln:find("gate") or ln:find("invis") then
+                            desc.CanCollide = false
+                        end
+                    end
+                end
+
+                local centerPos  = (obj.PrimaryPart and obj.PrimaryPart.Position) or getModelCenter(obj)
+                local doorHitbox = obj:FindFirstChild("DoorHitbox", true)
+                if centerPos and doorHitbox then
+                    local dPos = doorHitbox:IsA("BasePart") and doorHitbox.Position or doorHitbox:GetPivot().Position
+                    local inwardDir = Vector3.new(centerPos.X - dPos.X, 0, centerPos.Z - dPos.Z)
+                    if inwardDir.Magnitude > 0.5 then
+                        inwardDir = inwardDir.Unit
+                        local safeCabinPos = Vector3.new(dPos.X, centerPos.Y, dPos.Z) + (inwardDir * depth)
+                        cachedRealElevCF   = CFrame.new(safeCabinPos.X, safeCabinPos.Y + 3, safeCabinPos.Z)
+                        cachedRealElevRoom = curMap
+                        return CFrame.new(safeCabinPos.X, walkY or (safeCabinPos.Y + 3), safeCabinPos.Z)
+                    end
+                end
+                if centerPos then
+                    cachedRealElevCF   = CFrame.new(centerPos.X, centerPos.Y + 3, centerPos.Z)
+                    cachedRealElevRoom = curMap
+                    return CFrame.new(centerPos.X, walkY or (centerPos.Y + 3), centerPos.Z)
+                end
+            end
+        end
+        for _, obj in ipairs(elevatorsFolder:GetDescendants()) do
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                local cf = obj.CFrame * CFrame.new(0, 1.5, 2)
+                cachedRealElevCF   = cf
+                cachedRealElevRoom = curMap
+                return CFrame.new(cf.X, walkY or cf.Y, cf.Z)
+            end
+        end
+    end
+
+    local room = Workspace:FindFirstChild("CurrentRoom")
+    if room then
+        for _, obj in ipairs(room:GetDescendants()) do
+            if obj.Name == "ElevatorPrompt" and obj:IsA("BasePart") then
+                local parentName = string.lower(obj.Parent and obj.Parent.Name or "")
+                if not string.find(parentName, "fake") then
+                    local cf = obj.CFrame * CFrame.new(0, 1.5, 2)
+                    cachedRealElevCF   = cf
+                    cachedRealElevRoom = curMap
+                    return CFrame.new(cf.X, walkY or cf.Y, cf.Z)
+                end
+            end
+        end
+    end
+
+    if cachedRealElevCF and cachedRealElevRoom == curMap then
+        return CFrame.new(cachedRealElevCF.X, walkY or cachedRealElevCF.Y, cachedRealElevCF.Z)
+    end
+    return nil
+end
+
+local function moveToSafePlace(forceRealElevator)
+    clearAllServerSyncedHolds()
+    character = player.Character
+    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    rootPart.Anchored = false
+
+    local panicNow = isPanicTimeActive()
+    local useElevator = forceRealElevator
+        or (Config.SafePlace.Mode == "RealElevator")
+        or (panicNow and Config.ElevatorSafety.AlwaysLockInElevatorOnPanic)
+
+    if useElevator then
+        setTargetColliderPassable(nil, false)
+        local elevCF = getRealElevatorCFrame()
+        if elevCF then
+            currentStatusText = "SAFE DI REAL ELEVATOR (1000%)"
+            moveCharacterTo(elevCF, false, panicNow)
+            local hum = character and character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+                hum.Sit = false
+            end
+            return true
+        end
+    end
+
+    local colCenter, targetCol = getBestThickColliderCenter()
+    if colCenter and targetCol then
+        currentStatusText = "NGUNGSI DI TENGAH COLLIDER (" .. (targetCol.Parent and targetCol.Parent.Name or targetCol.Name) .. ")"
+        setTargetColliderPassable(targetCol, true)
+        moveCharacterTo(CFrame.new(colCenter), true, false)
+        startServerSyncedHold(function() return colCenter end)
+        return true
+    end
+
+    local elevCF = getRealElevatorCFrame()
+    if elevCF then
+        currentStatusText = "SAFE DI REAL ELEVATOR"
+        moveCharacterTo(elevCF, false, false)
+        return true
+    end
+
+    return false
+end
+
+local function ensureLockedInsideRealElevator1000Percent()
+    clearAllServerSyncedHolds()
+    setTargetColliderPassable(nil, false)
+    restoreNormalGravity()
+
+    character = player.Character
+    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    rootPart.Anchored = false
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = false
+        hum.Sit = false
+    end
+
+    local elevCF = getRealElevatorCFrame()
+    if not elevCF then return end
+
+    local flatDist = Vector2.new(rootPart.Position.X - elevCF.Position.X, rootPart.Position.Z - elevCF.Position.Z).Magnitude
+    local maxDrift = Config.ElevatorSafety.MaxAllowedDrift or 5.5
+
+    if flatDist > maxDrift or math.abs(rootPart.Position.Y - elevCF.Position.Y) > 8 then
+        -- Gunakan Instant Teleport saat darurat mengunci Real Elevator agar 1000% masuk sebelum waktu habis
+        teleportInstant(elevCF, false)
+        cprint("[ELEVATOR 1000% LOCK] Memastikan posisi tepat di dalam kabin Real Elevator!")
+    end
+    currentStatusText = "1000% AMAN DI DALAM REAL ELEVATOR"
+end
+
+-- ==============================================================================
+-- [SECTION 5] RESEARCH DATA & DISCOVER LOGIC
+-- ==============================================================================
+local function getTargetMonsterList()
+    local list = {}
+    for _, m in ipairs(Config.StandardMonsters) do
+        table.insert(list, { name = m, category = "Standard" })
+    end
+    if Config.Discover.IncludeEventMonsters then
+        for _, m in ipairs(Config.EventMonsters) do
+            table.insert(list, { name = m, category = "Event" })
+        end
+    end
+    return list
+end
+
+local function getMonsterResearchPercent(monsterName)
+    local PlayerData     = ReplicatedStorage:FindFirstChild("PlayerData")
+    local UserFolder     = PlayerData and PlayerData:FindFirstChild(userId)
+    local ResearchFolder = UserFolder and UserFolder:FindFirstChild("Research")
+
+    if ResearchFolder then
+        local researchObj = ResearchFolder:FindFirstChild(monsterName)
+        if researchObj then
+            local rawVal = tostring(researchObj.Value)
+            local clean  = string.gsub(rawVal, "%%", "")
+            local num    = tonumber(clean)
+            if num then
+                return math.clamp(math.floor(num + 0.5), 0, 100)
+            end
+        end
+    end
+    return 0
+end
+
+local function getActiveMonstersInCurrentFloor()
+    local activeMap = {}
+    local map = getMap()
+    local monstersFolder = map and map:FindFirstChild("Monsters")
+    if monstersFolder then
+        for _, m in ipairs(monstersFolder:GetChildren()) do
+            if m:IsA("Model") then
+                activeMap[m.Name] = m
+            end
+        end
+    end
+    return activeMap
+end
+
+local function getAllTwistedResearchReport()
+    local targetList  = getTargetMonsterList()
+    local activeInMap = getActiveMonstersInCurrentFloor()
+    local maxThresh   = Config.Discover.TargetMaxPercent or 0
+
+    local report      = {}
+    local zeroCount   = 0
+    local under100    = 0
+    local targetNeed  = {}
+
+    for _, entry in ipairs(targetList) do
+        local mName   = entry.name
+        local pct     = getMonsterResearchPercent(mName)
+        local inFloor = (activeInMap[mName] ~= nil)
+
+        if pct == 0 then zeroCount = zeroCount + 1 end
+        if pct < 100 then under100 = under100 + 1 end
+
+        local needsDiscover = (pct <= maxThresh)
+        if needsDiscover then
+            table.insert(targetNeed, mName)
+        end
+
+        table.insert(report, {
+            name          = mName,
+            cleanName     = string.gsub(mName, "Monster$", ""),
+            category      = entry.category,
+            percent       = pct,
+            inFloor       = inFloor,
+            needsDiscover = needsDiscover
+        })
+    end
+
+    table.sort(report, function(a, b)
+        if a.inFloor ~= b.inFloor then return a.inFloor end
+        if a.percent ~= b.percent then return a.percent < b.percent end
+        return a.cleanName < b.cleanName
+    end)
+
+    return report, targetNeed, zeroCount, under100, #targetList
+end
+
+local function isMonsterDiscoveredInRealTime(monsterName, initialPercent)
+    local currentPct = getMonsterResearchPercent(monsterName)
+    if currentPct > (initialPercent or 0) then
+        return true
+    end
+
+    local pGui        = player:FindFirstChild("PlayerGui")
+    local screenGui   = pGui and pGui:FindFirstChild("ScreenGui")
+    local monsterIcon = screenGui and screenGui:FindFirstChild("MonsterIcon")
+
+    if monsterIcon and monsterIcon.Visible and type(monsterIcon.ImageTransparency) == "number" then
+        if monsterIcon.ImageTransparency < 0.99 then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function executeHitAndRun(monsterModel, loopId)
+    local mPart = getMonsterPart(monsterModel)
+    if not mPart then return false end
+
+    character = player.Character
+    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+
+    local deadlineReached, secLeft = isPanicDeadlineReached()
+    if deadlineReached then
+        cprint(string.format("[SAFETY ABORT] Sisa waktu lift %s detik! Batal Hit & Run, wajib masuk Real Elevator!", tostring(secLeft)))
+        ensureLockedInsideRealElevator1000Percent()
+        return false
+    end
+
+    clearAllServerSyncedHolds()
+    setTargetColliderPassable(nil, false)
+
+    local initPct      = getMonsterResearchPercent(monsterModel.Name)
+    local dist         = Config.Discover.DistanceToMonster or 15
+    local heightOff    = Config.Discover.HeightOffset or 3
+    local monsterPos   = mPart.Position
+    local myTargetPos  = monsterPos + Vector3.new(dist, heightOff, dist)
+    local lookAtCFrame = CFrame.lookAt(myTargetPos, monsterPos)
+
+    currentStatusText = "HIT & RUN -> " .. monsterModel.Name
+    cprint("[AUTO-DISCOVER] 🎯 Mengunci Target: " .. monsterModel.Name .. " (" .. initPct .. "%) via Mode: " .. tostring(Config.Teleport.Mode))
+
+    moveCharacterTo(lookAtCFrame, true, false)
+    if rootPart then rootPart.Anchored = true end
+
+    local maxTicks = math.floor((Config.Discover.MaxWaitSeconds or 3.5) / 0.1)
+    local success  = false
+
+    for _ = 1, maxTicks do
+        if isScriptDestroyed or not isAutoDiscovering or activeLoopId ~= loopId then
+            if rootPart then rootPart.Anchored = false end
+            restoreNormalGravity()
+            return false
+        end
+
+        local isUrgent, remSec = isPanicDeadlineReached()
+        if isUrgent then
+            cprint(string.format("[PANIC SAFETY] Sisa waktu lift %s detik! Memutus penguncian & langsung masuk Real Elevator!", tostring(remSec)))
+            break
+        end
+
+        if not monsterModel.Parent then
+            break
+        end
+
+        local curMPart = getMonsterPart(monsterModel)
+        if curMPart and rootPart then
+            local mPos = curMPart.Position
+            local tPos = mPos + Vector3.new(dist, heightOff, dist)
+            rootPart.CFrame = CFrame.lookAt(tPos, mPos)
+        end
+
+        if isMonsterDiscoveredInRealTime(monsterModel.Name, initPct) then
+            cprint("[AUTO-DISCOVER] ✔ Berhasil Discover: " .. monsterModel.Name .. "!")
+            success = true
+            break
+        end
+
+        task.wait(0.1)
+    end
+
+    discoveredThisFloor[monsterModel.Name] = true
+    if rootPart then rootPart.Anchored = false end
+    restoreNormalGravity()
+
+    local panicNow = isPanicTimeActive()
+    if panicNow then
+        cprint("[AUTO-DISCOVER] 💨 Kembali & Mengunci Posisi di Real Elevator (Panic Time)...")
+        ensureLockedInsideRealElevator1000Percent()
+    else
+        cprint("[AUTO-DISCOVER] 💨 Ngungsi ke tengah Thick Collider SafePlace...")
+        moveToSafePlace(false)
+    end
+
+    task.wait(0.8)
+    return success
+end
+
+-- ==============================================================================
+-- [SECTION 6] FULL REVAMPED DASHBOARD GUI (AUTO-MINIMIZE + CLOSE TOTAL BUTTON)
+-- ==============================================================================
+local function getGuiContainer()
+    local ok, res = pcall(function()
+        local _ = CoreGui:FindFirstChild("AutoDiscoverUI_v4")
+        return CoreGui
+    end)
+    return (ok and res) or player:WaitForChild("PlayerGui")
+end
+
+local guiContainer = getGuiContainer()
+for _, oldName in ipairs({ "AutoDiscoverUI", "AutoDiscoverUI_v4", "AutoDiscoverUI_v4_1" }) do
+    local old = guiContainer:FindFirstChild(oldName)
+    if old then old:Destroy() end
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name           = "AutoDiscoverUI_v4_1"
+screenGui.ResetOnSpawn   = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent         = guiContainer
+
+local FULL_GUI_SIZE = UDim2.new(0, 360, 0, 460)
+local MIN_GUI_SIZE  = UDim2.new(0, 360, 0, 46)
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name             = "MainFrame"
+mainFrame.Size             = Config.AutoMinimize and MIN_GUI_SIZE or FULL_GUI_SIZE
+mainFrame.Position         = UDim2.new(0.5, -180, 0.08, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
+mainFrame.BorderSizePixel  = 0
+mainFrame.Parent           = screenGui
+
+local mainCorner = Instance.new("UICorner", mainFrame)
+mainCorner.CornerRadius = UDim.new(0, 10)
+
+local mainStroke = Instance.new("UIStroke", mainFrame)
+mainStroke.Color     = Color3.fromRGB(0, 190, 210)
+mainStroke.Thickness = 1.5
+
+-- Header Bar (Draggable)
+local headerBar = Instance.new("Frame")
+headerBar.Name             = "HeaderBar"
+headerBar.Size             = UDim2.new(1, 0, 0, 46)
+headerBar.BackgroundColor3 = Color3.fromRGB(26, 30, 42)
+headerBar.BorderSizePixel  = 0
+headerBar.Parent           = mainFrame
+
+local headerCorner = Instance.new("UICorner", headerBar)
+headerCorner.CornerRadius = UDim.new(0, 10)
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size                   = UDim2.new(1, -80, 0, 22)
+titleLabel.Position               = UDim2.new(0, 12, 0, 4)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font                   = Enum.Font.GothamBold
+titleLabel.TextSize               = 13
+titleLabel.TextColor3             = Color3.fromRGB(0, 230, 255)
+titleLabel.TextXAlignment         = Enum.TextXAlignment.Left
+titleLabel.Text                   = "👁️ AUTO-DISCOVER TWISTED v4.1"
+titleLabel.Parent                 = headerBar
+
+local userLabel = Instance.new("TextLabel")
+userLabel.Size                   = UDim2.new(1, -80, 0, 18)
+userLabel.Position               = UDim2.new(0, 12, 0, 24)
+userLabel.BackgroundTransparency = 1
+userLabel.Font                   = Enum.Font.GothamMedium
+userLabel.TextSize               = 11
+userLabel.TextColor3             = Color3.fromRGB(200, 210, 230)
+userLabel.TextXAlignment         = Enum.TextXAlignment.Left
+userLabel.Text                   = string.format("👤 %s (@%s) | ID: %s", player.DisplayName, player.Name, userId)
+userLabel.Parent                 = headerBar
+
+-- Minimize Button (— / +)
+local minBtn = Instance.new("TextButton")
+minBtn.Name             = "MinimizeBtn"
+minBtn.Size             = UDim2.new(0, 28, 0, 28)
+minBtn.Position         = UDim2.new(1, -68, 0, 9)
+minBtn.BackgroundColor3 = Color3.fromRGB(40, 46, 64)
+minBtn.Font             = Enum.Font.GothamBold
+minBtn.TextSize         = 14
+minBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+minBtn.Text             = Config.AutoMinimize and "+" or "—"
+minBtn.Parent           = headerBar
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+
+-- Tombol Close GUI Total Tanpa Sisa (✕)
+local closeBtn = Instance.new("TextButton")
+closeBtn.Name             = "CloseTotalBtn"
+closeBtn.Size             = UDim2.new(0, 28, 0, 28)
+closeBtn.Position         = UDim2.new(1, -34, 0, 9)
+closeBtn.BackgroundColor3 = Color3.fromRGB(190, 45, 55)
+closeBtn.Font             = Enum.Font.GothamBold
+closeBtn.TextSize         = 13
+closeBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+closeBtn.Text             = "✕"
+closeBtn.Parent           = headerBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Content Container (Otomatis mengikuti Config.AutoMinimize saat pertama kali jalan)
+local bodyFrame = Instance.new("Frame")
+bodyFrame.Name                   = "BodyFrame"
+bodyFrame.Size                   = UDim2.new(1, -20, 1, -56)
+bodyFrame.Position               = UDim2.new(0, 10, 0, 50)
+bodyFrame.BackgroundTransparency = 1
+bodyFrame.Visible                = not Config.AutoMinimize
+bodyFrame.Parent                 = mainFrame
+
+-- Status & Telemetry Box
+local statusBox = Instance.new("Frame")
+statusBox.Size             = UDim2.new(1, 0, 0, 68)
+statusBox.BackgroundColor3 = Color3.fromRGB(25, 28, 38)
+statusBox.BorderSizePixel  = 0
+statusBox.Parent           = bodyFrame
+Instance.new("UICorner", statusBox).CornerRadius = UDim.new(0, 8)
+
+local statusLine1 = Instance.new("TextLabel")
+statusLine1.Size                   = UDim2.new(1, -16, 0, 20)
+statusLine1.Position               = UDim2.new(0, 8, 0, 4)
+statusLine1.BackgroundTransparency = 1
+statusLine1.Font                   = Enum.Font.GothamBold
+statusLine1.TextSize               = 12
+statusLine1.TextColor3             = Color3.fromRGB(80, 255, 140)
+statusLine1.TextXAlignment         = Enum.TextXAlignment.Left
+statusLine1.Text                   = "STATUS: MEMUAT..."
+statusLine1.Parent                 = statusBox
+
+local statusLine2 = Instance.new("TextLabel")
+statusLine2.Size                   = UDim2.new(1, -16, 0, 18)
+statusLine2.Position               = UDim2.new(0, 8, 0, 25)
+statusLine2.BackgroundTransparency = 1
+statusLine2.Font                   = Enum.Font.Gotham
+statusLine2.TextSize               = 11
+statusLine2.TextColor3             = Color3.fromRGB(220, 220, 220)
+statusLine2.TextXAlignment         = Enum.TextXAlignment.Left
+statusLine2.Text                   = "Mesin: 0/0 | Lift Timer: - | Syarat: -"
+statusLine2.Parent                 = statusBox
+
+local statusLine3 = Instance.new("TextLabel")
+statusLine3.Size                   = UDim2.new(1, -16, 0, 18)
+statusLine3.Position               = UDim2.new(0, 8, 0, 44)
+statusLine3.BackgroundTransparency = 1
+statusLine3.Font                   = Enum.Font.GothamMedium
+statusLine3.TextSize               = 11
+statusLine3.TextColor3             = Color3.fromRGB(255, 200, 80)
+statusLine3.TextXAlignment         = Enum.TextXAlignment.Left
+statusLine3.Text                   = "Belum Discover (0%): 0 | Belum 100%: 0"
+statusLine3.Parent                 = statusBox
+
+-- Control Buttons Row 1 (Start/Stop & Trigger Mode)
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size             = UDim2.new(0.49, 0, 0, 30)
+toggleBtn.Position         = UDim2.new(0, 0, 0, 74)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 130)
+toggleBtn.Font             = Enum.Font.GothamBold
+toggleBtn.TextSize         = 11
+toggleBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text             = "START DISCOVER"
+toggleBtn.Parent           = bodyFrame
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+local modeBtn = Instance.new("TextButton")
+modeBtn.Size             = UDim2.new(0.49, 0, 0, 30)
+modeBtn.Position         = UDim2.new(0.51, 0, 0, 74)
+modeBtn.BackgroundColor3 = Color3.fromRGB(45, 55, 80)
+modeBtn.Font             = Enum.Font.GothamBold
+modeBtn.TextSize         = 11
+modeBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+modeBtn.Text             = "TRIGGER: " .. string.upper(Config.TriggerRules.Mode)
+modeBtn.Parent           = bodyFrame
+Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Control Buttons Row 2 (Teleport Mode, Event Toggle, & List Filter)
+local tpModeBtn = Instance.new("TextButton")
+tpModeBtn.Size             = UDim2.new(0.32, 0, 0, 28)
+tpModeBtn.Position         = UDim2.new(0, 0, 0, 108)
+tpModeBtn.BackgroundColor3 = Color3.fromRGB(35, 90, 95)
+tpModeBtn.Font             = Enum.Font.GothamBold
+tpModeBtn.TextSize         = 10
+tpModeBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+tpModeBtn.Text             = "TP: " .. string.upper(Config.Teleport.Mode)
+tpModeBtn.Parent           = bodyFrame
+Instance.new("UICorner", tpModeBtn).CornerRadius = UDim.new(0, 6)
+
+local eventBtn = Instance.new("TextButton")
+eventBtn.Size             = UDim2.new(0.32, 0, 0, 28)
+eventBtn.Position         = UDim2.new(0.34, 0, 0, 108)
+eventBtn.BackgroundColor3 = Config.Discover.IncludeEventMonsters and Color3.fromRGB(140, 70, 180) or Color3.fromRGB(50, 50, 65)
+eventBtn.Font             = Enum.Font.GothamBold
+eventBtn.TextSize         = 10
+eventBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+eventBtn.Text             = "EVENT: " .. (Config.Discover.IncludeEventMonsters and "ON" or "OFF")
+eventBtn.Parent           = bodyFrame
+Instance.new("UICorner", eventBtn).CornerRadius = UDim.new(0, 6)
+
+local filterBtn = Instance.new("TextButton")
+filterBtn.Size             = UDim2.new(0.32, 0, 0, 28)
+filterBtn.Position         = UDim2.new(0.68, 0, 0, 108)
+filterBtn.BackgroundColor3 = Color3.fromRGB(40, 75, 110)
+filterBtn.Font             = Enum.Font.GothamBold
+filterBtn.TextSize         = 10
+filterBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+filterBtn.Text             = "LIST: HANYA 0%"
+filterBtn.Parent           = bodyFrame
+Instance.new("UICorner", filterBtn).CornerRadius = UDim.new(0, 6)
+
+-- List Header
+local listHeader = Instance.new("TextLabel")
+listHeader.Size                   = UDim2.new(1, 0, 0, 18)
+listHeader.Position               = UDim2.new(0, 2, 0, 140)
+listHeader.BackgroundTransparency = 1
+listHeader.Font                   = Enum.Font.GothamBold
+listHeader.TextSize               = 11
+listHeader.TextColor3             = Color3.fromRGB(160, 180, 210)
+listHeader.TextXAlignment         = Enum.TextXAlignment.Left
+listHeader.Text                   = "📋 DAFTAR TWISTED & PERSENTASE RESEARCH:"
+listHeader.Parent                 = bodyFrame
+
+-- ScrollingFrame untuk Daftar Twisted
+local listScroll = Instance.new("ScrollingFrame")
+listScroll.Name                 = "TwistedListScroll"
+listScroll.Size                 = UDim2.new(1, 0, 1, -162)
+listScroll.Position             = UDim2.new(0, 0, 0, 160)
+listScroll.BackgroundColor3     = Color3.fromRGB(14, 16, 22)
+listScroll.BorderSizePixel      = 0
+listScroll.ScrollBarThickness   = 5
+listScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 190, 210)
+listScroll.CanvasSize           = UDim2.new(0, 0, 0, 0)
+listScroll.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+listScroll.Parent               = bodyFrame
+Instance.new("UICorner", listScroll).CornerRadius = UDim.new(0, 8)
+
+local listLayout = Instance.new("UIListLayout", listScroll)
+listLayout.Padding   = UDim.new(0, 4)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local listPadding = Instance.new("UIPadding", listScroll)
+listPadding.PaddingTop    = UDim.new(0, 6)
+listPadding.PaddingBottom = UDim.new(0, 6)
+listPadding.PaddingLeft   = UDim.new(0, 6)
+listPadding.PaddingRight  = UDim.new(0, 6)
+
+-- Custom Drag System
+do
+    local dragging, dragInput, dragStart, startPos
+    local c1 = headerBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            dragStart = input.Position
+            startPos  = mainFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    local c2 = headerBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    local c3 = UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging and mainFrame and mainFrame.Parent then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    table.insert(runtimeConnections, c1)
+    table.insert(runtimeConnections, c2)
+    table.insert(runtimeConnections, c3)
+end
+
+-- Minimize Handler (Mengikuti state awal Config.AutoMinimize)
+local isMinimized = (Config.AutoMinimize == true)
+minBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    bodyFrame.Visible = not isMinimized
+    mainFrame.Size = isMinimized and MIN_GUI_SIZE or FULL_GUI_SIZE
+    minBtn.Text = isMinimized and "+" or "—"
+end)
+
+-- Fungsi Render Daftar Twisted di GUI
+local function refreshDashboardGUI()
+    if isScriptDestroyed or not screenGui or not screenGui.Parent then return end
+
+    local report, _, zeroCount, under100, totalCount = getAllTwistedResearchReport()
+    local curGen, totGen = getMachineProgress()
+    local panicNow, secLeft = isPanicTimeActive()
+    local trigOk, trigDesc = isTriggerConditionMet()
+
+    statusLine1.Text = "STATUS: " .. currentStatusText
+    statusLine1.TextColor3 = isAutoDiscovering and Color3.fromRGB(80, 255, 140) or Color3.fromRGB(255, 120, 120)
+
+    local timerTxt = secLeft and (tostring(secLeft) .. "s (PANIC!)") or (panicNow and "PANIC ACTIVE" or "Normal")
+    statusLine2.Text = string.format("Mesin: %d/%d | Lift: %s | %s", curGen, totGen, timerTxt, trigDesc)
+    statusLine2.TextColor3 = trigOk and Color3.fromRGB(130, 240, 255) or Color3.fromRGB(210, 210, 210)
+
+    statusLine3.Text = string.format("Kurang 0%% (Belum Discover): %d  |  Kurang <100%%: %d / %d", zeroCount, under100, totalCount)
+
+    for _, child in ipairs(listScroll:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+
+    local shownCount = 0
+    for idx, item in ipairs(report) do
+        local showThis = false
+        if guiFilterMode == "ZERO" then
+            showThis = (item.percent == 0)
+        elseif guiFilterMode == "INCOMPLETE" then
+            showThis = (item.percent < 100)
+        else
+            showThis = true
+        end
+
+        if showThis then
+            shownCount = shownCount + 1
+            local row = Instance.new("Frame")
+            row.Name             = item.name
+            row.LayoutOrder      = idx
+            row.Size             = UDim2.new(1, 0, 0, 28)
+            row.BackgroundColor3 = item.inFloor and Color3.fromRGB(60, 50, 18) or Color3.fromRGB(24, 28, 38)
+            row.BorderSizePixel  = 0
+            row.Parent           = listScroll
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+
+            if item.inFloor then
+                local st = Instance.new("UIStroke", row)
+                st.Color = Color3.fromRGB(255, 215, 0)
+                st.Thickness = 1.2
+            end
+
+            local nameLbl = Instance.new("TextLabel")
+            nameLbl.Size                   = UDim2.new(0.68, -8, 1, 0)
+            nameLbl.Position               = UDim2.new(0, 8, 0, 0)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.Font                   = Enum.Font.GothamBold
+            nameLbl.TextSize               = 11
+            nameLbl.TextXAlignment         = Enum.TextXAlignment.Left
+            nameLbl.TextColor3             = item.inFloor and Color3.fromRGB(255, 230, 80)
+                                          or (item.percent == 0 and Color3.fromRGB(255, 110, 110)
+                                          or (item.percent == 100 and Color3.fromRGB(100, 255, 140)
+                                          or Color3.fromRGB(230, 230, 240)))
+
+            local prefix = item.inFloor and "🔥 [DI LANTAI INI] " or (item.category == "Event" and "🎃 " or "• ")
+            nameLbl.Text = prefix .. item.cleanName
+            nameLbl.Parent = row
+
+            local pctLbl = Instance.new("TextLabel")
+            pctLbl.Size                   = UDim2.new(0.32, -8, 1, 0)
+            pctLbl.Position               = UDim2.new(0.68, 0, 0, 0)
+            pctLbl.BackgroundTransparency = 1
+            pctLbl.Font                   = Enum.Font.GothamBold
+            pctLbl.TextSize               = 11
+            pctLbl.TextXAlignment         = Enum.TextXAlignment.Right
+            pctLbl.TextColor3             = (item.percent == 0) and Color3.fromRGB(255, 95, 95)
+                                         or (item.percent >= 100 and Color3.fromRGB(80, 255, 130)
+                                         or Color3.fromRGB(255, 205, 80))
+            pctLbl.Text                   = tostring(item.percent) .. "%"
+            pctLbl.Parent                 = row
+        end
+    end
+
+    if shownCount == 0 then
+        local emptyLbl = Instance.new("TextLabel")
+        emptyLbl.Size                   = UDim2.new(1, 0, 0, 40)
+        emptyLbl.BackgroundTransparency = 1
+        emptyLbl.Font                   = Enum.Font.GothamBold
+        emptyLbl.TextSize               = 12
+        emptyLbl.TextColor3             = Color3.fromRGB(100, 255, 150)
+        emptyLbl.Text                   = "🎉 Semua Twisted pada kategori ini sudah selesai!"
+        emptyLbl.Parent                 = listScroll
+    end
+end
+
+-- ==============================================================================
+-- [SECTION 7] MAIN AUTO-DISCOVER LOOP (SMART TRIGGER + ELEVATOR SAFETY)
+-- ==============================================================================
+local function startAutoDiscover()
+    activeLoopId = activeLoopId + 1
+    local myLoopId = activeLoopId
+
+    task.spawn(function()
+        while isAutoDiscovering and activeLoopId == myLoopId and not isScriptDestroyed do
+            character = player.Character
+            rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+
+            if not rootPart then
+                currentStatusText = "MENUNGGU KARAKTER SPAWN..."
+                task.wait(0.5)
+                continue
+            end
+
+            local _, undiscoveredList = getAllTwistedResearchReport()
+
+            if #undiscoveredList == 0 then
+                cprint("==================================================")
+                cprint("🎉 SELAMAT! Semua Monster Target di Config sudah ter-Discover!")
+                cprint("==================================================")
+                currentStatusText = "SEMUA TWISTED SELESAI!"
+                if isPanicTimeActive() then
+                    ensureLockedInsideRealElevator1000Percent()
+                end
+                toggleBtn.Text = "SEMUA SELESAI"
+                toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+                refreshDashboardGUI()
+                task.wait(1)
+                continue
+            end
+
+            local panicUrgent, remSec = isPanicDeadlineReached()
+            if panicUrgent then
+                ensureLockedInsideRealElevator1000Percent()
+                currentStatusText = string.format("1000%% LOCK REAL ELEVATOR (SISA %ds!)", remSec or 0)
+                refreshDashboardGUI()
+                task.wait(0.15)
+                continue
+            end
+
+            local triggerAllowed, triggerReason = isTriggerConditionMet()
+            if not triggerAllowed then
+                currentStatusText = "STANDBY: " .. triggerReason
+                refreshDashboardGUI()
+                task.wait(0.4)
+                continue
+            end
+
+            local map = getMap()
+            local foundTargetToHit = nil
+
+            if map then
+                local monstersFolder = map:FindFirstChild("Monsters")
+                if monstersFolder then
+                    for _, monsterModel in pairs(monstersFolder:GetChildren()) do
+                        if monsterModel:IsA("Model") and getMonsterPart(monsterModel) then
+                            local isNeeded = false
+                            for _, targetName in ipairs(undiscoveredList) do
+                                if monsterModel.Name == targetName then
+                                    isNeeded = true
+                                    break
+                                end
+                            end
+
+                            if isNeeded and not discoveredThisFloor[monsterModel.Name] then
+                                foundTargetToHit = monsterModel
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+
+            if foundTargetToHit then
+                refreshDashboardGUI()
+                executeHitAndRun(foundTargetToHit, myLoopId)
+                refreshDashboardGUI()
+            else
+                local panicNow, secLeft = isPanicTimeActive()
+                if panicNow and Config.ElevatorSafety.AlwaysLockInElevatorOnPanic then
+                    ensureLockedInsideRealElevator1000Percent()
+                    currentStatusText = "1000% AMAN DI REAL ELEVATOR" .. (secLeft and (" (" .. secLeft .. "s)") or "")
+                else
+                    currentStatusText = "AMAN (TIDAK ADA TARGET BARU DI LANTAI INI)"
+                end
+                refreshDashboardGUI()
+                task.wait(0.25)
+            end
+        end
+    end)
+end
+
+task.spawn(function()
+    while not isScriptDestroyed and screenGui and screenGui.Parent do
+        pcall(refreshDashboardGUI)
+        task.wait(1.0)
+    end
+end)
+
+-- ==============================================================================
+-- [SECTION 8] UI BUTTON EVENTS & CLEAN TOTAL DESTROY HANDLER
+-- ==============================================================================
+-- Tombol Close Total Tanpa Sisa (✕)
+closeBtn.MouseButton1Click:Connect(function()
+    cprint("[AUTO-DISCOVER] Menutup GUI & mematikan seluruh proses tanpa sisa...")
+    isScriptDestroyed    = true
+    isAutoDiscovering    = false
+    abortCurrentMovement = true
+    activeLoopId         = activeLoopId + 1
+
+    if activeTween then
+        pcall(function() activeTween:Cancel() end)
+        activeTween = nil
+    end
+
+    clearAllServerSyncedHolds()
+    setTargetColliderPassable(nil, false)
+    restoreNormalGravity()
+
+    for _, conn in ipairs(runtimeConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    table.clear(runtimeConnections)
+
+    local char = player.Character
+    local rp   = char and char:FindFirstChild("HumanoidRootPart")
+    if rp then rp.Anchored = false end
+
+    if screenGui and screenGui.Parent then
+        screenGui:Destroy()
+    end
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if isAutoDiscovering then
+        isAutoDiscovering    = false
+        abortCurrentMovement = true
+        activeLoopId         = activeLoopId + 1
+        if activeTween then pcall(function() activeTween:Cancel() end); activeTween = nil end
+        clearAllServerSyncedHolds()
+        setTargetColliderPassable(nil, false)
+        restoreNormalGravity()
+        if rootPart then rootPart.Anchored = false end
+
+        currentStatusText = "DIMATIKAN MANUAL"
+        toggleBtn.Text = "START DISCOVER"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 130)
+        cprint("[AUTO-DISCOVER] Dimatikan.")
+        refreshDashboardGUI()
+        task.delay(0.2, function() abortCurrentMovement = false end)
+    else
+        abortCurrentMovement = false
+        isAutoDiscovering    = true
+        currentStatusText    = "MEMULAI PEMANTAUAN..."
+        toggleBtn.Text       = "STOP DISCOVER"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 40)
+        cprint("[AUTO-DISCOVER] Diaktifkan!")
+        startAutoDiscover()
+        refreshDashboardGUI()
+    end
+end)
+
+local triggerModesOrder = { "PanicTime", "MachineCount", "Either", "Always" }
+modeBtn.MouseButton1Click:Connect(function()
+    local cur = Config.TriggerRules.Mode
+    local nextIdx = 1
+    for i, m in ipairs(triggerModesOrder) do
+        if string.lower(m) == string.lower(cur) then
+            nextIdx = (i % #triggerModesOrder) + 1
+            break
+        end
+    end
+    Config.TriggerRules.Mode = triggerModesOrder[nextIdx]
+    modeBtn.Text = "TRIGGER: " .. string.upper(Config.TriggerRules.Mode)
+    cprint("[CONFIG] Trigger Mode diubah ke: " .. Config.TriggerRules.Mode)
+    refreshDashboardGUI()
+end)
+
+local tpModesOrder = { "Instant", "Tween", "HybridY" }
+tpModeBtn.MouseButton1Click:Connect(function()
+    local cur = Config.Teleport.Mode
+    local nextIdx = 1
+    for i, m in ipairs(tpModesOrder) do
+        if string.lower(m) == string.lower(cur) then
+            nextIdx = (i % #tpModesOrder) + 1
+            break
+        end
+    end
+    Config.Teleport.Mode = tpModesOrder[nextIdx]
+    tpModeBtn.Text = "TP: " .. string.upper(Config.Teleport.Mode)
+    cprint("[CONFIG] Teleport Mode diubah ke: " .. Config.Teleport.Mode)
+    refreshDashboardGUI()
+end)
+
+eventBtn.MouseButton1Click:Connect(function()
+    Config.Discover.IncludeEventMonsters = not Config.Discover.IncludeEventMonsters
+    eventBtn.Text = "EVENT: " .. (Config.Discover.IncludeEventMonsters and "ON" or "OFF")
+    eventBtn.BackgroundColor3 = Config.Discover.IncludeEventMonsters and Color3.fromRGB(140, 70, 180) or Color3.fromRGB(50, 50, 65)
+    refreshDashboardGUI()
+end)
+
+local filterOrder = {
+    { key = "ZERO",       label = "LIST: HANYA 0%" },
+    { key = "INCOMPLETE", label = "LIST: < 100%" },
+    { key = "ALL",        label = "LIST: SEMUA" }
+}
+filterBtn.MouseButton1Click:Connect(function()
+    local nextIdx = 1
+    for i, f in ipairs(filterOrder) do
+        if f.key == guiFilterMode then
+            nextIdx = (i % #filterOrder) + 1
+            break
+        end
+    end
+    guiFilterMode  = filterOrder[nextIdx].key
+    filterBtn.Text = filterOrder[nextIdx].label
+    refreshDashboardGUI()
+end)
+
+if Config.AutoStart then
+    isAutoDiscovering = true
+    currentStatusText = "MEMULAI PEMANTAUAN..."
+    toggleBtn.Text = "STOP DISCOVER"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 40)
+    startAutoDiscover()
+end
+
+refreshDashboardGUI()
+print("👁️ Auto-Discover Script v4.1 (Multi-Teleport + AutoMinimize + Clean Close) Loaded!")
