@@ -1,6 +1,6 @@
 task.wait(60)
 -- ==============================================================================
--- 👁️ AUTO-DISCOVER MONSTER v4.1 (PANIC/MACHINE TRIGGER + COLLIDER SAFEPLACE)
+-- 👁️ AUTO-DISCOVER MONSTER v4.2 (1X TRIGGER ELEVATOR + COLLIDER SAFEPLACE)
 -- + MULTI-TELEPORT ENGINE + AUTO-MINIMIZE + CLEAN DESTROY GUI 👁️
 -- ==============================================================================
 
@@ -51,16 +51,18 @@ local Config = {
     SafePlace = {
         Mode = "ThickCollider",    -- Pilih: "ThickCollider" atau "RealElevator"
         MinHideThickness = 3.5,    -- Ketebalan minimal (studs X & Z) agar Collider dianggap tebal & aman
+        HoldAfterHitSeconds = 0.8, -- Tahan posisi sebentar (detik) di tengah Collider usai Hit & Run, lalu LEPAS agar bebas gerak!
     },
 
     -- ==========================================================================
-    -- [JAMINAN 1000% MASUK REAL ELEVATOR SAAT PANIC TIME]
+    -- [PENGATURAN MASUK REAL ELEVATOR SAAT PANIC TIME (1X TRIGGER vs LOCK)]
     -- ==========================================================================
     ElevatorSafety = {
-        AlwaysLockInElevatorOnPanic = true, -- true = wajib masuk & dikunci di Real Elevator saat selesai / Panic Time
-        PanicDeadlineSeconds = 7,           -- Batas detik darurat! Jika sisa waktu lift <= 7 detik, STOP Hit & Run & wajib langsung masuk Real Elevator!
+        AlwaysLockInElevatorOnPanic = true, -- true = masuk ke Real Elevator saat selesai / Panic Time
+        OneTimeTeleportOnly = true,         -- true = CUKUP 1X TELEPORT ke Real Elevator per lantai (setelah sampai, dilepas & bebas gerak!) | false = kunci permanen terus-menerus
+        PanicDeadlineSeconds = 7,           -- Batas detik darurat! Jika sisa waktu lift <= 7 detik, STOP Hit & Run & langsung masuk Real Elevator 1x!
         CabinInwardDepth = 8.0,             -- Jarak masuk ke dalam kabin lift di belakang DoorHitbox (studs)
-        MaxAllowedDrift = 5.5,              -- Jika karakter bergeser > 5.5 studs dari titik tengah kabin lift, otomatis ditarik masuk lagi
+        MaxAllowedDrift = 5.5,              -- Hanya dipakai jika OneTimeTeleportOnly = false
     },
 
     -- ==========================================================================
@@ -112,17 +114,18 @@ local rootPart  = character and character:FindFirstChild("HumanoidRootPart")
 
 local DEFAULT_GRAVITY = (Workspace.Gravity > 10) and Workspace.Gravity or 196.2
 
-local isScriptDestroyed     = false
-local isAutoDiscovering     = false
-local abortCurrentMovement  = false
-local activeLoopId          = 0
-local activeTween           = nil
-local currentStatusText     = "IDLE (NONAKTIF)"
-local currentMapInstance    = nil
-local cachedRealElevCF      = nil
-local cachedRealElevRoom    = nil
-local lastColliderScanClock = 0
-local lastColliderScanRoom  = nil
+local isScriptDestroyed           = false
+local isAutoDiscovering           = false
+local abortCurrentMovement        = false
+local hasEnteredElevatorThisFloor = false -- Penanda 1x Trigger Real Elevator per lantai
+local activeLoopId                = 0
+local activeTween                 = nil
+local currentStatusText           = "IDLE (NONAKTIF)"
+local currentMapInstance          = nil
+local cachedRealElevCF            = nil
+local cachedRealElevRoom          = nil
+local lastColliderScanClock       = 0
+local lastColliderScanRoom        = nil
 
 local cachedCharParts       = {}
 local cachedAllCols         = {}
@@ -163,6 +166,7 @@ local charAddedConn = player.CharacterAdded:Connect(function(c)
     rootPart  = c:WaitForChild("HumanoidRootPart", 10)
     rebuildCharPartCache(c)
     restoreNormalGravity()
+    hasEnteredElevatorThisFloor = false
 end)
 table.insert(runtimeConnections, charAddedConn)
 
@@ -187,9 +191,10 @@ local function getMap()
     local cr = Workspace:FindFirstChild("CurrentRoom")
     local m  = cr and cr:FindFirstChildWhichIsA("Model")
     if m and m ~= currentMapInstance then
-        currentMapInstance = m
-        cachedRealElevCF   = nil
-        cachedRealElevRoom = nil
+        currentMapInstance          = m
+        cachedRealElevCF            = nil
+        cachedRealElevRoom          = nil
+        hasEnteredElevatorThisFloor = false -- Reset 1x Trigger setiap ganti lantai baru!
         table.clear(discoveredThisFloor)
     end
     return m
@@ -394,7 +399,7 @@ local function isTriggerConditionMet()
 end
 
 -- ==============================================================================
--- [SECTION 4] COLLIDER SAFEPLACE, MULTI-TELEPORT & REAL ELEVATOR 1000% ENGINE
+-- [SECTION 4] COLLIDER SAFEPLACE, MULTI-TELEPORT & REAL ELEVATOR 1X ENGINE
 -- ==============================================================================
 local function clearAllServerSyncedHolds()
     for _, c in ipairs(activeHoldConns) do
@@ -611,13 +616,12 @@ local function teleportTween(cf, customSpeed, keepZeroGravity)
     rootPart.Anchored = false
     Workspace.Gravity = 0
 
-    local startPos  = rootPart.Position
-    local targetPos = cf.Position
-    local baseSpd   = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 27.5
-    local openMult  = customSpeed or Config.Teleport.TweenSpeed or 3.50
+    local startPos   = rootPart.Position
+    local targetPos  = cf.Position
+    local baseSpd    = player:GetAttribute("KM_MAX_PLAYER_SPEED") or 27.5
+    local openMult   = customSpeed or Config.Teleport.TweenSpeed or 3.50
     local noclipMult = Config.Teleport.NoClipTweenSpeed or 1.05
 
-    -- Cek apakah jalur melewati collider untuk menentukan kecepatan aman
     updateColliderCaches(false)
     local nearObstacle = false
     local midPt = startPos:Lerp(targetPos, 0.5)
@@ -676,7 +680,6 @@ local function teleportHybridY(cf, keepZeroGravity)
     local flatDist = Vector2.new(rootPart.Position.X - cf.Position.X, rootPart.Position.Z - cf.Position.Z).Magnitude
     local minDist  = Config.Teleport.HybridMinDistance or 75
 
-    -- Jika jarak dekat (< 75 studs), lebih cepat dan aman langsung pakai Tween
     if flatDist < minDist then
         teleportTween(cf, Config.Teleport.TweenSpeed, keepZeroGravity)
         return
@@ -806,6 +809,71 @@ local function getRealElevatorCFrame()
     return nil
 end
 
+-- Fungsi Masuk Real Elevator (Mendukung 1X Trigger & Verifikasi Anti-Revert)
+local function ensureLockedInsideRealElevator1000Percent(forceRetrigger)
+    if forceRetrigger then
+        hasEnteredElevatorThisFloor = false
+    end
+
+    -- Jika OneTimeTeleportOnly = true dan sudah pernah masuk lift di lantai ini, JANGAN tarik-tarik lagi!
+    if Config.ElevatorSafety.OneTimeTeleportOnly and hasEnteredElevatorThisFloor then
+        currentStatusText = "SUDAH 1X TP KE LIFT (BEBAS GERAK)"
+        return true
+    end
+
+    clearAllServerSyncedHolds()
+    setTargetColliderPassable(nil, false)
+    restoreNormalGravity()
+
+    character = player.Character
+    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+
+    rootPart.Anchored = false
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.PlatformStand = false
+        hum.Sit = false
+    end
+
+    local elevCF = getRealElevatorCFrame()
+    if not elevCF then return false end
+
+    if Config.ElevatorSafety.OneTimeTeleportOnly then
+        -- 1X Trigger dengan verifikasi anti-revert (maksimal 3x percobaan cepat dalam 0.4 detik jika server menolak)
+        for _ = 1, 3 do
+            teleportInstant(elevCF, false)
+            task.wait(0.12)
+            character = player.Character
+            rootPart  = character and character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local checkDist = Vector2.new(rootPart.Position.X - elevCF.Position.X, rootPart.Position.Z - elevCF.Position.Z).Magnitude
+                if checkDist <= 11.0 then
+                    hasEnteredElevatorThisFloor = true
+                    rootPart.Anchored = false
+                    restoreNormalGravity()
+                    cprint("[ELEVATOR 1X TRIGGER] ✔ Terverifikasi masuk Real Elevator! Trigger selesai (karakter bebas gerak).")
+                    currentStatusText = "SUDAH 1X TP KE LIFT (BEBAS GERAK)"
+                    return true
+                end
+            end
+        end
+        hasEnteredElevatorThisFloor = true
+        return true
+    else
+        -- Mode Kunci Permanen (Hanya jika OneTimeTeleportOnly = false)
+        local flatDist = Vector2.new(rootPart.Position.X - elevCF.Position.X, rootPart.Position.Z - elevCF.Position.Z).Magnitude
+        local maxDrift = Config.ElevatorSafety.MaxAllowedDrift or 5.5
+        if flatDist > maxDrift or math.abs(rootPart.Position.Y - elevCF.Position.Y) > 8 then
+            teleportInstant(elevCF, false)
+            cprint("[ELEVATOR LOCK] Memastikan posisi tepat di dalam kabin Real Elevator!")
+        end
+        currentStatusText = "LOCK PERMANEN DI REAL ELEVATOR"
+        return true
+    end
+end
+
+-- Fungsi Ngungsi ke SafePlace (Tahan sebentar di Collider lalu LEPAS agar tidak lengket!)
 local function moveToSafePlace(forceRealElevator)
     clearAllServerSyncedHolds()
     character = player.Character
@@ -819,67 +887,31 @@ local function moveToSafePlace(forceRealElevator)
         or (panicNow and Config.ElevatorSafety.AlwaysLockInElevatorOnPanic)
 
     if useElevator then
-        setTargetColliderPassable(nil, false)
-        local elevCF = getRealElevatorCFrame()
-        if elevCF then
-            currentStatusText = "SAFE DI REAL ELEVATOR (1000%)"
-            moveCharacterTo(elevCF, false, panicNow)
-            local hum = character and character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum.PlatformStand = false
-                hum.Sit = false
-            end
-            return true
-        end
+        return ensureLockedInsideRealElevator1000Percent(true)
     end
 
     local colCenter, targetCol = getBestThickColliderCenter()
     if colCenter and targetCol then
-        currentStatusText = "NGUNGSI DI TENGAH COLLIDER (" .. (targetCol.Parent and targetCol.Parent.Name or targetCol.Name) .. ")"
+        local colName = (targetCol.Parent and targetCol.Parent.Name or targetCol.Name)
+        currentStatusText = "NGUNGSI KE COLLIDER (" .. colName .. ")"
         setTargetColliderPassable(targetCol, true)
         moveCharacterTo(CFrame.new(colCenter), true, false)
-        startServerSyncedHold(function() return colCenter end)
+
+        -- Tahan sebentar sesuai HoldAfterHitSeconds (default 0.8 detik) supaya tidak jatuh/terpental, lalu LEPAS!
+        local holdSec = Config.SafePlace.HoldAfterHitSeconds or 0.8
+        if holdSec > 0 then
+            startServerSyncedHold(function() return colCenter end)
+            task.wait(holdSec)
+            clearAllServerSyncedHolds()
+        end
+
+        restoreNormalGravity()
+        if rootPart then rootPart.Anchored = false end
+        currentStatusText = "SAFE DI COLLIDER (BEBAS GERAK)"
         return true
     end
 
-    local elevCF = getRealElevatorCFrame()
-    if elevCF then
-        currentStatusText = "SAFE DI REAL ELEVATOR"
-        moveCharacterTo(elevCF, false, false)
-        return true
-    end
-
-    return false
-end
-
-local function ensureLockedInsideRealElevator1000Percent()
-    clearAllServerSyncedHolds()
-    setTargetColliderPassable(nil, false)
-    restoreNormalGravity()
-
-    character = player.Character
-    rootPart  = character and character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-
-    rootPart.Anchored = false
-    local hum = character:FindFirstChildOfClass("Humanoid")
-    if hum then
-        hum.PlatformStand = false
-        hum.Sit = false
-    end
-
-    local elevCF = getRealElevatorCFrame()
-    if not elevCF then return end
-
-    local flatDist = Vector2.new(rootPart.Position.X - elevCF.Position.X, rootPart.Position.Z - elevCF.Position.Z).Magnitude
-    local maxDrift = Config.ElevatorSafety.MaxAllowedDrift or 5.5
-
-    if flatDist > maxDrift or math.abs(rootPart.Position.Y - elevCF.Position.Y) > 8 then
-        -- Gunakan Instant Teleport saat darurat mengunci Real Elevator agar 1000% masuk sebelum waktu habis
-        teleportInstant(elevCF, false)
-        cprint("[ELEVATOR 1000% LOCK] Memastikan posisi tepat di dalam kabin Real Elevator!")
-    end
-    currentStatusText = "1000% AMAN DI DALAM REAL ELEVATOR"
+    return ensureLockedInsideRealElevator1000Percent(true)
 end
 
 -- ==============================================================================
@@ -1002,8 +1034,8 @@ local function executeHitAndRun(monsterModel, loopId)
 
     local deadlineReached, secLeft = isPanicDeadlineReached()
     if deadlineReached then
-        cprint(string.format("[SAFETY ABORT] Sisa waktu lift %s detik! Batal Hit & Run, wajib masuk Real Elevator!", tostring(secLeft)))
-        ensureLockedInsideRealElevator1000Percent()
+        cprint(string.format("[SAFETY ABORT] Sisa waktu lift %s detik! Batal Hit & Run, langsung 1x TP ke Real Elevator!", tostring(secLeft)))
+        ensureLockedInsideRealElevator1000Percent(false)
         return false
     end
 
@@ -1065,14 +1097,14 @@ local function executeHitAndRun(monsterModel, loopId)
 
     local panicNow = isPanicTimeActive()
     if panicNow then
-        cprint("[AUTO-DISCOVER] 💨 Kembali & Mengunci Posisi di Real Elevator (Panic Time)...")
-        ensureLockedInsideRealElevator1000Percent()
+        cprint("[AUTO-DISCOVER] 💨 Selesai Hit & Run saat Panic Time! 1x Teleport kembali ke Real Elevator...")
+        ensureLockedInsideRealElevator1000Percent(true)
     else
-        cprint("[AUTO-DISCOVER] 💨 Ngungsi ke tengah Thick Collider SafePlace...")
+        cprint("[AUTO-DISCOVER] 💨 Ngungsi ke tengah Thick Collider SafePlace lalu lepas...")
         moveToSafePlace(false)
     end
 
-    task.wait(0.8)
+    task.wait(0.4)
     return success
 end
 
@@ -1088,13 +1120,13 @@ local function getGuiContainer()
 end
 
 local guiContainer = getGuiContainer()
-for _, oldName in ipairs({ "AutoDiscoverUI", "AutoDiscoverUI_v4", "AutoDiscoverUI_v4_1" }) do
+for _, oldName in ipairs({ "AutoDiscoverUI", "AutoDiscoverUI_v4", "AutoDiscoverUI_v4_1", "AutoDiscoverUI_v4_2" }) do
     local old = guiContainer:FindFirstChild(oldName)
     if old then old:Destroy() end
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name           = "AutoDiscoverUI_v4_1"
+screenGui.Name           = "AutoDiscoverUI_v4_2"
 screenGui.ResetOnSpawn   = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent         = guiContainer
@@ -1136,7 +1168,7 @@ titleLabel.Font                   = Enum.Font.GothamBold
 titleLabel.TextSize               = 13
 titleLabel.TextColor3             = Color3.fromRGB(0, 230, 255)
 titleLabel.TextXAlignment         = Enum.TextXAlignment.Left
-titleLabel.Text                   = "👁️ AUTO-DISCOVER TWISTED v4.1"
+titleLabel.Text                   = "👁️ AUTO-DISCOVER TWISTED v4.2"
 titleLabel.Parent                 = headerBar
 
 local userLabel = Instance.new("TextLabel")
@@ -1172,7 +1204,7 @@ closeBtn.BackgroundColor3 = Color3.fromRGB(190, 45, 55)
 closeBtn.Font             = Enum.Font.GothamBold
 closeBtn.TextSize         = 13
 closeBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
-closeBtn.Text             = "X"
+closeBtn.Text             = "✕"
 closeBtn.Parent           = headerBar
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 
@@ -1353,7 +1385,7 @@ do
     table.insert(runtimeConnections, c3)
 end
 
--- Minimize Handler (Mengikuti state awal Config.AutoMinimize)
+-- Minimize Handler
 local isMinimized = (Config.AutoMinimize == true)
 minBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
@@ -1458,7 +1490,7 @@ local function refreshDashboardGUI()
 end
 
 -- ==============================================================================
--- [SECTION 7] MAIN AUTO-DISCOVER LOOP (SMART TRIGGER + ELEVATOR SAFETY)
+-- [SECTION 7] MAIN AUTO-DISCOVER LOOP (SMART TRIGGER + 1X ELEVATOR TRIGGER)
 -- ==============================================================================
 local function startAutoDiscover()
     activeLoopId = activeLoopId + 1
@@ -1475,6 +1507,8 @@ local function startAutoDiscover()
                 continue
             end
 
+            -- Update deteksi lantai agar hasEnteredElevatorThisFloor otomatis ter-reset saat pindah lantai
+            local map = getMap()
             local _, undiscoveredList = getAllTwistedResearchReport()
 
             if #undiscoveredList == 0 then
@@ -1482,8 +1516,8 @@ local function startAutoDiscover()
                 cprint("🎉 SELAMAT! Semua Monster Target di Config sudah ter-Discover!")
                 cprint("==================================================")
                 currentStatusText = "SEMUA TWISTED SELESAI!"
-                if isPanicTimeActive() then
-                    ensureLockedInsideRealElevator1000Percent()
+                if isPanicTimeActive() and not hasEnteredElevatorThisFloor then
+                    ensureLockedInsideRealElevator1000Percent(false)
                 end
                 toggleBtn.Text = "SEMUA SELESAI"
                 toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
@@ -1492,12 +1526,15 @@ local function startAutoDiscover()
                 continue
             end
 
+            -- Jika sisa detik Panic Time <= PanicDeadlineSeconds (misal <= 7 detik), 1x Trigger ke Real Elevator!
             local panicUrgent, remSec = isPanicDeadlineReached()
             if panicUrgent then
-                ensureLockedInsideRealElevator1000Percent()
-                currentStatusText = string.format("1000%% LOCK REAL ELEVATOR (SISA %ds!)", remSec or 0)
+                if not hasEnteredElevatorThisFloor or not Config.ElevatorSafety.OneTimeTeleportOnly then
+                    ensureLockedInsideRealElevator1000Percent(false)
+                end
+                currentStatusText = string.format("SELESAI 1X TP KE LIFT (SISA %ds)", remSec or 0)
                 refreshDashboardGUI()
-                task.wait(0.15)
+                task.wait(0.25)
                 continue
             end
 
@@ -1509,9 +1546,7 @@ local function startAutoDiscover()
                 continue
             end
 
-            local map = getMap()
             local foundTargetToHit = nil
-
             if map then
                 local monstersFolder = map:FindFirstChild("Monsters")
                 if monstersFolder then
@@ -1541,13 +1576,15 @@ local function startAutoDiscover()
             else
                 local panicNow, secLeft = isPanicTimeActive()
                 if panicNow and Config.ElevatorSafety.AlwaysLockInElevatorOnPanic then
-                    ensureLockedInsideRealElevator1000Percent()
-                    currentStatusText = "1000% AMAN DI REAL ELEVATOR" .. (secLeft and (" (" .. secLeft .. "s)") or "")
+                    if not hasEnteredElevatorThisFloor or not Config.ElevatorSafety.OneTimeTeleportOnly then
+                        ensureLockedInsideRealElevator1000Percent(false)
+                    end
+                    currentStatusText = "SUDAH 1X TP KE LIFT" .. (secLeft and (" (" .. secLeft .. "s)") or "")
                 else
                     currentStatusText = "AMAN (TIDAK ADA TARGET BARU DI LANTAI INI)"
                 end
                 refreshDashboardGUI()
-                task.wait(0.25)
+                task.wait(0.3)
             end
         end
     end)
@@ -1563,7 +1600,6 @@ end)
 -- ==============================================================================
 -- [SECTION 8] UI BUTTON EVENTS & CLEAN TOTAL DESTROY HANDLER
 -- ==============================================================================
--- Tombol Close Total Tanpa Sisa (✕)
 closeBtn.MouseButton1Click:Connect(function()
     cprint("[AUTO-DISCOVER] Menutup GUI & mematikan seluruh proses tanpa sisa...")
     isScriptDestroyed    = true
@@ -1612,11 +1648,12 @@ toggleBtn.MouseButton1Click:Connect(function()
         refreshDashboardGUI()
         task.delay(0.2, function() abortCurrentMovement = false end)
     else
-        abortCurrentMovement = false
-        isAutoDiscovering    = true
-        currentStatusText    = "MEMULAI PEMANTAUAN..."
-        toggleBtn.Text       = "STOP DISCOVER"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 40)
+        abortCurrentMovement        = false
+        hasEnteredElevatorThisFloor = false
+        isAutoDiscovering           = true
+        currentStatusText           = "MEMULAI PEMANTAUAN..."
+        toggleBtn.Text              = "STOP DISCOVER"
+        toggleBtn.BackgroundColor3  = Color3.fromRGB(200, 80, 40)
         cprint("[AUTO-DISCOVER] Diaktifkan!")
         startAutoDiscover()
         refreshDashboardGUI()
@@ -1689,4 +1726,4 @@ if Config.AutoStart then
 end
 
 refreshDashboardGUI()
-print("👁️ Auto-Discover Script v4.1 (Multi-Teleport + AutoMinimize + Clean Close) Loaded!")
+print("👁️ Auto-Discover Script v4.2 (1x Elevator Trigger + Non-Sticky SafePlace) Loaded!")
