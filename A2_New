@@ -1,4 +1,4 @@
-print("Memulai pengecekan sistem NEW.....")
+print("Memulai pengecekan sistem NEW Yatta.....")
 repeat task.wait() until game:IsLoaded() and game.Players.LocalPlayer
 task.wait(0.5)
 
@@ -21,7 +21,7 @@ local NAMA_CONFIG_LOBBY   = ""           -- Nama config Lobby (kosong = skip)
 
 --khusus ingame
 local PAKAI_CONFIG_INGAME = true         -- true = Auto load config saat di In-Game
-local NAMA_CONFIG_INGAME  = "TestFarmV1" -- Nama config In-Game (tanpa ekstensi)
+local NAMA_CONFIG_INGAME  = "TestFarmV1Ke2" -- Nama config In-Game (tanpa ekstensi)
 
 --1 = nyala 0 = mati
 local SET_AUTO_RECONNECT = "0" -- "1" = Auto reconnect jika DC
