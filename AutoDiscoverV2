@@ -1208,7 +1208,7 @@ closeBtn.BackgroundColor3 = Color3.fromRGB(190, 45, 55)
 closeBtn.Font             = Enum.Font.GothamBold
 closeBtn.TextSize         = 13
 closeBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
-closeBtn.Text             = "✕"
+closeBtn.Text             = "X"
 closeBtn.Parent           = headerBar
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
 
