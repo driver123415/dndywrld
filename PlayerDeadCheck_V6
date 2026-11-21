@@ -1,0 +1,292 @@
+-- ==================== Configuration ====================
+local AUTO_MATCHMAKE = true         -- True: Prioritaskan Matchmaking in-game, False: Langsung ke Lobby
+local MATCHMAKE_TIMEOUT = 30        -- Detik maksimal antrean matchmaking
+local INGAME_PLACE_ID = 16552821455 -- ID Place saat berada di dalam game
+local LOBBY_PLACE_ID = 16116270224  -- ID Place Lobby untuk tempat kabur
+local MAX_RETRY_BEFORE_KICK = 3     -- Berapa kali siklus teleport boleh gagal sebelum di-kick
+local RETRY_COOLDOWN = 10           -- Waktu tunggu (detik) antar percobaan teleport (aman dari tabrakan)
+-- =======================================================
+
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    print("[INFO] Not in-game (Place ID mismatch). Script dinonaktifkan.")
+    return
+end
+
+print("[ULTIMATE] In-game detected. Memantau UI kematian secara pasif...")
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local isProcessingDeath = false
+local lastTeleportFailed = false
+
+-- Tangkap kegagalan teleport asinkron dari server Roblox
+TeleportService.TeleportInitFailed:Connect(function(failedPlayer, teleportResult, errorMessage)
+    if failedPlayer == player then
+        lastTeleportFailed = true
+        warn("[WARN] TeleportInitFailed (" .. tostring(teleportResult) .. "): " .. tostring(errorMessage))
+    end
+end)
+
+-- Helper: Ambil Network RemoteEvent dengan aman
+local function getNetworkRemote()
+    local sharedUtils = ReplicatedStorage:WaitForChild("SharedUtils", 5)
+    local network = sharedUtils and sharedUtils:WaitForChild("Network", 5)
+    return network and network:WaitForChild("RemoteEvent", 5)
+end
+
+-- Helper: Klik tombol GUI secara aman (anti double-click & support Activated)
+local function clickButton(button)
+    if not button then return false end
+    local ok = pcall(function()
+        if getconnections then
+            local activatedConns = getconnections(button.Activated)
+            if #activatedConns > 0 then
+                for _, conn in ipairs(activatedConns) do
+                    conn:Fire()
+                end
+                return
+            end
+            local clickConns = getconnections(button.MouseButton1Click)
+            for _, conn in ipairs(clickConns) do
+                conn:Fire()
+            end
+        elseif firesignal then
+            firesignal(button.Activated)
+        end
+    end)
+    return ok
+end
+
+-- Helper: Cek apakah SpectatorGui sudah aktif dan terlihat
+local function getActiveMatchmakeButton()
+    local spectatorGui = playerGui:FindFirstChild("SpectatorGui")
+    if not spectatorGui or not spectatorGui.Enabled then return nil end
+
+    local bottomFrame = spectatorGui:FindFirstChild("BottomFrame")
+    if not bottomFrame or not bottomFrame.Visible then return nil end
+
+    return bottomFrame:FindFirstChild("MatchmakeGroup")
+end
+
+-- Helper: Tunggu dengan early-exit jika TeleportInitFailed terjadi
+local function waitTeleportCooldown(seconds)
+    lastTeleportFailed = false
+    local elapsed = 0
+    while elapsed < seconds do
+        if lastTeleportFailed then
+            return false -- Gagal lebih cepat, tidak perlu tunggu sampai habis
+        end
+        task.wait(0.5)
+        elapsed = elapsed + 0.5
+    end
+    return true
+end
+
+-- Fungsi Eksekusi Teleportasi Hibrida (Lobby Fallback)
+local function executeLobbyTeleport()
+    print("[INFO] Memulai proses kabur ke Lobby...")
+
+    for attempt = 1, MAX_RETRY_BEFORE_KICK do
+        print("[LOBBY] Siklus Teleportasi ke-" .. attempt .. " dari " .. MAX_RETRY_BEFORE_KICK)
+
+        -- Tahap 1: Server-Side Remote
+        print("[1/2] Menembak RemoteEvent Teleport (Server-Side)...")
+        local success1, err1 = pcall(function()
+            local events = ReplicatedStorage:FindFirstChild("Events")
+            local tpRemote = events and events:FindFirstChild("Teleport")
+            if tpRemote then
+                tpRemote:FireServer()
+            else
+                error("RemoteEvent Teleport tidak ditemukan")
+            end
+        end)
+
+        if not success1 then
+            warn("[WARN] RemoteEvent Error: " .. tostring(err1))
+        else
+            waitTeleportCooldown(RETRY_COOLDOWN)
+        end
+
+        -- Tahap 2: Client-Side Teleport
+        print("[2/2] Masih di In-Game. Mencoba TeleportService (Client-Side)...")
+        local success2, err2 = pcall(function()
+            TeleportService:Teleport(LOBBY_PLACE_ID, player)
+        end)
+
+        if not success2 then
+            warn("[WARN] TeleportService Error: " .. tostring(err2))
+            task.wait(2)
+        else
+            waitTeleportCooldown(RETRY_COOLDOWN)
+        end
+    end
+
+    -- Failsafe Final: Kick
+    warn("[FATAL] Gagal berteleportasi setelah " .. MAX_RETRY_BEFORE_KICK .. " siklus maksimal.")
+    player:Kick("Auto-Failsafe: Gagal join Matchmaking dan Lobby. Koneksi diputus untuk keamanan.")
+end
+
+-- Fungsi Utama: Menangani Logika Setelah Kematian Terdeteksi
+local function processDeathRoutine()
+    if isProcessingDeath then return end
+    isProcessingDeath = true
+
+    task.spawn(function()
+        print("[SYSTEM] Layar kematian tervalidasi. Memulai urutan spektator...")
+        local networkRemote = getNetworkRemote()
+
+        -- Langkah 1: Masuk Mode Spectate (Hibrida: Klik UI + Backup Remote SpectateGhostStart)
+        local deathGui = playerGui:FindFirstChild("DeathGui")
+        local spectateBtn = deathGui and deathGui:FindFirstChild("SpectateButton")
+
+        if spectateBtn and spectateBtn.Visible then
+            print("[ACTION] Menekan SpectateButton...")
+            clickButton(spectateBtn)
+        end
+
+        -- Tunggu hingga SpectatorGui benar-benar muncul (maks 5 detik)
+        local matchmakeBtn = nil
+        local firedGhostBackup = false
+
+        for i = 1, 10 do
+            matchmakeBtn = getActiveMatchmakeButton()
+            if matchmakeBtn then break end
+
+            -- Jika setelah 1.5 detik SpectatorGui belum terbuka, tembak remote SpectateGhostStart
+            if i == 3 and not firedGhostBackup and networkRemote then
+                firedGhostBackup = true
+                print("[ACTION] SpectatorGui belum muncul. Menembak Remote SpectateGhostStart...")
+                pcall(function()
+                    networkRemote:FireServer("SpectateGhostStart")
+                end)
+            end
+            task.wait(0.5)
+        end
+
+        -- Beri jeda singkat agar server selesai mendaftarkan state spectator
+        task.wait(0.5)
+
+        -- Langkah 2: Eksekusi Matchmaking via Remote Event
+        if AUTO_MATCHMAKE then
+            if not networkRemote then
+                warn("[WARN] Network RemoteEvent tidak ditemukan. Lanjut ke Failsafe Lobby...")
+            else
+                print("[ACTION] AUTO_MATCHMAKE Aktif! Menembak Remote SpectateMatchmakeGroupToggle...")
+                local successMM, errMM = pcall(function()
+                    networkRemote:FireServer("SpectateMatchmakeGroupToggle")
+                end)
+
+                if not successMM then
+                    warn("[WARN] Gagal menembak Remote Matchmaking: " .. tostring(errMM))
+                else
+                    print("[INFO] Remote Matchmaking ditembak! Memantau status antrean...")
+
+                    -- Cari ulang tombol jika sebelumnya belum sempat ter-load
+                    if not matchmakeBtn then
+                        matchmakeBtn = getActiveMatchmakeButton()
+                    end
+
+                    if matchmakeBtn then
+                        local textLabel = matchmakeBtn:FindFirstChild("TextLabel")
+                        local waited = 0
+                        local inQueue = false
+                        local hasRetriedRemote = false
+
+                        while waited < MATCHMAKE_TIMEOUT do
+                            if textLabel then
+                                local txt = string.lower(textLabel.Text or "")
+                                local isJoinText = string.find(txt, "join matchmaking", 1, true) ~= nil
+                                local isQueueing = (not isJoinText) and (
+                                    string.find(txt, "matchmaking", 1, true) ~= nil
+                                    or string.find(txt, "leave", 1, true) ~= nil
+                                    or string.find(txt, "cancel", 1, true) ~= nil
+                                    or string.find(txt, "searching", 1, true) ~= nil
+                                )
+
+                                if isQueueing then
+                                    inQueue = true
+                                    local bottomText = matchmakeBtn:FindFirstChild("BottomText")
+                                    if waited % 5 == 0 then
+                                        local statusInfo = bottomText and bottomText.Text or textLabel.Text
+                                        print("[MATCHMAKING] Status Antrean: " .. tostring(statusInfo))
+                                    end
+                                elseif isJoinText then
+                                    if inQueue and waited >= 3 then
+                                        warn("[FAILED] Server memutus antrean! Beralih ke Failsafe Lobby...")
+                                        break
+                                    elseif not inQueue and waited == 4 and not hasRetriedRemote then
+                                        -- Remote pertama mungkin telat diterima; coba 1x lagi (aman karena status masih Join)
+                                        hasRetriedRemote = true
+                                        warn("[RETRY] Belum masuk antrean setelah 4 detik. Menembak ulang remote matchmaking...")
+                                        pcall(function()
+                                            networkRemote:FireServer("SpectateMatchmakeGroupToggle")
+                                        end)
+                                    elseif not inQueue and waited >= 10 then
+                                        warn("[FAILED] Tetap gagal masuk antrean setelah retry. Beralih ke Failsafe Lobby...")
+                                        break
+                                    end
+                                end
+                            end
+
+                            task.wait(1)
+                            waited = waited + 1
+                        end
+                    else
+                        -- Remote sudah ditembak tapi UI tidak ditemukan: tetap tunggu agar tidak langsung potong antrean
+                        warn("[WARN] MatchmakeGroup UI tidak terdeteksi, menunggu " .. MATCHMAKE_TIMEOUT .. " detik sebelum fallback...")
+                        task.wait(MATCHMAKE_TIMEOUT)
+                    end
+                end
+            end
+        else
+            print("[INFO] AUTO_MATCHMAKE = false. Melompati proses Matchmaking...")
+        end
+
+        -- Langkah 3: Failsafe Lobby
+        executeLobbyTeleport()
+    end)
+end
+
+-- Fungsi Validasi & Pemantauan GUI Kematian (DeathGui)
+local function monitorDeathGui(gui)
+    if gui.Name ~= "DeathGui" then return end
+    print("[DEBUG] DeathGui terdeteksi! Memantau status kemunculan...")
+
+    local deathScreen = gui:WaitForChild("DeathScreen", 10)
+    local spectateBtn = gui:WaitForChild("SpectateButton", 10)
+
+    local function checkDeathActive()
+        if isProcessingDeath or not gui.Enabled then return end
+        local screenVisible = deathScreen and deathScreen.Visible
+        local btnVisible = spectateBtn and spectateBtn.Visible
+
+        if screenVisible or btnVisible then
+            processDeathRoutine()
+        end
+    end
+
+    gui:GetPropertyChangedSignal("Enabled"):Connect(checkDeathActive)
+    if deathScreen then
+        deathScreen:GetPropertyChangedSignal("Visible"):Connect(checkDeathActive)
+    end
+    if spectateBtn then
+        spectateBtn:GetPropertyChangedSignal("Visible"):Connect(checkDeathActive)
+    end
+
+    checkDeathActive()
+end
+
+-- Inisialisasi Monitoring
+for _, child in ipairs(playerGui:GetChildren()) do
+    monitorDeathGui(child)
+end
+playerGui.ChildAdded:Connect(monitorDeathGui)
