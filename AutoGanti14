@@ -295,27 +295,29 @@ local function getIndicatorCount(btn)
 end
 
 -- ==========================================
--- =  HELPER TOON & MASTERY (LOADOUTFRAME)  =
+-- =   HELPER TOON & MASTERY (ANTI LAZY)    =
 -- ==========================================
 local function getToonContainer()
+    -- Prioritaskan CharacterFrame.ScrollingFrame karena langsung sinkron saat join
+    -- (LoadoutFrame.MainPage.LeftScroll.Grid tidak memasang LockedOverlay sebelum dibuka)
+    local oldFrame  = MainGui:FindFirstChild("CharacterFrame")
+    local oldScroll = oldFrame and oldFrame:FindFirstChild("ScrollingFrame")
+    if oldScroll and #oldScroll:GetChildren() > 0 then
+        return oldScroll, "old"
+    end
+
     local loadout    = MainGui:FindFirstChild("LoadoutFrame")
     local mainPage   = loadout and loadout:FindFirstChild("MainPage")
     local leftScroll = mainPage and mainPage:FindFirstChild("LeftScroll")
     local newGrid    = leftScroll and leftScroll:FindFirstChild("Grid")
-    if newGrid then
+    if newGrid and #newGrid:GetChildren() > 0 then
         return newGrid, "new"
-    end
-
-    local oldFrame  = MainGui:FindFirstChild("CharacterFrame")
-    local oldScroll = oldFrame and oldFrame:FindFirstChild("ScrollingFrame")
-    if oldScroll then
-        return oldScroll, "old"
     end
 
     return nil, nil
 end
 
--- Tunggu container toon tersedia saat baru masuk Lobby (maks 10 detik)
+-- Tunggu container toon terisi saat baru masuk Lobby (maks 10 detik)
 do
     local waited = 0
     while waited < 10 do
@@ -338,11 +340,11 @@ local function isToonOwned(toonName)
     local toonUI = container and container:FindFirstChild(toonName)
     if not toonUI then return false end
 
-    if mode == "new" then
+    if mode == "old" then
+        return toonUI.Visible == true
+    else
         local lock = toonUI:FindFirstChild("LockedOverlay") or toonUI:FindFirstChild("Locked")
         return not (lock and lock.Visible)
-    else
-        return toonUI.Visible == true
     end
 end
 
@@ -363,11 +365,11 @@ local function countTotalMasteryStars()
     for _, child in ipairs(container:GetChildren()) do
         if child:IsA("GuiObject") and not IGNORE_TEMPLATE_NAMES[child.Name] then
             local owned
-            if mode == "new" then
+            if mode == "old" then
+                owned = child.Visible == true
+            else
                 local lock = child:FindFirstChild("LockedOverlay") or child:FindFirstChild("Locked")
                 owned = not (lock and lock.Visible)
-            else
-                owned = child.Visible == true
             end
 
             if owned then
@@ -515,14 +517,29 @@ local function getTrinketGrid()
     return leftScroll and leftScroll:FindFirstChild("Grid")
 end
 
+local function isTrinketItemLocked(item)
+    local lockOverlay = item:FindFirstChild("LockedOverlay")
+    local nameLbl     = item:FindFirstChild("CharacterName")
+    return (lockOverlay and lockOverlay.Visible)
+        or (nameLbl and nameLbl:IsA("TextLabel") and nameLbl.Text == "???")
+end
+
+local function isTrinketGridInitialized(grid)
+    if not grid then return false end
+    for _, item in ipairs(grid:GetChildren()) do
+        if item:IsA("GuiButton") and item.Visible and not IGNORE_TEMPLATE_NAMES[item.Name] then
+            if isTrinketItemLocked(item) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function isTrinketOwned(grid, trinketName)
     local item = grid and grid:FindFirstChild(trinketName)
     if not item or not item.Visible then return false end
-    local lockOverlay = item:FindFirstChild("LockedOverlay")
-    local nameLbl     = item:FindFirstChild("CharacterName")
-    local isLocked    = (lockOverlay and lockOverlay.Visible)
-        or (nameLbl and nameLbl:IsA("TextLabel") and nameLbl.Text == "???")
-    return not isLocked
+    return not isTrinketItemLocked(item)
 end
 
 local function getSlotImage(slotIndex)
@@ -571,11 +588,20 @@ local function formatTargetNames(targets)
 end
 
 local function SmartEquipTrinkets(justClaimedMonster)
+    local primaryTargets = { Config.TrinketSlots[1][1], Config.TrinketSlots[2][1] }
+
+    -- Cek paling cepat: kalau VeeRemote + StressBall sudah terpasang, langsung skip
+    if isTargetEquipped(primaryTargets) then
+        print("✅ Trinket utama (" .. formatTargetNames(primaryTargets) .. ") sudah terpasang. Skip equip.")
+        return
+    end
+
     local EquipTrinket = ReplicatedStorage:WaitForChild("EquipTrinket")
     local maxRetry     = Config.TrinketRetryBeforeFallback or 3
     local grid         = getTrinketGrid()
 
-    if grid then
+    -- Pastikan Grid trinket benar-benar sudah terinisialisasi (bukan lazy-init 0 locked)
+    if grid and isTrinketGridInitialized(grid) then
         local targets        = getBestOwnedTargets(grid)
         local primary1       = Config.TrinketSlots[1][1]
         local primary2       = Config.TrinketSlots[2][1]
@@ -669,7 +695,8 @@ local function SmartEquipTrinkets(justClaimedMonster)
         return
     end
 
-    warn("⚠️ Grid trinket tidak ditemukan, pakai fallback equip biasa...")
+    -- Fallback aman jika Grid trinket belum terinisialisasi (lazy-init) atau path berubah
+    print("🔧 Grid trinket belum terinisialisasi — menjalankan equip prioritas...")
     local attempts = 0
     repeat
         attempts += 1
@@ -683,7 +710,7 @@ local function SmartEquipTrinkets(justClaimedMonster)
             for _, trinket in ipairs(Config.TrinketSlots[slotIndex]) do
                 if not picked[trinket.name] then
                     pcall(function() EquipTrinket:InvokeServer(trinket.name, "Equip") end)
-                    task.wait(1)
+                    task.wait(0.8)
                     if getSlotImage(nextSlot) == trinket.image then
                         table.insert(equipped, trinket)
                         picked[trinket.name] = true
@@ -1238,11 +1265,16 @@ else
                     print("Membeli Toon: " .. FallbackConfig.ToonToBuy)
                     pcall(function() BuyTower:InvokeServer(FallbackConfig.ToonToBuy) end)
                     task.wait(1.5)
-                    currentIchor -= FallbackConfig.ToonCost
-                    ownsRodger = true
-                    local toonData = ReplicatedStorage:WaitForChild("SharedData"):WaitForChild("TowerData"):FindFirstChild(FallbackConfig.ToonToBuy)
-                    if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
-                    task.wait(1)
+                    ownsRodger = isToonOwned(FallbackConfig.ToonToBuy)
+                    if ownsRodger then
+                        print("✅ Berhasil membeli " .. FallbackConfig.ToonToBuy .. "!")
+                        currentIchor -= FallbackConfig.ToonCost
+                        local toonData = ReplicatedStorage:WaitForChild("SharedData"):WaitForChild("TowerData"):FindFirstChild(FallbackConfig.ToonToBuy)
+                        if toonData then pcall(function() ChangeCharEvent:FireServer(toonData) end) end
+                        task.wait(1)
+                    else
+                        warn("❌ Gagal membeli " .. FallbackConfig.ToonToBuy .. " (cek syarat unlock / Ichor).")
+                    end
                 else
                     print("Ichor belum cukup (" .. currentIchor .. "/1000). NABUNG DULU!")
                 end
