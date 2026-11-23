@@ -26,13 +26,13 @@ local Config = {
     UseInGamePlayers     = true, -- Hitung hanya player hidup di Workspace.InGamePlayers
 
     -- TRIGGER 1: Solo tidak ada mesin bertambah (detik)
-    SoloMachineTimeout   = 120,  -- 2 menit (ganti ke 60-90 kalau pakai autofarm cepat)
+    SoloMachineTimeout   = 300,  -- 5 menit (120,  -- 2 menit (ganti ke 60-90 kalau pakai autofarm cepat))
 
     -- TRIGGER 2: Global tidak ada mesin bertambah walau ada teman (detik)
     GlobalMachineTimeout = 300,  -- 5 menit
 
     -- TRIGGER 3: Pengaman jika nyangkut di fase Elevator / loading antar floor (detik)
-    TransitionTimeout    = 120,  -- 2 menit (normalnya panic + shop sekitar 45-60 detik)
+    TransitionTimeout    = 300,  -- 5 menit (120,  -- 2 menit (normalnya panic + shop sekitar 45-60 detik))
 }
 -- =======================================================
 
