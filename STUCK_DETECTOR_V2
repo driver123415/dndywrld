@@ -1,0 +1,393 @@
+-- ==============================================================================
+-- STUCK DETECTOR V4 — MACHINE PROGRESS BASED
+-- Trigger 1 (Solo)       : Sendirian & mesin tidak bertambah melebihi SoloMachineTimeout
+-- Trigger 2 (Global)     : Rame/Solo & mesin tidak bertambah melebihi GlobalMachineTimeout
+-- Trigger 3 (Transition) : Nyangkut di fase Elevator / intermission melebihi TransitionTimeout
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    warn("[SYSTEM] Script dibatalkan: Bukan INGAME.")
+    return
+end
+
+local Players           = game:GetService("Players")
+local Workspace         = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TeleportService   = game:GetService("TeleportService")
+
+local player = Players.LocalPlayer
+
+-- ===================== KONFIGURASI =====================
+local Config = {
+    CheckInterval        = 2,    -- Seberapa sering ngecek (detik)
+    MinPlayerToCheck     = 1,    -- Dianggap solo jika player hidup <= angka ini
+    UseInGamePlayers     = true, -- Hitung hanya player hidup di Workspace.InGamePlayers
+
+    -- TRIGGER 1: Solo tidak ada mesin bertambah (detik)
+    SoloMachineTimeout   = 120,  -- 2 menit (ganti ke 60-90 kalau pakai autofarm cepat)
+
+    -- TRIGGER 2: Global tidak ada mesin bertambah walau ada teman (detik)
+    GlobalMachineTimeout = 300,  -- 5 menit
+
+    -- TRIGGER 3: Pengaman jika nyangkut di fase Elevator / loading antar floor (detik)
+    TransitionTimeout    = 120,  -- 2 menit (normalnya panic + shop sekitar 45-60 detik)
+}
+-- =======================================================
+
+local isTeleporting    = false
+
+-- State pelacakan floor & mesin
+local lastFloor        = nil
+local lastMachineDone  = nil
+local lastMachineTotal = nil
+
+-- Timer terpisah
+local soloStallTimer   = 0
+local globalStallTimer = 0
+local transitionTimer  = 0
+
+-- Pelacak log biar console rapi
+local lastSoloLogMark   = nil
+local lastGlobalLogMin  = 0
+local lastTransLogStep  = 0
+
+-- ===================== HELPERS =====================
+
+local function getFloorStatusChild(childName)
+    local pGui = player:FindFirstChild("PlayerGui")
+    if not pGui then return nil end
+
+    local hud = pGui:FindFirstChild("HUD")
+    local topbar = hud and hud:FindFirstChild("Topbar")
+    local floorStatus = topbar and topbar:FindFirstChild("FloorStatus")
+    return floorStatus and floorStatus:FindFirstChild(childName) or nil
+end
+
+local function getCurrentFloor()
+    local floorLabel = getFloorStatusChild("FloorNumber")
+    if floorLabel and floorLabel:IsA("TextLabel") then
+        local match = string.match(floorLabel.Text, "(%d+)")
+        if match then
+            return tonumber(match)
+        end
+    end
+    return nil
+end
+
+local function getMachineStatus()
+    -- Return: done (number|nil), total (number|nil), isElevatorPhase (boolean)
+    local machineLabel = getFloorStatusChild("MachineCount")
+    if not machineLabel or not machineLabel:IsA("TextLabel") then
+        return nil, nil, false
+    end
+
+    local text = machineLabel.Text
+    local upper = string.upper(text)
+
+    if string.find(upper, "ELEVATOR") or string.find(upper, "QUICKLY") then
+        return nil, nil, true
+    end
+
+    local doneStr, totalStr = string.match(text, "(%d+)%s*/%s*(%d+)")
+    if doneStr and totalStr then
+        local done = tonumber(doneStr)
+        local total = tonumber(totalStr)
+        local allDone = (total ~= nil and total > 0 and done ~= nil and done >= total)
+        return done, total, allDone
+    end
+
+    return nil, nil, false
+end
+
+local function isFloorInProgress()
+    local mv = ReplicatedStorage:FindFirstChild("MatchValues")
+    local fip = mv and mv:FindFirstChild("FloorInProgress")
+    if fip and fip:IsA("BoolValue") then
+        return fip.Value
+    end
+    return true
+end
+
+local function getAlivePlayerCount()
+    if Config.UseInGamePlayers then
+        local inGame = Workspace:FindFirstChild("InGamePlayers")
+        if inGame then
+            return #inGame:GetChildren(), inGame:FindFirstChild(player.Name) ~= nil
+        end
+    end
+    return #Players:GetPlayers(), true
+end
+
+local function resetSoloTimer()
+    soloStallTimer  = 0
+    lastSoloLogMark = nil
+end
+
+local function resetMachineTimers()
+    soloStallTimer   = 0
+    globalStallTimer = 0
+    lastSoloLogMark  = nil
+    lastGlobalLogMin = 0
+end
+
+local function resetTransitionTimer()
+    transitionTimer  = 0
+    lastTransLogStep = 0
+end
+
+local function kickLocalPlayer(reason)
+    warn("[SYSTEM] Kick dipicu! Alasan: " .. reason)
+
+    pcall(function()
+        if syn and syn.kick then syn.kick() return end
+    end)
+    pcall(function()
+        player:Kick("[Auto-Kick] " .. reason)
+    end)
+    pcall(function()
+        TeleportService:Teleport(1, player)
+    end)
+    pcall(function()
+        if player.Character then
+            local hum = player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = 0 end
+        end
+    end)
+end
+
+local function teleportToLobby(reason)
+    if isTeleporting then return end
+    isTeleporting = true
+
+    warn("[SYSTEM] Teleport ke Lobby! Alasan: " .. reason)
+
+    pcall(function()
+        local events = ReplicatedStorage:FindFirstChild("Events")
+        local tpRemote = events and events:FindFirstChild("Teleport")
+        if tpRemote then
+            tpRemote:FireServer()
+        else
+            warn("[SYSTEM] Remote ReplicatedStorage.Events.Teleport tidak ditemukan!")
+        end
+    end)
+
+    task.wait(8)
+
+    if game.PlaceId == INGAME_PLACE_ID then
+        warn("[SYSTEM] Teleport gagal. Memicu Auto-Kick...")
+        kickLocalPlayer("Teleport gagal — " .. reason)
+    end
+
+    task.wait(5)
+    isTeleporting = false
+end
+
+-- ===================== MAIN LOOP =====================
+
+print(string.format(
+    "[SYSTEM] Machine Stuck Detector V4 Aktif | Solo: %ds | Global: %ds (%.1f mnt) | Elevator/Transisi: %ds",
+    Config.SoloMachineTimeout,
+    Config.GlobalMachineTimeout,
+    Config.GlobalMachineTimeout / 60,
+    Config.TransitionTimeout
+))
+
+task.spawn(function()
+    while true do
+        local dt = task.wait(Config.CheckInterval)
+
+        if isTeleporting then continue end
+        if not player.Character then continue end
+
+        local currentFloor = getCurrentFloor()
+        local floorActive  = isFloorInProgress()
+        local machineDone, machineTotal, isElevatorPhase = getMachineStatus()
+        local aliveCount, isLocalAlive = getAlivePlayerCount()
+
+        -- Deteksi pergantian floor -> reset semua timer
+        if currentFloor ~= nil and lastFloor ~= nil and currentFloor ~= lastFloor then
+            print(string.format("[SYSTEM] Pindah Floor %d -> %d. Semua timer reset.", lastFloor, currentFloor))
+            lastFloor        = currentFloor
+            lastMachineDone  = nil
+            lastMachineTotal = nil
+            resetMachineTimers()
+            resetTransitionTimer()
+        elseif currentFloor ~= nil and lastFloor == nil then
+            lastFloor = currentFloor
+        end
+
+        -- ============================================================
+        -- FASE 1: ELEVATOR / TRANSISI ANTAR FLOOR
+        -- (Semua mesin selesai, FloorInProgress = false, atau HUD mesin belum muncul)
+        -- ============================================================
+        if (not floorActive) or isElevatorPhase or (machineDone == nil) then
+            -- Jeda & reset timer mesin biar tidak false kick di elevator/shop
+            if soloStallTimer > 0 or globalStallTimer > 0 then
+                resetMachineTimers()
+            end
+
+            transitionTimer = transitionTimer + dt
+
+            local step30 = math.floor(transitionTimer / 30)
+            if step30 > 0 and step30 > lastTransLogStep then
+                lastTransLogStep = step30
+                warn(string.format(
+                    "[TRIGGER 3 - TRANSISI] Floor %s | Fase Elevator/Loading %.0fs / %ds",
+                    tostring(currentFloor or "?"),
+                    transitionTimer,
+                    Config.TransitionTimeout
+                ))
+            end
+
+            if transitionTimer >= Config.TransitionTimeout then
+                local reason = string.format(
+                    "[TRIGGER 3] Nyangkut di fase Elevator/Transisi (Floor %s) selama %.0fs",
+                    tostring(currentFloor or "?"),
+                    transitionTimer
+                )
+                resetTransitionTimer()
+                task.spawn(teleportToLobby, reason)
+                continue
+            end
+
+            continue
+        end
+
+        -- ============================================================
+        -- FASE 2: FLOOR AKTIF & PENGERJAAN MESIN
+        -- ============================================================
+        if transitionTimer > 0 then
+            resetTransitionTimer()
+        end
+
+        -- Cek perubahan angka mesin selesai
+        if lastMachineDone == nil then
+            lastMachineDone  = machineDone
+            lastMachineTotal = machineTotal
+            resetMachineTimers()
+            print(string.format(
+                "[SYSTEM] Mulai pantau Floor %s | Mesin: %d/%d",
+                tostring(currentFloor or "?"), machineDone, machineTotal or 0
+            ))
+            continue
+
+        elseif machineDone > lastMachineDone then
+            print(string.format(
+                "[PROGRES] Floor %s | Mesin bertambah %d -> %d/%d. Timer stuck reset!",
+                tostring(currentFloor or "?"), lastMachineDone, machineDone, machineTotal or 0
+            ))
+            lastMachineDone  = machineDone
+            lastMachineTotal = machineTotal
+            resetMachineTimers()
+            continue
+
+        elseif machineDone < lastMachineDone then
+            -- Antisipasi jika HUD mesin sudah reset ke floor baru lebih dulu daripada FloorNumber
+            print(string.format(
+                "[SYSTEM] Counter mesin reset (%d -> %d/%d). Menganggap floor baru, timer reset.",
+                lastMachineDone, machineDone, machineTotal or 0
+            ))
+            lastMachineDone  = machineDone
+            lastMachineTotal = machineTotal
+            resetMachineTimers()
+            continue
+        end
+
+        -- Jika sampai sini: angka mesin selesai STAGNAN (tidak bertambah)
+        local floorLabelText = tostring(currentFloor or "?")
+        local machineProgressText = string.format("%d/%d", machineDone, machineTotal or 0)
+
+        -- ------------------------------------------------------------
+        -- TRIGGER 1: SOLO MACHINE STALL
+        -- ------------------------------------------------------------
+        if isLocalAlive and aliveCount > 0 and aliveCount <= Config.MinPlayerToCheck then
+            soloStallTimer = soloStallTimer + dt
+
+            local remaining = math.max(0, Config.SoloMachineTimeout - soloStallTimer)
+            -- Log tiap 30 detik, lalu tiap 10 detik saat sisa <= 30 detik
+            local interval = (remaining <= 30) and 10 or 30
+            local logMark = math.floor(remaining / interval) * interval
+            if remaining > 0 and logMark > 0 and logMark ~= lastSoloLogMark then
+                lastSoloLogMark = logMark
+                warn(string.format(
+                    "[TRIGGER 1 - SOLO] Floor %s | Mesin macet di %s selama %.0fs (~%.0fs lagi...)",
+                    floorLabelText, machineProgressText, soloStallTimer, remaining
+                ))
+            end
+
+            if soloStallTimer >= Config.SoloMachineTimeout then
+                local reason = string.format(
+                    "[TRIGGER 1] Solo & mesin macet di %s (Floor %s) selama %.0fs",
+                    machineProgressText, floorLabelText, soloStallTimer
+                )
+                resetMachineTimers()
+                task.spawn(teleportToLobby, reason)
+                continue
+            end
+        else
+            if soloStallTimer > 0 then
+                resetSoloTimer()
+            end
+        end
+
+        -- ------------------------------------------------------------
+        -- TRIGGER 2: GLOBAL MACHINE STALL (Berlaku walau ada teman)
+        -- ------------------------------------------------------------
+        globalStallTimer = globalStallTimer + dt
+
+        local currentMin = math.floor(globalStallTimer / 60)
+        if currentMin > 0 and currentMin > lastGlobalLogMin then
+            lastGlobalLogMin = currentMin
+            warn(string.format(
+                "[TRIGGER 2 - GLOBAL] Floor %s | Mesin macet di %s selama %d mnt (sisa %.1f mnt | Alive: %d)",
+                floorLabelText,
+                machineProgressText,
+                currentMin,
+                math.max(0, (Config.GlobalMachineTimeout - globalStallTimer) / 60),
+                aliveCount
+            ))
+        end
+
+        if globalStallTimer >= Config.GlobalMachineTimeout then
+            local reason = string.format(
+                "[TRIGGER 2] Mesin macet di %s (Floor %s) selama %.1f menit (alive %d player)",
+                machineProgressText,
+                floorLabelText,
+                globalStallTimer / 60,
+                aliveCount
+            )
+            resetMachineTimers()
+            task.spawn(teleportToLobby, reason)
+            continue
+        end
+
+    end
+end)
+
+-- ===================== ANTISIPASI TEMAN MATI / KELUAR =====================
+
+local function onTeammateGone(triggerSource)
+    task.wait(1)
+    local aliveCount, isLocalAlive = getAlivePlayerCount()
+    if isLocalAlive and aliveCount > 0 and aliveCount <= Config.MinPlayerToCheck then
+        warn("[SYSTEM] " .. triggerSource .. " Sendirian sekarang. Solo machine timer mulai fresh.")
+        resetSoloTimer()
+    end
+end
+
+Players.PlayerRemoving:Connect(function(leavingPlayer)
+    if leavingPlayer == player then return end
+    task.spawn(onTeammateGone, "Player keluar (" .. leavingPlayer.Name .. ")!")
+end)
+
+task.spawn(function()
+    local inGame = Workspace:WaitForChild("InGamePlayers", 15)
+    if not inGame then return end
+
+    inGame.ChildRemoved:Connect(function(child)
+        if child.Name == player.Name then return end
+        task.spawn(onTeammateGone, "Teman mati/keluar (" .. child.Name .. ")!")
+    end)
+end)
