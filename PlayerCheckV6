@@ -1,0 +1,209 @@
+-- ==============================================================================
+-- SMART AUTO DETECT V2 (NEW HUD HEARTS + DYNAMIC SLOTS + ANTI FALSE ALARM)
+-- ==============================================================================
+
+local INGAME_PLACE_ID = 16552821455
+
+if game.PlaceId ~= INGAME_PLACE_ID then
+    warn("[SYSTEM] Script dibatalkan: Kamu sedang tidak berada di INGAME_PLACE_ID")
+    return
+end
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+-- ===================== KONFIGURASI =====================
+local Config = {
+    TargetToon         = {"Cosmo"}, -- Isi {"All"} untuk semua Toon
+    MaxHealth          = 3,         -- Fallback max HP jika HUD belum terbaca
+    AbsoluteMinPlayer  = 1,         -- MUTLAK KABUR: Jika jumlah player <= angka ini
+    MinPlayerInGame    = 4,         -- BATAS NORMAL: Kabur jika kurang dari ini (KECUALI darah penuh / punya item heal)
+    LowHealthThreshold = 1,         -- BATAS SEKARAT: Kabur jika darah <= angka ini & tidak punya heal
+    UpdateInterval     = 1          -- Kecepatan scan (detik)
+}
+
+local HealingItems = {"Bandage", "HealthKit"}
+-- =======================================================
+
+print("[SYSTEM] Smart Auto-Deteksi V2 Berjalan! (HUD Hearts + Dynamic Inventory)")
+
+local isTeleporting = false
+
+-- ===================== HELPER FUNCTIONS =====================
+
+local function safePath(root, ...)
+    local cur = root
+    for _, name in ipairs({...}) do
+        if not cur then return nil end
+        cur = cur:FindFirstChild(name)
+    end
+    return cur
+end
+
+local function inList(val, list)
+    local low = string.lower(val)
+    for _, v in ipairs(list) do
+        if string.find(low, string.lower(v), 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Auto-scan semua slot di Character.Inventory (Slot1, Slot2, Slot3, Slot4, dst)
+local function hasHealingItem()
+    local char = player.Character
+    local inv = char and char:FindFirstChild("Inventory")
+    if not inv then return false end
+
+    for _, slot in ipairs(inv:GetChildren()) do
+        if slot:IsA("ValueBase") and typeof(slot.Value) == "string" and string.match(slot.Name, "^Slot%d+$") then
+            if slot.Value ~= "" and slot.Value ~= "None" and inList(slot.Value, HealingItems) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function isToonValid(usedUnit)
+    for _, toonName in ipairs(Config.TargetToon) do
+        if string.lower(toonName) == "all" then return true end
+        if string.lower(usedUnit) == string.lower(toonName) then return true end
+    end
+    return false
+end
+
+local function getPlayerCount()
+    return #Players:GetPlayers()
+end
+
+local function getUsedUnit()
+    local unitName = "Unknown"
+    local conf = safePath(Workspace, "InGamePlayers", player.Name, "Config")
+    if conf then
+        local charName = conf:FindFirstChild("CharacterName") or conf:FindFirstChild("ModuleName")
+        if charName and charName:IsA("StringValue") and charName.Value ~= "" then
+            unitName = string.split(charName.Value, "_")[1]
+        end
+    end
+    return unitName
+end
+
+-- Membaca HP & MaxHP aktual dari HUD.LeftStatus.Hearts berdasarkan Empty.Visible
+-- Mengembalikan -1 jika HUD Hearts belum selesai dimuat (mencegah false alarm)
+local function getHealthData()
+    local currentHP = -1
+    local maxHP = Config.MaxHealth
+
+    pcall(function()
+        local pGui = player:FindFirstChild("PlayerGui")
+        local content = safePath(pGui, "HUD", "LeftStatus", "Hearts", "Margin", "Bar", "Content")
+
+        if content then
+            local activeHP = 0
+            local detectedMax = 0
+
+            for _, child in ipairs(content:GetChildren()) do
+                if child:IsA("Frame") and child.Visible and string.match(child.Name, "^Heart%d+$") then
+                    detectedMax = detectedMax + 1
+                    local emptyImg = child:FindFirstChild("Empty")
+                    if emptyImg and not emptyImg.Visible then
+                        activeHP = activeHP + 1
+                    end
+                end
+            end
+
+            if detectedMax > 0 then
+                currentHP = activeHP
+                maxHP = detectedMax
+            end
+        end
+    end)
+
+    return currentHP, maxHP
+end
+
+local function teleportToLobby(reason)
+    if isTeleporting then return end
+    isTeleporting = true
+
+    print("[SYSTEM WARNING] Memicu Auto Rejoin! Alasan: " .. reason)
+
+    local success, err = pcall(function()
+        local teleportRemote = safePath(ReplicatedStorage, "Events", "Teleport")
+        if teleportRemote then
+            teleportRemote:FireServer()
+        else
+            error("Remote ReplicatedStorage.Events.Teleport tidak ditemukan")
+        end
+    end)
+
+    if not success then
+        warn("[SYSTEM ERROR] Gagal mengeksekusi remote teleport:", err)
+    end
+
+    task.wait(10)
+    isTeleporting = false
+end
+
+-- ===================== MAIN LOOP =====================
+
+task.spawn(function()
+    while true do
+        if player.Character and not isTeleporting then
+            local usedUnit = getUsedUnit()
+
+            if isToonValid(usedUnit) then
+                local totalPlayers = getPlayerCount()
+                local hp, maxHealth = getHealthData()
+                local hasHeal = hasHealingItem()
+                local hudReady = (hp >= 0)
+
+                -- PRIORITAS 1: Kondisi Absolut (Misal: Sisa sendirian)
+                if totalPlayers <= Config.AbsoluteMinPlayer then
+                    teleportToLobby("Game Sepi / Terlalu Sedikit Player (" .. totalPlayers .. " player)")
+
+                -- PRIORITAS 2: Kondisi Kekurangan Player (hanya evaluasi HP jika HUD sudah siap)
+                elseif hudReady and totalPlayers < Config.MinPlayerInGame then
+                    if hp >= maxHealth or hasHeal then
+                        -- Tetap di game karena darah penuh / ada item heal
+                    else
+                        teleportToLobby("Kekurangan Player (" .. totalPlayers .. "/" .. Config.MinPlayerInGame .. ") & Tidak Bisa Survive (HP: " .. hp .. "/" .. maxHealth .. ")")
+                    end
+
+                -- PRIORITAS 3: Cek Darah Sekarat (Walaupun player banyak)
+                elseif hudReady and maxHealth > 0 and hp > 0 and hp <= Config.LowHealthThreshold then
+                    if not hasHeal then
+                        teleportToLobby("Low Health & Tidak Punya Item Heal (" .. hp .. "/" .. maxHealth .. ")")
+                    end
+                end
+            end
+        end
+
+        task.wait(Config.UpdateInterval)
+    end
+end)
+
+-- Antisipasi instan saat player keluar dari game
+Players.PlayerRemoving:Connect(function()
+    if isTeleporting then return end
+    task.wait(0.5)
+
+    if not isTeleporting and player.Character and isToonValid(getUsedUnit()) then
+        local totalPlayers = getPlayerCount()
+        local hp, maxHealth = getHealthData()
+        local hasHeal = hasHealingItem()
+        local hudReady = (hp >= 0)
+
+        if totalPlayers <= Config.AbsoluteMinPlayer then
+            teleportToLobby("Game Sepi (" .. totalPlayers .. " player) setelah seseorang keluar")
+        elseif hudReady and totalPlayers < Config.MinPlayerInGame then
+            if not (hp >= maxHealth or hasHeal) then
+                teleportToLobby("Kekurangan Player setelah ada yang keluar (" .. totalPlayers .. ") & Tidak Bisa Survive (HP: " .. hp .. "/" .. maxHealth .. ")")
+            end
+        end
+    end
+end)
