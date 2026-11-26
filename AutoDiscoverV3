@@ -113,7 +113,19 @@ local Config = {
         IncludeEventMonsters = true, -- true = ikutkan Monster Event | false = abaikan Monster Event
     },
 
--- Hanya dipakai sebagai penanda kategori "Event" (daftar monster diambil OTOMATIS dari PlayerData.Research)
+    -- Daftar dasar agar monster yang masih 0% (belum ada di folder Research) tetap muncul di list
+    -- Monster update baru di luar daftar ini tetap otomatis terdeteksi dari Research & lantai aktif
+    StandardMonsters = {
+        "AstroMonster", "BlottMonster", "BoxtenMonster", "BrightneyMonster",
+        "BrushaMonster", "ConnieMonster", "CosmoMonster", "FinnMonster",
+        "FlutterMonster", "GigiMonster", "GlistenMonster", "GoobMonster",
+        "LooeyMonster", "PebbleMonster", "PoppyMonster", "RazzleDazzleMonster",
+        "RodgerMonster", "ScrapsMonster", "ShellyMonster", "ShrimpoMonster",
+        "SproutMonster", "SquirmMonster", "TeaganMonster", "TishaMonster",
+        "ToodlesMonster", "VeeMonster", "WaxwellMonster", "YattaMonster"
+    },
+
+    -- Penanda kategori "Event" + daftar dasar Event yang masih 0%
     EventMonsters = {
         "BassieMonster", "BobetteMonster", "CoalMonster", "CocoaMonster",
         "EclipseMonster", "EggsonMonster", "FlyteMonster", "GingerMonster",
@@ -389,23 +401,25 @@ local function getElevatorCountdownSeconds()
 end
 
 local function isPanicTimeActive()
+    local curGen, totGen = getMachineProgress()
+
     local secLeft = getElevatorCountdownSeconds()
     if secLeft ~= nil then
         return true, secLeft
     end
 
+    if totGen > 0 and curGen >= totGen then
+        return true, nil
+    end
+
     local machineLbl = getFloorStatusChild("MachineCount")
-    if machineLbl and machineLbl:IsA("TextLabel") then
+    if machineLbl and machineLbl:IsA("TextLabel") and machineLbl.Visible then
         local upper = string.upper(machineLbl.Text)
-        if string.find(upper, "ELEVATOR") or string.find(upper, "QUICKLY") then
+        if (string.find(upper, "ELEVATOR") or string.find(upper, "QUICKLY")) and not (totGen > 0 and curGen < totGen) then
             return true, nil
         end
     end
 
-    local curGen, totGen = getMachineProgress()
-    if totGen > 0 and curGen >= totGen then
-        return true, nil
-    end
     return false, nil
 end
 
@@ -435,8 +449,10 @@ local function isTriggerConditionMet()
         end
         return false, string.format("Menunggu Panic Time (Mesin: %d/%d)", curGen, totGen)
     elseif mode == "machinecount" then
-        if curGen >= minReq or panicNow then
+        if curGen >= minReq then
             return true, string.format("Target Mesin Terpenuhi (%d/%d >= %d)", curGen, totGen, minReq)
+        elseif panicNow then
+            return true, "Panic Time Aktif" .. (secLeft and (" (" .. secLeft .. "s)") or "")
         end
         return false, string.format("Menunggu %d Mesin Selesai (Sekarang: %d/%d)", minReq, curGen, totGen)
     elseif mode == "either" then
@@ -1005,7 +1021,7 @@ local function getActiveMonstersInCurrentFloor()
     return activeMap
 end
 
--- Otomatis membaca seluruh daftar monster dari ReplicatedStorage.PlayerData[userId].Research
+-- Hybrid: Auto-sync dari PlayerData.Research + lantai aktif, digabung daftar dasar agar monster 0% tetap tampil
 local function getAllTwistedResearchReport()
     local ResearchFolder = getResearchFolder()
     local activeInMap    = getActiveMonstersInCurrentFloor()
@@ -1018,66 +1034,63 @@ local function getAllTwistedResearchReport()
     local under100   = 0
     local seenNames  = {}
 
+    local function addEntry(mName, pct)
+        if seenNames[mName] then return end
+        local isEvent  = (EventMonsterSet[mName] == true)
+        local isLethal = (LethalMonsterSet[mName] == true)
+        if isEvent and not Config.Discover.IncludeEventMonsters then
+            return
+        end
+
+        seenNames[mName] = true
+        local inFloor  = (activeInMap[mName] ~= nil)
+        local category = isLethal and "Lethal" or (isEvent and "Event" or "Standard")
+
+        if pct == 0 then zeroCount = zeroCount + 1 end
+        if pct < 100 then under100 = under100 + 1 end
+
+        local needsDiscover = (pct <= maxThresh)
+        if needsDiscover then
+            table.insert(targetNeed, mName)
+            targetSet[mName] = true
+        end
+
+        table.insert(report, {
+            name          = mName,
+            cleanName     = string.gsub(mName, "Monster$", ""),
+            category      = category,
+            isLethal      = isLethal,
+            percent       = pct,
+            inFloor       = inFloor,
+            needsDiscover = needsDiscover
+        })
+    end
+
+    -- 1. Baca semua yang sudah tercatat di folder Research (termasuk monster update baru)
     if ResearchFolder then
         for _, researchObj in ipairs(ResearchFolder:GetChildren()) do
             if researchObj:IsA("ValueBase") then
-                local mName    = researchObj.Name
-                local isEvent  = (EventMonsterSet[mName] == true)
-                local isLethal = (LethalMonsterSet[mName] == true)
-                local category = isLethal and "Lethal" or (isEvent and "Event" or "Standard")
-
-                if (not isEvent) or Config.Discover.IncludeEventMonsters then
-                    seenNames[mName] = true
-                    local pct     = parseResearchValue(researchObj)
-                    local inFloor = (activeInMap[mName] ~= nil)
-
-                    if pct == 0 then zeroCount = zeroCount + 1 end
-                    if pct < 100 then under100 = under100 + 1 end
-
-                    local needsDiscover = (pct <= maxThresh)
-                    if needsDiscover then
-                        table.insert(targetNeed, mName)
-                        targetSet[mName] = true
-                    end
-
-                    table.insert(report, {
-                        name          = mName,
-                        cleanName     = string.gsub(mName, "Monster$", ""),
-                        category      = category,
-                        isLethal      = isLethal,
-                        percent       = pct,
-                        inFloor       = inFloor,
-                        needsDiscover = needsDiscover
-                    })
-                end
+                addEntry(researchObj.Name, parseResearchValue(researchObj))
             end
         end
     end
 
-    -- Bonus antisipasi: jika ada monster baru yang spawn di lantai tapi belum ada entry-nya di Research (masih 0%)
-    for mName, _ in pairs(activeInMap) do
-        if not seenNames[mName] then
-            local isEvent  = (EventMonsterSet[mName] == true)
-            local isLethal = (LethalMonsterSet[mName] == true)
-            if (not isEvent) or Config.Discover.IncludeEventMonsters then
-                zeroCount = zeroCount + 1
-                under100  = under100 + 1
-                local needsDiscover = (0 <= maxThresh)
-                if needsDiscover then
-                    table.insert(targetNeed, mName)
-                    targetSet[mName] = true
-                end
-                table.insert(report, {
-                    name          = mName,
-                    cleanName     = string.gsub(mName, "Monster$", ""),
-                    category      = isLethal and "Lethal" or (isEvent and "Event" or "Standard"),
-                    isLethal      = isLethal,
-                    percent       = 0,
-                    inFloor       = true,
-                    needsDiscover = needsDiscover
-                })
-            end
+    -- 2. Lengkapi monster 0% dari daftar dasar Config (belum dibuatkan entry oleh server)
+    for _, mName in ipairs(Config.StandardMonsters or {}) do
+        addEntry(mName, 0)
+    end
+    for _, mName in ipairs(Config.LethalMonsters or {}) do
+        addEntry(mName, 0)
+    end
+    if Config.Discover.IncludeEventMonsters then
+        for _, mName in ipairs(Config.EventMonsters or {}) do
+            addEntry(mName, 0)
         end
+    end
+
+    -- 3. Antisipasi monster update baru yang belum ada di Research & Config tapi sedang spawn di lantai
+    for mName, _ in pairs(activeInMap) do
+        addEntry(mName, 0)
     end
 
     table.sort(report, function(a, b)
