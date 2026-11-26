@@ -109,10 +109,11 @@ local Config = {
         HeightOffset = 3,            -- Offset ketinggian saat menatap monster (studs)
         MaxWaitSeconds = 3.5,        -- Waktu maksimal (detik) menatap 1 monster sebelum ngungsi
         MaxAttemptsPerFloor = 2,     -- Maksimal percobaan per monster di 1 lantai jika gagal discover
-        TargetMaxPercent = 99,        -- 0 = hanya kejar yang 0% | Ubah ke 99 untuk semua yang < 100%
+        TargetMaxPercent = 99,       -- 0 = hanya kejar yang 0% | Ubah ke 99 untuk semua yang < 100%
         IncludeEventMonsters = true, -- true = ikutkan Monster Event | false = abaikan Monster Event
+        SkipPassiveMonsters = true,  -- true = lewati monster pasif/khusus yang tidak bisa ditatap biasa
+        EncounterMinDelta = 5,       -- Kenaikan minimal (+5%/+10%) agar dianggap Encounter manual, bukan kapsul (+1%/+2%)
     },
-
     -- Daftar dasar agar monster yang masih 0% (belum ada di folder Research) tetap muncul di list
     -- Monster update baru di luar daftar ini tetap otomatis terdeteksi dari Research & lantai aktif
     StandardMonsters = {
@@ -135,10 +136,15 @@ local Config = {
     -- Hanya dipakai sebagai penanda kategori "Lethal" (daftar monster diambil OTOMATIS dari PlayerData.Research)
     LethalMonsters = {
         "DyleMonster", "DandyMonster", "DiodaMonster", "DessaMonster"
+    },
+
+    -- Monster bermekanik pasif/khusus (tidak bisa di-discover hanya dengan ditatap dari 15 studs)
+    PassiveMonsters = {
+        "RodgerMonster", "RazzleDazzleMonster", "ConnieMonster"
     }
 }
 
--- Lookup table cepat untuk kategori Event & Lethal
+-- Lookup table cepat untuk kategori Event, Lethal & Passive
 local EventMonsterSet = {}
 for _, mName in ipairs(Config.EventMonsters) do
     EventMonsterSet[mName] = true
@@ -147,6 +153,11 @@ end
 local LethalMonsterSet = {}
 for _, mName in ipairs(Config.LethalMonsters) do
     LethalMonsterSet[mName] = true
+end
+
+local PassiveMonsterSet = {}
+for _, mName in ipairs(Config.PassiveMonsters) do
+    PassiveMonsterSet[mName] = true
 end
 
 -- ==============================================================================
@@ -178,10 +189,12 @@ local tempHideCollideStates = {}
 local activeHoldConns       = {}
 local runtimeConnections    = {}
 local currentSafePlatform   = nil
-local discoveredThisFloor   = {} -- [monsterName] = true (selesai)
+local discoveredThisFloor   = {} -- [monsterName] = true (selesai di lantai ini)
 local attemptsThisFloor     = {} -- [monsterName] = jumlah percobaan gagal di lantai ini
+local lastKnownResearch     = {} -- Pelacak kenaikan Research manual per monster
+local hasInitResearchSnap   = false
 
-local guiFilterMode = "ZERO"
+local guiFilterMode = ((Config.Discover.TargetMaxPercent or 0) > 0) and "INCOMPLETE" or "ZERO"
 
 local function cprint(message)
     if Config.ConsoleCommand and not isScriptDestroyed then
@@ -1102,6 +1115,90 @@ local function getAllTwistedResearchReport()
     return report, targetNeed, targetSet, zeroCount, under100, #report
 end
 
+-- Lacak encounter manual sebelum/selama trigger aktif (+5%/+10% = encounter; +1%/+2% = kapsul)
+local function syncManualEncounters()
+    local ResearchFolder = getResearchFolder()
+    if not ResearchFolder then return end
+
+    local minDelta = Config.Discover.EncounterMinDelta or 5
+
+    if not hasInitResearchSnap then
+        for _, obj in ipairs(ResearchFolder:GetChildren()) do
+            if obj:IsA("ValueBase") then
+                lastKnownResearch[obj.Name] = parseResearchValue(obj)
+            end
+        end
+        hasInitResearchSnap = true
+        return
+    end
+
+    for _, obj in ipairs(ResearchFolder:GetChildren()) do
+        if obj:IsA("ValueBase") then
+            local mName  = obj.Name
+            local curPct = parseResearchValue(obj)
+            local prev   = lastKnownResearch[mName] or 0
+            local delta  = curPct - prev
+
+            if curPct > prev then
+                lastKnownResearch[mName] = curPct
+                if (delta >= minDelta or curPct >= 100) and not discoveredThisFloor[mName] then
+                    discoveredThisFloor[mName] = true
+                    cprint(string.format(
+                        "[AUTO-TRACK] ✔ %s naik +%d%% (%d%% -> %d%%) secara manual! Skip TP di lantai ini.",
+                        mName, delta, prev, curPct
+                    ))
+                end
+            end
+        end
+    end
+end
+
+-- Pilih posisi menatap di sisi target yang paling jauh dari monster lain
+local function getSafestApproachOffset(targetModel, monsterPos, dist, heightOff)
+    local map = getMap()
+    local monstersFolder = map and map:FindFirstChild("Monsters")
+    local otherPositions = {}
+
+    if monstersFolder then
+        for _, m in ipairs(monstersFolder:GetChildren()) do
+            if m:IsA("Model") and m ~= targetModel then
+                local p = getMonsterPart(m)
+                if p then
+                    table.insert(otherPositions, p.Position)
+                end
+            end
+        end
+    end
+
+    if #otherPositions == 0 then
+        return Vector3.new(dist, heightOff, 0)
+    end
+
+    local bestOffset = Vector3.new(dist, heightOff, 0)
+    local bestClearance = -1
+
+    for i = 0, 7 do
+        local angle  = (i / 8) * (math.pi * 2)
+        local offset = Vector3.new(math.cos(angle) * dist, heightOff, math.sin(angle) * dist)
+        local testPt = monsterPos + offset
+
+        local nearestOther = math.huge
+        for _, otherPos in ipairs(otherPositions) do
+            local d = (otherPos - testPt).Magnitude
+            if d < nearestOther then
+                nearestOther = d
+            end
+        end
+
+        if nearestOther > bestClearance then
+            bestClearance = nearestOther
+            bestOffset    = offset
+        end
+    end
+
+    return bestOffset
+end
+
 local function isSpottedEyeActive()
     local pGui = player:FindFirstChild("PlayerGui")
     local hud  = pGui and pGui:FindFirstChild("HUD")
@@ -1113,32 +1210,6 @@ local function isSpottedEyeActive()
         return eye.ImageTransparency < 0.5
     end
     return false
-end
-
-local function isMonsterDiscoveredInRealTime(monsterName, initialPercent, allowSpottedEye)
-    -- 1. Validasi utama: Persentase Research naik langsung dari server
-    local currentPct = getMonsterResearchPercent(monsterName)
-    if currentPct > (initialPercent or 0) then
-        return true, "Research"
-    end
-
-    -- 2. Deteksi instan HUD baru: SpottedEye menyala (ImgTrans < 0.5)
-    if allowSpottedEye and isSpottedEyeActive() then
-        return true, "SpottedEye"
-    end
-
-    -- 3. Fallback UI lama jika suatu saat masih dipakai
-    local pGui        = player:FindFirstChild("PlayerGui")
-    local screenGui   = pGui and pGui:FindFirstChild("ScreenGui")
-    local monsterIcon = screenGui and screenGui:FindFirstChild("MonsterIcon")
-
-    if monsterIcon and monsterIcon.Visible and type(monsterIcon.ImageTransparency) == "number" then
-        if monsterIcon.ImageTransparency < 0.99 then
-            return true, "MonsterIcon"
-        end
-    end
-
-    return false, nil
 end
 
 local function executeHitAndRun(monsterModel, loopId)
@@ -1156,15 +1227,16 @@ local function executeHitAndRun(monsterModel, loopId)
         return false
     end
 
-    local monsterName = monsterModel.Name
-    local success = false
+    local monsterName          = monsterModel.Name
+    local initPct              = getMonsterResearchPercent(monsterName)
+    local confirmedByResearch  = false
+    local retreatedBySpotted   = false
 
     -- Bungkus pcall agar karakter TIDAK PERNAH nyangkut Anchored / Gravity = 0 jika ada error
     local ok, err = pcall(function()
         clearAllServerSyncedHolds()
         setTargetColliderPassable(nil, false)
 
-        local initPct       = getMonsterResearchPercent(monsterName)
         local spottedBefore = isSpottedEyeActive()
         local hum           = character and character:FindFirstChildOfClass("Humanoid")
         local initHealth    = hum and hum.Health or nil
@@ -1172,7 +1244,8 @@ local function executeHitAndRun(monsterModel, loopId)
         local dist         = Config.Discover.DistanceToMonster or 15
         local heightOff    = Config.Discover.HeightOffset or 3
         local monsterPos   = mPart.Position
-        local myTargetPos  = monsterPos + Vector3.new(dist, heightOff, dist)
+        local safeOffset   = getSafestApproachOffset(monsterModel, monsterPos, dist, heightOff)
+        local myTargetPos  = monsterPos + safeOffset
         local lookAtCFrame = CFrame.lookAt(myTargetPos, monsterPos)
 
         currentStatusText = "HIT & RUN -> " .. monsterName
@@ -1207,19 +1280,27 @@ local function executeHitAndRun(monsterModel, loopId)
             local curMPart = getMonsterPart(monsterModel)
             if curMPart and rootPart then
                 local mPos = curMPart.Position
-                local tPos = mPos + Vector3.new(dist, heightOff, dist)
+                local tPos = mPos + safeOffset
                 rootPart.CFrame = CFrame.lookAt(tPos, mPos)
             end
 
-            -- Jika sebelumnya ter-spot monster lain lalu sempat padam, aktifkan kembali deteksi SpottedEye
+            -- 1. Bukti paling valid: angka Research target naik langsung dari server
+            local curPct = getMonsterResearchPercent(monsterName)
+            if curPct > initPct then
+                cprint(string.format("[AUTO-DISCOVER] ✔ Terkonfirmasi Discover %s (%d%% -> %d%%) via Research!", monsterName, initPct, curPct))
+                confirmedByResearch = true
+                break
+            end
+
+            -- Jika sebelumnya ter-spot monster lain lalu sempat padam, aktifkan kembali sensor SpottedEye
             if spottedBefore and not isSpottedEyeActive() then
                 spottedBefore = false
             end
 
-            local discovered, via = isMonsterDiscoveredInRealTime(monsterName, initPct, not spottedBefore)
-            if discovered then
-                cprint("[AUTO-DISCOVER] ✔ Berhasil Discover: " .. monsterName .. " (via " .. tostring(via) .. ")!")
-                success = true
+            -- 2. Sensor instan SpottedEye: langsung kabur demi aman, lalu verifikasi Research setelah di SafePlace
+            if (not spottedBefore) and isSpottedEyeActive() then
+                cprint("[AUTO-DISCOVER] 👁️ SpottedEye menyala! Mundur aman dulu, lalu verifikasi Research...")
+                retreatedBySpotted = true
                 break
             end
 
@@ -1235,25 +1316,13 @@ local function executeHitAndRun(monsterModel, loopId)
         warn("[AUTO-DISCOVER] Error saat Hit & Run (" .. tostring(monsterName) .. "): " .. tostring(err))
     end
 
-    if success then
-        discoveredThisFloor[monsterName] = true
-    else
-        attemptsThisFloor[monsterName] = (attemptsThisFloor[monsterName] or 0) + 1
-        local maxAtt = Config.Discover.MaxAttemptsPerFloor or 2
-        if attemptsThisFloor[monsterName] >= maxAtt then
-            discoveredThisFloor[monsterName] = true
-            cprint(string.format("[AUTO-DISCOVER] ⚠ Gagal discover %s setelah %dx coba di lantai ini. Dilewati.", monsterName, maxAtt))
-        else
-            cprint(string.format("[AUTO-DISCOVER] ↻ Belum ter-discover (%s), percobaan %d/%d. Ngungsi dulu...", monsterName, attemptsThisFloor[monsterName], maxAtt))
-        end
-    end
-
     if isScriptDestroyed or not isAutoDiscovering or activeLoopId ~= loopId then
         clearAllServerSyncedHolds()
         setTargetColliderPassable(nil, false)
-        return success
+        return confirmedByResearch
     end
 
+    -- Mundur ke SafePlace dulu (juga memberi waktu server sinkronisasi data Research)
     local panicNow = isPanicTimeActive()
     if panicNow and Config.ElevatorSafety.AlwaysLockInElevatorOnPanic then
         cprint("[AUTO-DISCOVER] 💨 Selesai Hit & Run saat Panic Time! 1x Teleport kembali ke Real Elevator...")
@@ -1263,8 +1332,39 @@ local function executeHitAndRun(monsterModel, loopId)
         moveToSafePlace()
     end
 
+    -- Verifikasi Pasca-Mundur: cek apakah Research target benar-benar naik (anti false positive SpottedEye)
+    local afterPct = getMonsterResearchPercent(monsterName)
+    if (not confirmedByResearch) and retreatedBySpotted and afterPct <= initPct then
+        task.wait(0.45)
+        afterPct = getMonsterResearchPercent(monsterName)
+    end
+
+    if afterPct > initPct then
+        if not confirmedByResearch then
+            cprint(string.format("[AUTO-DISCOVER] ✔ Verifikasi sukses! Research %s naik (%d%% -> %d%%).", monsterName, initPct, afterPct))
+        end
+        confirmedByResearch = true
+    elseif retreatedBySpotted then
+        cprint(string.format("[AUTO-DISCOVER] ⚠ SpottedEye palsu (kemungkinan dari monster lain)! Research %s tetap %d%%.", monsterName, afterPct))
+    end
+
+    lastKnownResearch[monsterName] = math.max(lastKnownResearch[monsterName] or 0, afterPct)
+
+    if confirmedByResearch then
+        discoveredThisFloor[monsterName] = true
+    else
+        attemptsThisFloor[monsterName] = (attemptsThisFloor[monsterName] or 0) + 1
+        local maxAtt = Config.Discover.MaxAttemptsPerFloor or 2
+        if attemptsThisFloor[monsterName] >= maxAtt then
+            discoveredThisFloor[monsterName] = true
+            cprint(string.format("[AUTO-DISCOVER] ⚠ Gagal discover %s setelah %dx coba di lantai ini. Dilewati.", monsterName, maxAtt))
+        else
+            cprint(string.format("[AUTO-DISCOVER] ↻ Belum ter-discover (%s), percobaan %d/%d. Menunggu momen aman...", monsterName, attemptsThisFloor[monsterName], maxAtt))
+        end
+    end
+
     task.wait(0.4)
-    return success
+    return confirmedByResearch
 end
 
 -- ==============================================================================
@@ -1462,7 +1562,7 @@ filterBtn.BackgroundColor3 = Color3.fromRGB(40, 75, 110)
 filterBtn.Font             = Enum.Font.GothamBold
 filterBtn.TextSize         = 10
 filterBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
-filterBtn.Text             = "LIST: HANYA 0%"
+filterBtn.Text             = (guiFilterMode == "INCOMPLETE") and "LIST: < 100%" or "LIST: HANYA 0%"
 filterBtn.Parent           = bodyFrame
 Instance.new("UICorner", filterBtn).CornerRadius = UDim.new(0, 6)
 
@@ -1662,6 +1762,7 @@ local function startAutoDiscover()
             end
 
             local map = getMap()
+            syncManualEncounters()
             local _, undiscoveredList, targetSet = getAllTwistedResearchReport()
 
             if #undiscoveredList == 0 then
@@ -1701,7 +1802,8 @@ local function startAutoDiscover()
                 if monstersFolder then
                     for _, monsterModel in ipairs(monstersFolder:GetChildren()) do
                         if monsterModel:IsA("Model") and getMonsterPart(monsterModel) then
-                            if targetSet[monsterModel.Name] and not discoveredThisFloor[monsterModel.Name] then
+                            local isPassiveSkip = Config.Discover.SkipPassiveMonsters and PassiveMonsterSet[monsterModel.Name]
+                            if (not isPassiveSkip) and targetSet[monsterModel.Name] and not discoveredThisFloor[monsterModel.Name] then
                                 foundTargetToHit = monsterModel
                                 break
                             end
