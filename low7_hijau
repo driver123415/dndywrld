@@ -1,5 +1,5 @@
 -- ==============================================================================
--- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14.3 - KEEP STATS OPEN)
+-- DANDY'S WORLD SUPER OPTIMIZER & BLACK SCREEN AFK (V14.4 - LABS & AMBROSIA)
 -- ==============================================================================
 
 local Config = {
@@ -32,13 +32,15 @@ local isOptimized = false
 local hasOptimizedOnce = false 
 local stats = {
     Toon = "Scanning...",
+    GameMode = "Scanning...",
     Floor = "1",
     Taken = 0,
     Consumed = 0,
     Machines = 0,
     Mastery = "Menunggu Update...", 
     Ichor = "0",
-    Holiday = "0"
+    Holiday = "0",
+    Ambrosia = "00000"
 }
 
 local lobbyStats = {
@@ -664,17 +666,46 @@ local function updateStatsVariables()
             end
         end
 
-        -- ✅ FLOOR PATH BARU: PlayerGui.HUD.Topbar.FloorStatus.FloorNumber
+        -- ✅ PATH BARU HUD: Jenis Game, Floor Number, & Ambrosia (Labs)
         local hud = pGui:FindFirstChild("HUD")
         if hud then
             local topbar = hud:FindFirstChild("Topbar")
             local floorStatus = topbar and topbar:FindFirstChild("FloorStatus")
-            local floorNumber = floorStatus and floorStatus:FindFirstChild("FloorNumber")
-            if floorNumber and floorNumber:IsA("TextLabel") then
-                local digits = string.match(floorNumber.Text or "", "%d+")
-                if digits then
-                    stats.Floor = tostring(tonumber(digits) or digits)
+            if floorStatus then
+                -- Jenis Game: PlayerGui.HUD.Topbar.FloorStatus.FloorLabel ('FLOOR' / 'LABS')
+                local floorLabel = floorStatus:FindFirstChild("FloorLabel")
+                if floorLabel and floorLabel:IsA("TextLabel") then
+                    local rawMode = string.gsub(floorLabel.Text or "", "^%s*(.-)%s*$", "%1")
+                    local upperMode = string.upper(rawMode)
+                    if string.find(upperMode, "LAB") then
+                        stats.GameMode = "Labs"
+                    elseif string.find(upperMode, "FLOOR") then
+                        stats.GameMode = "Normal Floor"
+                    elseif rawMode ~= "" then
+                        stats.GameMode = rawMode
+                    end
                 end
+
+                -- Current Floor: PlayerGui.HUD.Topbar.FloorStatus.FloorNumber
+                local floorNumber = floorStatus:FindFirstChild("FloorNumber")
+                if floorNumber and floorNumber:IsA("TextLabel") then
+                    local digits = string.match(floorNumber.Text or "", "%d+")
+                    if digits then
+                        stats.Floor = tostring(tonumber(digits) or digits)
+                    end
+                end
+            end
+
+            -- Ambrosia: PlayerGui.HUD.LeftStatus.Currencies.Ambrosia.Margin.Label (khusus Labs)
+            local leftStatus = hud:FindFirstChild("LeftStatus")
+            local currencies = leftStatus and leftStatus:FindFirstChild("Currencies")
+            local ambrosiaFrame = currencies and currencies:FindFirstChild("Ambrosia")
+            local ambrosiaMargin = ambrosiaFrame and ambrosiaFrame:FindFirstChild("Margin")
+            local ambrosiaLabel = ambrosiaMargin and ambrosiaMargin:FindFirstChild("Label")
+            if ambrosiaFrame and ambrosiaFrame.Visible and ambrosiaLabel and ambrosiaLabel:IsA("TextLabel") and ambrosiaLabel.Text ~= "" then
+                stats.Ambrosia = ambrosiaLabel.Text
+            else
+                stats.Ambrosia = "00000"
             end
         end
 
@@ -796,16 +827,18 @@ task.spawn(function()
                 statsLabel.Text = string.format(
                     "<font color='" .. labelColor .. "'>=== DANDY'S WORLD AFK OPTIMIZER ===\n\n" ..
                     "👤 Used Toon        : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>🎮 Jenis Game       : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
                     "<font color='" .. labelColor .. "'>🏢 Current Floor    : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
                     "<font color='" .. labelColor .. "'>🎒 Items Taken      : </font><b><font color='" .. fontColor .. "'>%d</font></b>\n" ..
                     "<font color='" .. labelColor .. "'>🍔 Items Consumed   : </font><b><font color='" .. fontColor .. "'>%d</font></b>\n" ..
                     "<font color='" .. labelColor .. "'>⚙️ Handled by You   : </font><b><font color='" .. fontColor .. "'>%d</font></b>\n" ..
                     "<font color='" .. labelColor .. "'>💰 Ichor            : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
                     "<font color='" .. labelColor .. "'>🎟️ Holiday Event    : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
+                    "<font color='" .. labelColor .. "'>🔅 Ambrosia         : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n" ..
                     "<font color='" .. labelColor .. "'>⭐ Mastery Status   : </font><b><font color='" .. fontColor .. "'>%s</font></b>\n\n" ..
                     "<font color='" .. labelColor .. "'>===================================\n" ..
                     "Tinggalkan perangkat dengan tenang.</font>",
-                    stats.Toon, stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Ichor, stats.Holiday, stats.Mastery
+                    stats.Toon, stats.GameMode, stats.Floor, stats.Taken, stats.Consumed, stats.Machines, stats.Ichor, stats.Holiday, stats.Ambrosia, stats.Mastery
                 )
                 
             elseif locationStatus == "LOBBY" then
